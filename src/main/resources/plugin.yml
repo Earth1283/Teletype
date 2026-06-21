@@ -6,3 +6,14 @@ api-version: '1.21'
 load: STARTUP
 
 authors: [ Earth1283 ]
+
+commands:
+  tty:
+    description: Teletype web server control
+    usage: /tty <verify|status|start|stop>
+    permission: teletype.admin
+
+permissions:
+  teletype.admin:
+    description: Full Teletype admin access
+    default: op

@@ -1,0 +1,44 @@
+package io.github.Earth1283.teletype.auth
+
+import io.github.Earth1283.teletype.Teletype
+import kotlinx.coroutines.CompletableDeferred
+import org.bukkit.scheduler.BukkitRunnable
+import java.time.Instant
+import java.util.UUID
+import java.util.concurrent.ConcurrentHashMap
+
+class ChallengeStore(plugin: Teletype) {
+    private val store = ConcurrentHashMap<UUID, PendingChallenge>()
+
+    init {
+        object : BukkitRunnable() {
+            override fun run() {
+                val cutoff = Instant.now().minusSeconds(300)
+                store.entries.removeIf { (_, challenge) ->
+                    if (challenge.createdAt.isBefore(cutoff)) {
+                        challenge.deferred.cancel()
+                        true
+                    } else false
+                }
+            }
+        }.runTaskTimerAsynchronously(plugin, 600L, 600L)
+    }
+
+    fun createChallenge(): PendingChallenge {
+        val challenge = PendingChallenge(
+            uuid = UUID.randomUUID(),
+            createdAt = Instant.now(),
+            deferred = CompletableDeferred()
+        )
+        store[challenge.uuid] = challenge
+        return challenge
+    }
+
+    fun getPending(uuid: UUID): PendingChallenge? = store[uuid]
+
+    fun verify(uuid: UUID, jwt: String): Boolean {
+        val challenge = store.remove(uuid) ?: return false
+        challenge.deferred.complete(jwt)
+        return true
+    }
+}

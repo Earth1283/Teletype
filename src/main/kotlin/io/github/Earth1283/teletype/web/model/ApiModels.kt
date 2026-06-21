@@ -1,0 +1,66 @@
+package io.github.Earth1283.teletype.web.model
+
+import kotlinx.serialization.Serializable
+
+@Serializable
+data class ServerStatus(
+    val name: String,
+    val version: String,
+    val onlinePlayers: Int,
+    val maxPlayers: Int,
+    val tps: List<Double>
+)
+
+@Serializable
+data class PlayerInfo(
+    val name: String,
+    val uuid: String,
+    val world: String,
+    val health: Double
+)
+
+@Serializable
+data class ExecuteRequest(val command: String)
+
+@Serializable
+data class ChallengeResponse(val uuid: String, val message: String)
+
+@Serializable
+data class TokenResponse(val token: String)
+
+@Serializable
+data class PollResponse(val status: String, val token: String? = null)
+
+@Serializable
+data class FileEntry(
+    val name: String,
+    val path: String,
+    val isDirectory: Boolean,
+    val size: Long,
+    val lastModified: Long
+)
+
+@Serializable
+data class RenameRequest(val from: String, val to: String)
+
+@Serializable
+data class FetchRequest(val url: String, val destPath: String, val fileName: String? = null)
+
+@Serializable
+data class MetricSnapshot(
+    val timestamp: Long,
+    val tps1: Double,
+    val tps5: Double,
+    val tps15: Double,
+    val tickTimeMs: Double,
+    val memUsedMb: Long,
+    val memTotalMb: Long,
+    val memMaxMb: Long,
+    val uptimeMs: Long
+)
+
+@Serializable
+data class ErrorResponse(val error: String)
+
+@Serializable
+data class StatusResponse(val status: String)

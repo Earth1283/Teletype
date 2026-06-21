@@ -1,0 +1,13 @@
+# Teletype Configuration
+
+# Port for the embedded web server
+web-port: 8080
+
+# JWT token expiry in hours
+jwt-expiry-hours: 24
+
+# Root directory exposed by the file manager (defaults to server working directory)
+# files-root: /path/to/server
+
+# JWT secret is auto-generated on first run — do not share this value
+# jwt-secret: (auto-generated)
