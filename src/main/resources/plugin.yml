@@ -1,0 +1,8 @@
+name: Teletype
+version: '${version}'
+
+main: io.github.Earth1283.teletype.Teletype
+api-version: '1.21'
+load: STARTUP
+
+authors: [ Earth1283 ]
