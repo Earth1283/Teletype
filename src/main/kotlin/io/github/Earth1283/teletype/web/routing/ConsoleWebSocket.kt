@@ -5,14 +5,16 @@ import io.github.Earth1283.teletype.web.model.WsMessage
 import io.ktor.http.HttpStatusCode
 import io.ktor.server.response.respond
 import io.ktor.server.websocket.DefaultWebSocketServerSession
-import io.ktor.server.websocket.sendSerialized
 import io.ktor.websocket.CloseReason
 import io.ktor.websocket.Frame
 import io.ktor.websocket.close
 import io.ktor.websocket.readText
 import kotlinx.coroutines.launch
+import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
 import org.bukkit.Bukkit
+
+private val json = Json { encodeDefaults = true }
 
 suspend fun DefaultWebSocketServerSession.consoleWebSocket(plugin: Teletype) {
     // Browsers cannot send custom WS headers — accept token via query parameter
@@ -24,7 +26,7 @@ suspend fun DefaultWebSocketServerSession.consoleWebSocket(plugin: Teletype) {
 
     val collectJob = launch {
         plugin.consoleBroadcaster.flow.collect { line ->
-            sendSerialized(WsMessage(type = "log", payload = line))
+            send(Frame.Text(json.encodeToString(WsMessage(type = "log", payload = line))))
         }
     }
 

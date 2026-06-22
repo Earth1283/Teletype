@@ -1,0 +1,120 @@
+/* ── Shell layout ───────────────────────────────────────────── */
+.shell {
+  display: flex;
+  height: 100vh;
+  overflow: hidden;
+}
+
+/* ── Sidebar ────────────────────────────────────────────────── */
+.sidebar {
+  width: 220px;
+  flex-shrink: 0;
+  background: var(--surface);
+  border-right: 1px solid var(--border);
+  display: flex;
+  flex-direction: column;
+  padding: 0;
+  z-index: 10;
+}
+
+.sidebar-logo {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 18px 16px 16px;
+  border-bottom: 1px solid var(--border);
+}
+.sidebar-logo-text {
+  font-family: var(--mono);
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--amber);
+  letter-spacing: -0.01em;
+}
+
+.sidebar-nav {
+  flex: 1;
+  padding: 8px 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.nav-btn {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  padding: 8px 10px;
+  background: transparent;
+  border: none;
+  border-radius: var(--r-md);
+  color: var(--mist);
+  font-family: var(--sans);
+  font-size: 13.5px;
+  font-weight: 400;
+  cursor: pointer;
+  transition: background 120ms, color 120ms;
+  text-align: left;
+}
+.nav-btn:hover {
+  background: var(--elevated);
+  color: var(--ash);
+}
+.nav-btn.active {
+  background: var(--amber-dim);
+  color: var(--amber);
+}
+.nav-btn svg { flex-shrink: 0; opacity: 0.7; }
+.nav-btn.active svg { opacity: 1; }
+
+.sidebar-footer {
+  padding: 12px 16px;
+  border-top: 1px solid var(--border);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.status-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--green);
+  flex-shrink: 0;
+}
+.status-dot.live {
+  box-shadow: 0 0 0 2px var(--void), 0 0 0 3px rgba(74,222,128,.4);
+  animation: pulse-dot 2.4s ease infinite;
+}
+.status-label {
+  font-family: var(--mono);
+  font-size: 11px;
+  color: var(--mist);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.sidebar-logout {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 6px;
+  background: transparent;
+  border: none;
+  border-radius: var(--r-sm);
+  color: var(--mist);
+  cursor: pointer;
+  margin-left: auto;
+  transition: color 120ms;
+  flex-shrink: 0;
+}
+.sidebar-logout:hover { color: var(--red); }
+
+/* ── Main content ───────────────────────────────────────────── */
+.main {
+  flex: 1;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}

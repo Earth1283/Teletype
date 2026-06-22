@@ -1,8 +1,8 @@
 <configuration>
     <!-- Suppress logback's own startup status output -->
-    <statusListener class="ch.qos.logback.core.status.NopStatusListener"/>
+    <statusListener class="teletype.shaded.logback.core.status.NopStatusListener"/>
 
-    <appender name="NOP" class="ch.qos.logback.core.helpers.NOPAppender"/>
+    <appender name="NOP" class="teletype.shaded.logback.core.helpers.NOPAppender"/>
 
     <!-- Ktor uses the string-based "ktor" logger hierarchy; silence it -->
     <logger name="ktor" level="OFF" additivity="false">

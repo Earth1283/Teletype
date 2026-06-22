@@ -3,6 +3,7 @@ import { useQuery, useQueryClient } from '@tanstack/react-query'
 import Editor, { useMonaco } from '@monaco-editor/react'
 import { api, TOKEN_KEY } from '../api/client'
 import { useSettings } from '../SettingsContext'
+import { getTheme } from '../themes'
 import {
   IconFolder, IconFile, IconUpload, IconDownload,
   IconFolderPlus, IconPencil, IconTrash, IconSave, IconX, IconGlobe, IconChevronRight
@@ -294,7 +295,7 @@ export default function FileManager() {
               language={langFor(editing.path.split('/').pop() ?? '')}
               value={editorContent}
               onChange={(v) => setEditorContent(v ?? '')}
-              theme="vs-dark"
+              theme={getTheme(settings.theme).base === 'light' ? 'vs' : 'vs-dark'}
               options={editorOptions}
             />
           </div>

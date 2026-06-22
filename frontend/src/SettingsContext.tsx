@@ -1,6 +1,8 @@
 import { createContext, useCallback, useContext, useState } from 'react'
+import { DEFAULT_THEME_ID } from './themes'
 
 export interface TeletypeSettings {
+  theme: string
   greyBeardMode: boolean
 
   glance: {
@@ -42,6 +44,7 @@ export interface TeletypeSettings {
 }
 
 export const DEFAULT_SETTINGS: TeletypeSettings = {
+  theme: DEFAULT_THEME_ID,
   greyBeardMode: false,
   glance: {
     anomalyThresholdTps: 2.0,

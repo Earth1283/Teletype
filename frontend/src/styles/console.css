@@ -1,0 +1,109 @@
+/* ── Console ────────────────────────────────────────────────── */
+.console-root {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  background: var(--void);
+}
+.console-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 16px;
+  background: var(--surface);
+  border-bottom: 1px solid var(--border);
+  flex-shrink: 0;
+}
+.console-header-title {
+  font-family: var(--mono);
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--mist);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  flex: 1;
+}
+.conn-badge {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  font-family: var(--mono);
+  font-size: 11px;
+  color: var(--mist);
+}
+.conn-badge .dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+}
+.conn-badge .dot.on { background: var(--green); animation: pulse-dot 2.4s ease infinite; }
+.conn-badge .dot.off { background: var(--red); }
+
+.console-log {
+  flex: 1;
+}
+.log-line {
+  font-family: var(--mono);
+  font-size: 12.5px;
+  line-height: 1.7;
+  padding: 0 16px;
+  white-space: pre-wrap;
+  word-break: break-all;
+  color: var(--mist);
+}
+.log-line.info  { color: var(--mist); }
+.log-line.warn  { color: var(--yellow); }
+.log-line.error { color: var(--red); }
+.log-line.debug { color: var(--ghost); }
+
+.console-cursor {
+  display: inline-block;
+  width: 8px;
+  height: 14px;
+  background: var(--amber);
+  margin-left: 2px;
+  vertical-align: middle;
+  animation: blink 1.1s step-start infinite;
+}
+
+.console-input-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 16px;
+  border-top: 1px solid var(--border);
+  background: var(--surface);
+  flex-shrink: 0;
+}
+.console-prompt {
+  font-family: var(--mono);
+  font-size: 13px;
+  color: var(--amber);
+  flex-shrink: 0;
+  user-select: none;
+}
+.console-input {
+  flex: 1;
+  background: transparent;
+  border: none;
+  outline: none;
+  font-family: var(--mono);
+  font-size: 13px;
+  color: var(--ash);
+  caret-color: var(--amber);
+}
+.console-input::placeholder { color: var(--ghost); }
+.console-send-btn {
+  background: var(--amber-dim);
+  border: 1px solid var(--amber-glow);
+  border-radius: var(--r-sm);
+  color: var(--amber);
+  font-family: var(--sans);
+  font-size: 12px;
+  font-weight: 500;
+  padding: 5px 12px;
+  cursor: pointer;
+  transition: background 120ms;
+  flex-shrink: 0;
+}
+.console-send-btn:hover { background: var(--amber-glow); }

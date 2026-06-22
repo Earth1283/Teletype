@@ -48,10 +48,9 @@ export function LogProvider({ children }: { children: React.ReactNode }) {
     const socket = new ConsoleSocket()
     socketRef.current = socket
 
-    const unsub = socket.onLog((raw) => {
+    const unsubLog = socket.onLog((raw) => {
       const line = stripMinecraft(raw)
       const ts = parseLogTs(raw) ?? Date.now()
-
       setLines(prev => {
         const next = [...prev, line]
         return next.length > 5000 ? next.slice(-5000) : next
@@ -61,20 +60,16 @@ export function LogProvider({ children }: { children: React.ReactNode }) {
         return next.length > 2000 ? next.slice(-2000) : next
       })
     })
+    const unsubConn = socket.onConnected(() => setConnected(true))
+    const unsubDisc = socket.onDisconnected(() => setConnected(false))
 
     socket.connect()
 
-    const tid = setInterval(() => {
-      if ((socket as any).ws?.readyState === 1) {
-        setConnected(true)
-        clearInterval(tid)
-      }
-    }, 300)
-
     return () => {
-      unsub()
+      unsubLog()
+      unsubConn()
+      unsubDisc()
       socket.disconnect()
-      clearInterval(tid)
     }
   }, [])
 

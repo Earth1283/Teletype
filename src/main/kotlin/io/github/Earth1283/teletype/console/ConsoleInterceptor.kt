@@ -6,8 +6,13 @@ import org.apache.logging.log4j.core.Logger
 import org.apache.logging.log4j.core.appender.AbstractAppender
 import org.apache.logging.log4j.core.config.Property
 import org.apache.logging.log4j.core.layout.PatternLayout
+import java.time.Instant
+import java.time.LocalTime
+import java.time.ZoneId
+import java.time.format.DateTimeFormatter
 
 private const val APPENDER_NAME = "TeletypeConsoleAppender"
+private val TIME_FMT = DateTimeFormatter.ofPattern("HH:mm:ss")
 
 class ConsoleInterceptor(
     private val broadcaster: ConsoleBroadcaster
@@ -19,10 +24,13 @@ class ConsoleInterceptor(
     Property.EMPTY_ARRAY
 ) {
     override fun append(event: LogEvent) {
-        val msg = event.message.formattedMessage
+        val time = LocalTime.ofInstant(
+            Instant.ofEpochMilli(event.timeMillis), ZoneId.systemDefault()
+        ).format(TIME_FMT)
         val level = event.level.name()
-        val logger = event.loggerName?.substringAfterLast('.') ?: "?"
-        broadcaster.emit("[$level] [$logger] $msg")
+        val thread = event.threadName ?: "Server thread"
+        val msg = event.message.formattedMessage
+        broadcaster.emit("[$time] [$thread/$level]: $msg")
     }
 
     companion object {

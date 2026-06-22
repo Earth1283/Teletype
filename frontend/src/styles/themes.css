@@ -1,0 +1,38 @@
+/* ── Color Themes ─────────────────────────────────────────────────────────── */
+
+/* Dark accent variants — only --amber changes; all derived vars update automatically */
+html[data-theme="void-blue"]   { --amber: #60a5fa; }
+html[data-theme="void-green"]  { --amber: #4ade80; }
+html[data-theme="void-rose"]   { --amber: #fb7185; }
+html[data-theme="void-purple"] { --amber: #a78bfa; }
+
+/* Slate — GitHub-dark-like cool backgrounds, amber accent */
+html[data-theme="slate-amber"] {
+  --void:      #0d1117;
+  --surface:   #161b22;
+  --elevated:  #21262d;
+  --border:    #30363d;
+  --border-hi: #484f58;
+  --ash:       #e6edf3;
+  --mist:      #8b949e;
+  --ghost:     #6e7681;
+}
+
+/* Light themes */
+html[data-theme="light-amber"],
+html[data-theme="light-blue"] {
+  --void:      #fafafa;
+  --surface:   #ffffff;
+  --elevated:  #f4f4f5;
+  --border:    #e4e4e7;
+  --border-hi: #d4d4d8;
+  --ash:       #18181b;
+  --mist:      #52525b;
+  --ghost:     #71717a;
+  --green:     #16a34a;
+  --red:       #dc2626;
+  --blue:      #2563eb;
+  --yellow:    #ca8a04;
+}
+html[data-theme="light-amber"] { --amber: #d97706; }
+html[data-theme="light-blue"]  { --amber: #2563eb; }

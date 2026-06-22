@@ -1,0 +1,50 @@
+/* ── Design system ──────────────────────────────────────────── */
+:root {
+  --void:        #09090b;
+  --surface:     #111115;
+  --elevated:    #18181d;
+  --border:      #222228;
+  --border-hi:   #2e2e38;
+
+  --amber:       #f59e0b;
+  /* Derived from --amber so all themes get correct tints by only overriding --amber */
+  --amber-dim:   color-mix(in srgb, var(--amber) 12%, transparent);
+  --amber-glow:  color-mix(in srgb, var(--amber) 25%, transparent);
+  --accent-04:   color-mix(in srgb, var(--amber)  4%, transparent);
+  --accent-05:   color-mix(in srgb, var(--amber)  5%, transparent);
+  --accent-15:   color-mix(in srgb, var(--amber) 15%, transparent);
+  --accent-30:   color-mix(in srgb, var(--amber) 30%, transparent);
+  --accent-40:   color-mix(in srgb, var(--amber) 40%, transparent);
+  --accent-50:   color-mix(in srgb, var(--amber) 50%, transparent);
+
+  --ash:         #c9c6be;
+  --mist:        #80809a;
+  --ghost:       #5e5e72;
+
+  --green:       #4ade80;
+  --red:         #f87171;
+  --blue:        #60a5fa;
+  --yellow:      #fbbf24;
+
+  --mono: 'JetBrains Mono', monospace;
+  --sans: 'Geist', system-ui, sans-serif;
+
+  --r-sm: 4px;
+  --r-md: 8px;
+  --r-lg: 12px;
+}
+
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+html, body, #root { height: 100%; }
+body {
+  font-family: var(--sans);
+  background: var(--void);
+  color: var(--ash);
+  -webkit-font-smoothing: antialiased;
+}
+
+/* ── Scrollbar ──────────────────────────────────────────────── */
+::-webkit-scrollbar { width: 6px; height: 6px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: var(--ghost); border-radius: 3px; }
+::-webkit-scrollbar-thumb:hover { background: var(--mist); }

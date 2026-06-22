@@ -3,6 +3,7 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { TOKEN_KEY } from './api/client'
 import { LogProvider } from './LogContext'
 import { SettingsProvider, useSettings } from './SettingsContext'
+import { DEFAULT_THEME_ID } from './themes'
 import AuthSetup from './components/AuthSetup'
 import Console from './components/Console'
 import PlayerList from './components/PlayerList'
@@ -19,6 +20,14 @@ import {
 } from './Icons'
 
 const qc = new QueryClient()
+
+function ThemeApplier() {
+  const { settings } = useSettings()
+  useEffect(() => {
+    document.documentElement.dataset.theme = settings.theme ?? DEFAULT_THEME_ID
+  }, [settings.theme])
+  return null
+}
 
 type Tab = 'glance' | 'console' | 'players' | 'stats' | 'files' | 'actions' | 'audit' | 'settings'
 
@@ -117,6 +126,7 @@ export default function App() {
   return (
     <QueryClientProvider client={qc}>
       <SettingsProvider>
+        <ThemeApplier />
         <LogProvider>
           {authed ? <MainApp /> : <AuthSetup onAuth={() => setAuthed(true)} />}
         </LogProvider>

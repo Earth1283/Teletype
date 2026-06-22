@@ -1,5 +1,6 @@
 import { useSettings } from '../SettingsContext'
-import { IconEyeOff, IconSliders, IconTerminal, IconCommand, IconCode } from '../Icons'
+import { IconEyeOff, IconSliders, IconTerminal, IconCommand, IconCode, IconPalette } from '../Icons'
+import { THEMES, getTheme } from '../themes'
 
 // ── Primitive controls ────────────────────────────────────────────────────────
 
@@ -83,6 +84,34 @@ export default function SettingsPage() {
         <span className="s-header-title">Settings</span>
         <span className="s-header-sub">Stored in your browser. Reset returns to factory defaults.</span>
       </div>
+
+      {/* ── Theme ────────────────────────────────────────────────── */}
+      <Section title="Theme" icon={<IconPalette size={13} />}>
+        <div className="s-theme-grid">
+          {THEMES.map(t => {
+            const active = (settings.theme ?? 'void-amber') === t.id
+            return (
+              <button
+                key={t.id}
+                className={`s-theme-swatch${active ? ' active' : ''}`}
+                onClick={() => update({ theme: t.id })}
+                title={t.name}
+              >
+                <span className="s-theme-preview" style={{ background: t.bg }}>
+                  <span className="s-theme-accent" style={{ background: t.accent }} />
+                  {t.base === 'light' && (
+                    <span className="s-theme-line" style={{ background: '#d4d4d8' }} />
+                  )}
+                </span>
+                <span className="s-theme-name">{t.name}</span>
+              </button>
+            )
+          })}
+        </div>
+        <div style={{ padding: '4px 14px 8px', fontFamily: 'var(--mono)', fontSize: 10, color: 'var(--ghost)' }}>
+          Current: {getTheme(settings.theme ?? 'void-amber').name}
+        </div>
+      </Section>
 
       {/* ── Grey Beard Mode ──────────────────────────────────────── */}
       <div className={`gbm-card${gbm ? ' gbm-active' : ''}`}>

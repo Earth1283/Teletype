@@ -1,0 +1,18 @@
+/* ── Animations ─────────────────────────────────────────────── */
+@keyframes blink {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0; }
+}
+@keyframes pulse-dot {
+  0%, 100% { box-shadow: 0 0 0 2px var(--void), 0 0 0 3px rgba(74,222,128,.4); }
+  50% { box-shadow: 0 0 0 2px var(--void), 0 0 0 4px rgba(74,222,128,.15); }
+}
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .console-cursor, .tty-cursor { animation: none; opacity: 1; }
+  .status-dot { animation: none; }
+  .auth-spinner { animation: none; border-color: var(--amber); }
+}
