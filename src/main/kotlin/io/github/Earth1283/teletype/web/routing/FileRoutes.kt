@@ -83,6 +83,7 @@ fun Route.fileRoutes(plugin: Teletype) {
         file.parentFile?.mkdirs()
         file.writeText(content)
         call.respond(StatusResponse("saved"))
+        auditAsync(plugin, "file_write", path)
     }
 
     get("/download") {
@@ -118,6 +119,7 @@ fun Route.fileRoutes(plugin: Teletype) {
             part.dispose()
         }
         call.respond(StatusResponse("uploaded $count file(s)"))
+        auditAsync(plugin, "file_upload", "$count file(s) to $dirPath")
     }
 
     delete("") {
@@ -128,8 +130,10 @@ fun Route.fileRoutes(plugin: Teletype) {
             return@delete call.respond(HttpStatusCode.NotFound, ErrorResponse("Not found"))
 
         val deleted = if (file.isDirectory) file.deleteRecursively() else file.delete()
-        if (deleted) call.respond(StatusResponse("deleted"))
-        else call.respond(HttpStatusCode.InternalServerError, ErrorResponse("Delete failed"))
+        if (deleted) {
+            call.respond(StatusResponse("deleted"))
+            auditAsync(plugin, "file_delete", path)
+        } else call.respond(HttpStatusCode.InternalServerError, ErrorResponse("Delete failed"))
     }
 
     post("/mkdir") {
@@ -156,8 +160,10 @@ fun Route.fileRoutes(plugin: Teletype) {
             return@patch call.respond(HttpStatusCode.Conflict, ErrorResponse("Destination already exists"))
 
         to.parentFile?.mkdirs()
-        if (from.renameTo(to)) call.respond(StatusResponse("moved"))
-        else call.respond(HttpStatusCode.InternalServerError, ErrorResponse("Rename failed"))
+        if (from.renameTo(to)) {
+            call.respond(StatusResponse("moved"))
+            auditAsync(plugin, "file_rename", "${req.from} → ${req.to}")
+        } else call.respond(HttpStatusCode.InternalServerError, ErrorResponse("Rename failed"))
     }
 
     post("/fetch") {

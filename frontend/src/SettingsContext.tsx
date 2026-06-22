@@ -7,6 +7,7 @@ export interface TeletypeSettings {
     anomalyThresholdTps: number
     anomalyThresholdTick: number
     anomalyThresholdMem: number
+    anomalyThresholdCpu: number
     logCorrelation: boolean
     logCorrelationWindowMs: number
     showBifurcation: boolean
@@ -36,6 +37,7 @@ export const DEFAULT_SETTINGS: TeletypeSettings = {
     anomalyThresholdTps: 2.0,
     anomalyThresholdTick: 2.0,
     anomalyThresholdMem: 2.5,
+    anomalyThresholdCpu: 2.0,
     logCorrelation: true,
     logCorrelationWindowMs: 5000,
     showBifurcation: true,

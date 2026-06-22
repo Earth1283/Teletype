@@ -36,13 +36,38 @@ class MetricsDatabase(dataFolder: File) {
                 stmt.executeUpdate("CREATE INDEX IF NOT EXISTS idx_${table}_ts ON $table(ts)")
             }
         }
+        // Add system-metrics columns to existing tables if not yet present (idempotent migration).
+        val newCols = linkedMapOf(
+            "cpu_pct"        to "REAL",
+            "sys_mem_used"   to "INTEGER",
+            "sys_mem_total"  to "INTEGER",
+            "disk_used_gb"   to "INTEGER",
+            "disk_total_gb"  to "INTEGER",
+        )
+        for (table in listOf("metrics_1s", "metrics_1m", "metrics_15m")) {
+            val existing = conn.prepareStatement("PRAGMA table_info($table)").use { ps ->
+                val cols = mutableSetOf<String>()
+                ps.executeQuery().use { rs -> while (rs.next()) cols += rs.getString("name") }
+                cols
+            }
+            conn.createStatement().use { s ->
+                for ((col, type) in newCols) {
+                    if (col !in existing) s.executeUpdate("ALTER TABLE $table ADD COLUMN $col $type")
+                }
+            }
+        }
     }
 
     suspend fun insert(samples: List<MetricSnapshot>) {
         if (samples.isEmpty()) return
         mutex.withLock {
             withContext(Dispatchers.IO) {
-                val sql = "INSERT OR IGNORE INTO metrics_1s (ts, tps1, tps5, tps15, tick_ms, mem_used, mem_total, mem_max, uptime_ms) VALUES (?,?,?,?,?,?,?,?,?)"
+                val sql = """
+                    INSERT OR IGNORE INTO metrics_1s
+                    (ts, tps1, tps5, tps15, tick_ms, mem_used, mem_total, mem_max, uptime_ms,
+                     cpu_pct, sys_mem_used, sys_mem_total, disk_used_gb, disk_total_gb)
+                    VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)
+                """.trimIndent()
                 conn.autoCommit = false
                 try {
                     conn.prepareStatement(sql).use { ps ->
@@ -56,6 +81,11 @@ class MetricsDatabase(dataFolder: File) {
                             ps.setLong(7, s.memTotalMb)
                             ps.setLong(8, s.memMaxMb)
                             ps.setLong(9, s.uptimeMs)
+                            ps.setObject(10, s.cpuPercent)
+                            ps.setObject(11, s.sysMemUsedMb)
+                            ps.setObject(12, s.sysMemTotalMb)
+                            ps.setObject(13, s.diskUsedGb)
+                            ps.setObject(14, s.diskTotalGb)
                             ps.addBatch()
                         }
                         ps.executeBatch()
@@ -100,13 +130,20 @@ class MetricsDatabase(dataFolder: File) {
             conn.autoCommit = false
             try {
                 conn.prepareStatement("""
-                    INSERT OR IGNORE INTO metrics_1m (ts, tps1, tps5, tps15, tick_ms, mem_used, mem_total, mem_max, uptime_ms)
+                    INSERT OR IGNORE INTO metrics_1m
+                    (ts, tps1, tps5, tps15, tick_ms, mem_used, mem_total, mem_max, uptime_ms,
+                     cpu_pct, sys_mem_used, sys_mem_total, disk_used_gb, disk_total_gb)
                     SELECT (ts / 60000) * 60000,
                            AVG(tps1), AVG(tps5), AVG(tps15), AVG(tick_ms),
                            CAST(AVG(mem_used)   AS INTEGER),
                            CAST(AVG(mem_total)  AS INTEGER),
                            CAST(AVG(mem_max)    AS INTEGER),
-                           CAST(AVG(uptime_ms)  AS INTEGER)
+                           CAST(AVG(uptime_ms)  AS INTEGER),
+                           AVG(cpu_pct),
+                           CAST(AVG(sys_mem_used)   AS INTEGER),
+                           CAST(AVG(sys_mem_total)  AS INTEGER),
+                           CAST(AVG(disk_used_gb)   AS INTEGER),
+                           CAST(AVG(disk_total_gb)  AS INTEGER)
                     FROM metrics_1s
                     WHERE ts >= ? AND ts < ?
                     GROUP BY (ts / 60000)
@@ -137,13 +174,20 @@ class MetricsDatabase(dataFolder: File) {
             conn.autoCommit = false
             try {
                 conn.prepareStatement("""
-                    INSERT OR IGNORE INTO metrics_15m (ts, tps1, tps5, tps15, tick_ms, mem_used, mem_total, mem_max, uptime_ms)
+                    INSERT OR IGNORE INTO metrics_15m
+                    (ts, tps1, tps5, tps15, tick_ms, mem_used, mem_total, mem_max, uptime_ms,
+                     cpu_pct, sys_mem_used, sys_mem_total, disk_used_gb, disk_total_gb)
                     SELECT (ts / 900000) * 900000,
                            AVG(tps1), AVG(tps5), AVG(tps15), AVG(tick_ms),
                            CAST(AVG(mem_used)   AS INTEGER),
                            CAST(AVG(mem_total)  AS INTEGER),
                            CAST(AVG(mem_max)    AS INTEGER),
-                           CAST(AVG(uptime_ms)  AS INTEGER)
+                           CAST(AVG(uptime_ms)  AS INTEGER),
+                           AVG(cpu_pct),
+                           CAST(AVG(sys_mem_used)   AS INTEGER),
+                           CAST(AVG(sys_mem_total)  AS INTEGER),
+                           CAST(AVG(disk_used_gb)   AS INTEGER),
+                           CAST(AVG(disk_total_gb)  AS INTEGER)
                     FROM metrics_1m
                     WHERE ts >= ? AND ts < ?
                     GROUP BY (ts / 900000)
@@ -168,21 +212,28 @@ class MetricsDatabase(dataFolder: File) {
     private fun queryTable(table: String, from: Long, to: Long): List<MetricSnapshot> {
         val result = mutableListOf<MetricSnapshot>()
         conn.prepareStatement(
-            "SELECT ts, tps1, tps5, tps15, tick_ms, mem_used, mem_total, mem_max, uptime_ms FROM $table WHERE ts >= ? AND ts <= ? ORDER BY ts"
+            """SELECT ts, tps1, tps5, tps15, tick_ms, mem_used, mem_total, mem_max, uptime_ms,
+               cpu_pct, sys_mem_used, sys_mem_total, disk_used_gb, disk_total_gb
+               FROM $table WHERE ts >= ? AND ts <= ? ORDER BY ts"""
         ).use { ps ->
             ps.setLong(1, from); ps.setLong(2, to)
             ps.executeQuery().use { rs ->
                 while (rs.next()) {
                     result += MetricSnapshot(
-                        timestamp  = rs.getLong("ts"),
-                        tps1       = rs.getDouble("tps1"),
-                        tps5       = rs.getDouble("tps5"),
-                        tps15      = rs.getDouble("tps15"),
-                        tickTimeMs = rs.getDouble("tick_ms"),
-                        memUsedMb  = rs.getLong("mem_used"),
-                        memTotalMb = rs.getLong("mem_total"),
-                        memMaxMb   = rs.getLong("mem_max"),
-                        uptimeMs   = rs.getLong("uptime_ms")
+                        timestamp     = rs.getLong("ts"),
+                        tps1          = rs.getDouble("tps1"),
+                        tps5          = rs.getDouble("tps5"),
+                        tps15         = rs.getDouble("tps15"),
+                        tickTimeMs    = rs.getDouble("tick_ms"),
+                        memUsedMb     = rs.getLong("mem_used"),
+                        memTotalMb    = rs.getLong("mem_total"),
+                        memMaxMb      = rs.getLong("mem_max"),
+                        uptimeMs      = rs.getLong("uptime_ms"),
+                        cpuPercent    = rs.getObject("cpu_pct")?.let { rs.getDouble("cpu_pct") },
+                        sysMemUsedMb  = rs.getObject("sys_mem_used")?.let { rs.getLong("sys_mem_used") },
+                        sysMemTotalMb = rs.getObject("sys_mem_total")?.let { rs.getLong("sys_mem_total") },
+                        diskUsedGb    = rs.getObject("disk_used_gb")?.let { rs.getLong("disk_used_gb") },
+                        diskTotalGb   = rs.getObject("disk_total_gb")?.let { rs.getLong("disk_total_gb") },
                     )
                 }
             }

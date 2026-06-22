@@ -11,15 +11,16 @@ import FileManager from './components/FileManager'
 import GlancePage from './components/GlancePage'
 import ActionsPage from './components/actions/ActionsPage'
 import SettingsPage from './components/SettingsPage'
+import AuditPage from './components/AuditPage'
 import CommandPalette from './CommandPalette'
 import {
   TeletypeLogo, IconTerminal, IconUsers, IconCpu, IconFolder,
-  IconLogOut, IconActivity, IconZap, IconSettings,
+  IconLogOut, IconActivity, IconZap, IconSettings, IconList,
 } from './Icons'
 
 const qc = new QueryClient()
 
-type Tab = 'glance' | 'console' | 'players' | 'stats' | 'files' | 'actions' | 'settings'
+type Tab = 'glance' | 'console' | 'players' | 'stats' | 'files' | 'actions' | 'audit' | 'settings'
 
 const TABS: { id: Tab; label: string; Icon: React.FC<{ size?: number }> }[] = [
   { id: 'glance',   label: 'Glance',   Icon: IconActivity  },
@@ -28,6 +29,7 @@ const TABS: { id: Tab; label: string; Icon: React.FC<{ size?: number }> }[] = [
   { id: 'stats',    label: 'Stats',    Icon: IconCpu       },
   { id: 'files',    label: 'Files',    Icon: IconFolder    },
   { id: 'actions',  label: 'Actions',  Icon: IconZap       },
+  { id: 'audit',    label: 'Audit',    Icon: IconList      },
   { id: 'settings', label: 'Settings', Icon: IconSettings  },
 ]
 
@@ -96,6 +98,7 @@ function MainApp() {
         {tab === 'stats'    && <ServerStats />}
         {tab === 'files'    && <FileManager />}
         {tab === 'actions'  && <ActionsPage />}
+        {tab === 'audit'    && <AuditPage />}
         {tab === 'settings' && <SettingsPage />}
       </main>
 

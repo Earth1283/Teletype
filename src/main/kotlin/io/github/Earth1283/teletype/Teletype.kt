@@ -2,6 +2,8 @@ package io.github.Earth1283.teletype
 
 import io.github.Earth1283.teletype.actions.SnippetScheduler
 import io.github.Earth1283.teletype.actions.SnippetStore
+import io.github.Earth1283.teletype.audit.AuditEntry
+import io.github.Earth1283.teletype.audit.AuditLog
 import io.github.Earth1283.teletype.auth.ChallengeStore
 import io.github.Earth1283.teletype.auth.JwtService
 import io.github.Earth1283.teletype.command.TtyCommand
@@ -16,6 +18,7 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
+import kotlinx.coroutines.launch
 import org.bukkit.plugin.java.JavaPlugin
 
 class Teletype : JavaPlugin() {
@@ -27,6 +30,7 @@ class Teletype : JavaPlugin() {
     lateinit var metricsCollector: MetricsCollector
     lateinit var snippetStore: SnippetStore
     lateinit var snippetScheduler: SnippetScheduler
+    lateinit var auditLog: AuditLog
     lateinit var webServer: WebServer
 
     private val pluginScope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
@@ -42,6 +46,7 @@ class Teletype : JavaPlugin() {
         RetentionJob(this, metricsDatabase, pluginScope).start()
         snippetStore = SnippetStore(this).also { it.load() }
         snippetScheduler = SnippetScheduler(this, snippetStore).also { it.load(); it.startAll() }
+        auditLog = AuditLog(dataFolder)
         ConsoleInterceptor.install(consoleBroadcaster)
         webServer = WebServer(this).also { it.start() }
         getCommand("tty")?.setExecutor(TtyCommand(this))
@@ -53,5 +58,20 @@ class Teletype : JavaPlugin() {
         ConsoleInterceptor.uninstall()
         pluginScope.cancel()
         metricsDatabase.close()
+        auditLog.close()
+    }
+
+    fun auditAsync(action: String, detail: String, actor: String, ip: String) {
+        pluginScope.launch(Dispatchers.IO) {
+            runCatching {
+                auditLog.insert(AuditEntry(
+                    ts     = System.currentTimeMillis(),
+                    actor  = actor,
+                    ip     = ip,
+                    action = action,
+                    detail = detail,
+                ))
+            }
+        }
     }
 }

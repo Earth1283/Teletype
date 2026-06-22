@@ -165,6 +165,12 @@ export const IconCommand = ({ size = 16, className }: IconProps) => (
     <path d="M18 3a3 3 0 0 0-3 3v12a3 3 0 0 0 3 3 3 3 0 0 0 3-3 3 3 0 0 0-3-3H6a3 3 0 0 0-3 3 3 3 0 0 0 3 3 3 3 0 0 0 3-3V6a3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3h12a3 3 0 0 0 3-3 3 3 0 0 0-3-3z" />
   </svg>
 )
+export const IconList = ({ size = 16, className }: IconProps) => (
+  <svg {...s(size)} viewBox="0 0 24 24" fill="none" stroke="currentColor" className={className}>
+    <line x1="8" y1="6" x2="21" y2="6" /><line x1="8" y1="12" x2="21" y2="12" /><line x1="8" y1="18" x2="21" y2="18" />
+    <line x1="3" y1="6" x2="3.01" y2="6" /><line x1="3" y1="12" x2="3.01" y2="12" /><line x1="3" y1="18" x2="3.01" y2="18" />
+  </svg>
+)
 export const IconSliders = ({ size = 16, className }: IconProps) => (
   <svg {...s(size)} viewBox="0 0 24 24" fill="none" stroke="currentColor" className={className}>
     <line x1="4" y1="21" x2="4" y2="14" /><line x1="4" y1="10" x2="4" y2="3" />

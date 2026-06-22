@@ -56,7 +56,12 @@ data class MetricSnapshot(
     val memUsedMb: Long,
     val memTotalMb: Long,
     val memMaxMb: Long,
-    val uptimeMs: Long
+    val uptimeMs: Long,
+    val cpuPercent: Double? = null,
+    val sysMemUsedMb: Long? = null,
+    val sysMemTotalMb: Long? = null,
+    val diskUsedGb: Long? = null,
+    val diskTotalGb: Long? = null,
 )
 
 @Serializable

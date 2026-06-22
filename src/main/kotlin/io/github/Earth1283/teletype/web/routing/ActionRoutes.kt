@@ -41,6 +41,7 @@ fun Route.actionRoutes(plugin: Teletype) {
                 call.respond(HttpStatusCode.Conflict, ErrorResponse("Category already exists")); return@post
             }
             call.respond(HttpStatusCode.Created, cat)
+            auditAsync(plugin, "category_create", req.name.trim())
         }
 
         delete("/{id}") {
@@ -54,6 +55,7 @@ fun Route.actionRoutes(plugin: Teletype) {
             }
             store.removeCategory(id)
             call.respond(StatusResponse("deleted"))
+            auditAsync(plugin, "category_delete", id)
         }
     }
 
@@ -106,12 +108,12 @@ fun Route.actionRoutes(plugin: Teletype) {
     post("/execute/{snippetId}") {
         val id = call.parameters["snippetId"]
             ?: return@post call.respond(HttpStatusCode.BadRequest, ErrorResponse("Missing id"))
-        if (store.findSnippet(id) == null) {
-            call.respond(HttpStatusCode.NotFound, ErrorResponse("Snippet not found")); return@post
-        }
+        val snippet = store.findSnippet(id)
+            ?: run { call.respond(HttpStatusCode.NotFound, ErrorResponse("Snippet not found")); return@post }
         val req = call.receive<ExecuteSnippetRequest>()
         scheduler.executeNow(id, req.vars)
         call.respond(StatusResponse("dispatched"))
+        auditAsync(plugin, "run_snippet", "${snippet.name} vars=${req.vars}")
     }
 
     route("/schedule") {
@@ -137,6 +139,7 @@ fun Route.actionRoutes(plugin: Teletype) {
             )
             scheduler.add(action)
             call.respond(HttpStatusCode.Created, action)
+            auditAsync(plugin, "schedule_create", "${action.label} (${req.snippetId})")
         }
 
         delete("/{id}") {
@@ -146,6 +149,7 @@ fun Route.actionRoutes(plugin: Teletype) {
                 call.respond(HttpStatusCode.NotFound, ErrorResponse("Not found")); return@delete
             }
             call.respond(StatusResponse("deleted"))
+            auditAsync(plugin, "schedule_delete", id)
         }
 
         patch("/{id}/pause") {

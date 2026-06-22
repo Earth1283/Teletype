@@ -47,6 +47,7 @@ fun Route.apiRoutes(plugin: Teletype) {
                 Bukkit.dispatchCommand(Bukkit.getConsoleSender(), body.command)
             })
             call.respond(StatusResponse("dispatched"))
+            auditAsync(plugin, "execute_command", body.command)
         }
     }
 }

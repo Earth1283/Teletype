@@ -6,6 +6,7 @@ import io.github.Earth1283.teletype.Teletype
 import io.github.Earth1283.teletype.web.model.ErrorResponse
 import io.github.Earth1283.teletype.web.routing.actionRoutes
 import io.github.Earth1283.teletype.web.routing.apiRoutes
+import io.github.Earth1283.teletype.web.routing.auditRoutes
 import io.github.Earth1283.teletype.web.routing.authRoutes
 import io.github.Earth1283.teletype.web.routing.consoleWebSocket
 import io.github.Earth1283.teletype.web.routing.fileRoutes
@@ -179,6 +180,7 @@ class WebServer(private val plugin: Teletype) {
                             route("/files")   { fileRoutes(plugin) }
                             route("/glance")  { glanceRoutes(plugin) }
                             route("/actions") { actionRoutes(plugin) }
+                            auditRoutes(plugin)
                         }
                     }
                 }

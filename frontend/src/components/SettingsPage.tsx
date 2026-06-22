@@ -1,4 +1,4 @@
-import { useSettings, DEFAULT_SETTINGS } from '../SettingsContext'
+import { useSettings } from '../SettingsContext'
 import { IconEyeOff, IconSliders, IconTerminal, IconCommand } from '../Icons'
 
 // ── Primitive controls ────────────────────────────────────────────────────────
@@ -119,6 +119,13 @@ export default function SettingsPage() {
             value={settings.glance.anomalyThresholdMem} min={1} max={5} step={0.1}
             fmt={v => `${v.toFixed(1)}σ`} disabled={gbm}
             onChange={v => setGlance({ anomalyThresholdMem: v })}
+          />
+        </Row>
+        <Row label="CPU sigma">
+          <Slider
+            value={settings.glance.anomalyThresholdCpu} min={1} max={5} step={0.1}
+            fmt={v => `${v.toFixed(1)}σ`} disabled={gbm}
+            onChange={v => setGlance({ anomalyThresholdCpu: v })}
           />
         </Row>
 

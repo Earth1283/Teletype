@@ -23,6 +23,12 @@ class MetricsCollector(plugin: Teletype, private val db: MetricsDatabase, scope:
 
     @Volatile var latest: MetricSnapshot? = null
 
+    private val osMx: com.sun.management.OperatingSystemMXBean? = runCatching {
+        ManagementFactory.getOperatingSystemMXBean() as com.sun.management.OperatingSystemMXBean
+    }.getOrNull()
+
+    private val diskRoot = plugin.server.worldContainer.absoluteFile
+
     init {
         // Sample at 1 Hz on the Bukkit main thread.
         object : BukkitRunnable() {
@@ -31,16 +37,32 @@ class MetricsCollector(plugin: Teletype, private val db: MetricsDatabase, scope:
                 val tps = Bukkit.getTPS()
                 val tps1 = tps[0].coerceIn(0.0, 20.0)
 
+                val cpuLoad = osMx?.cpuLoad
+                val cpuPercent = cpuLoad?.let { if (it < 0.0) -1.0 else it * 100.0 }
+                val sysMemTotal = osMx?.totalMemorySize
+                val sysMemFree  = osMx?.freeMemorySize
+                val sysMemUsedMb  = if (sysMemTotal != null && sysMemFree != null) (sysMemTotal - sysMemFree) / 1_048_576L else null
+                val sysMemTotalMb = sysMemTotal?.div(1_048_576L)
+                val diskTotal = diskRoot.totalSpace
+                val diskFree  = diskRoot.freeSpace
+                val diskUsedGb  = if (diskTotal > 0) (diskTotal - diskFree) / 1_073_741_824L else null
+                val diskTotalGb = if (diskTotal > 0) diskTotal / 1_073_741_824L else null
+
                 val snap = MetricSnapshot(
-                    timestamp  = System.currentTimeMillis(),
-                    tps1       = tps1,
-                    tps5       = tps[1].coerceIn(0.0, 20.0),
-                    tps15      = tps[2].coerceIn(0.0, 20.0),
-                    tickTimeMs = if (tps1 > 0) (1000.0 / tps1.coerceAtMost(20.0)) else 50.0,
-                    memUsedMb  = (rt.totalMemory() - rt.freeMemory()) / 1_048_576L,
-                    memTotalMb = rt.totalMemory() / 1_048_576L,
-                    memMaxMb   = rt.maxMemory()   / 1_048_576L,
-                    uptimeMs   = ManagementFactory.getRuntimeMXBean().uptime
+                    timestamp     = System.currentTimeMillis(),
+                    tps1          = tps1,
+                    tps5          = tps[1].coerceIn(0.0, 20.0),
+                    tps15         = tps[2].coerceIn(0.0, 20.0),
+                    tickTimeMs    = if (tps1 > 0) (1000.0 / tps1.coerceAtMost(20.0)) else 50.0,
+                    memUsedMb     = (rt.totalMemory() - rt.freeMemory()) / 1_048_576L,
+                    memTotalMb    = rt.totalMemory() / 1_048_576L,
+                    memMaxMb      = rt.maxMemory()   / 1_048_576L,
+                    uptimeMs      = ManagementFactory.getRuntimeMXBean().uptime,
+                    cpuPercent    = cpuPercent,
+                    sysMemUsedMb  = sysMemUsedMb,
+                    sysMemTotalMb = sysMemTotalMb,
+                    diskUsedGb    = diskUsedGb,
+                    diskTotalGb   = diskTotalGb,
                 )
 
                 latest = snap

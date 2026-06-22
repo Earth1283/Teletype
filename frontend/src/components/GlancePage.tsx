@@ -18,6 +18,11 @@ interface Snap {
   tickTimeMs: number
   memUsedMb: number; memTotalMb: number; memMaxMb: number
   uptimeMs: number
+  cpuPercent?: number | null
+  sysMemUsedMb?: number | null
+  sysMemTotalMb?: number | null
+  diskUsedGb?: number | null
+  diskTotalGb?: number | null
 }
 
 interface ProcessedSnap extends Snap { memPct: number }
@@ -78,6 +83,13 @@ function memColor(pct: number): string {
 function tpsStatus(v: number): Status { return v >= 19 ? 'nominal' : v >= 15 ? 'degraded' : 'incident' }
 function tickStatus(v: number): Status { return v <= 50 ? 'nominal' : v <= 100 ? 'degraded' : 'incident' }
 function memStatus(pct: number): Status { return pct < 0.65 ? 'nominal' : pct < 0.85 ? 'degraded' : 'incident' }
+function cpuColor(pct: number): string {
+  if (pct < 50) return 'var(--green)'
+  if (pct < 80) return 'var(--amber)'
+  return 'var(--red)'
+}
+function cpuStatus(pct: number): Status { return pct < 50 ? 'nominal' : pct < 80 ? 'degraded' : 'incident' }
+function diskStatus(pct: number): Status { return pct < 0.75 ? 'nominal' : pct < 0.9 ? 'degraded' : 'incident' }
 function globalStatus(snap: Snap): Status {
   const p = snap.memMaxMb > 0 ? snap.memUsedMb / snap.memMaxMb : 0
   if (snap.tps1 < 15 || snap.tickTimeMs > 100 || p > 0.9) return 'incident'
@@ -578,6 +590,37 @@ export default function GlancePage() {
             sub={current ? `${current.memUsedMb} / ${current.memMaxMb} MB` : ''}
             color={memColor(memP)} status={memStatus(memP)} barPct={memP} sigma={memSigma} />
           <StatCard label="Uptime" value={uptimeStr} color="var(--ash)" status="nominal" />
+          {/* CPU */}
+          {current?.cpuPercent != null && current.cpuPercent >= 0 ? (
+            <StatCard label="CPU" value={`${current.cpuPercent.toFixed(1)}%`} sub="host load"
+              color={cpuColor(current.cpuPercent)} status={cpuStatus(current.cpuPercent)}
+              barPct={current.cpuPercent / 100} />
+          ) : (
+            <StatCard label="CPU" value={current?.cpuPercent === -1 ? '—' : '…'} sub={current?.cpuPercent === -1 ? 'unavailable' : undefined}
+              color="var(--ash)" status="nominal" />
+          )}
+          {/* System RAM */}
+          {current?.sysMemUsedMb != null && current.sysMemTotalMb != null ? (
+            <StatCard label="Sys RAM"
+              value={`${(current.sysMemUsedMb / 1024).toFixed(1)} GB`}
+              sub={`${current.sysMemUsedMb} / ${current.sysMemTotalMb} MB`}
+              color={memColor(current.sysMemUsedMb / current.sysMemTotalMb)}
+              status={memStatus(current.sysMemUsedMb / current.sysMemTotalMb)}
+              barPct={current.sysMemUsedMb / current.sysMemTotalMb} />
+          ) : (
+            <StatCard label="Sys RAM" value="…" color="var(--ash)" status="nominal" />
+          )}
+          {/* Disk */}
+          {current?.diskUsedGb != null && current.diskTotalGb != null && current.diskTotalGb > 0 ? (
+            <StatCard label="Disk"
+              value={`${current.diskUsedGb} / ${current.diskTotalGb} GB`}
+              sub={`${Math.round((current.diskUsedGb / current.diskTotalGb) * 100)}% used`}
+              color={diskStatus(current.diskUsedGb / current.diskTotalGb) === 'incident' ? 'var(--red)' : diskStatus(current.diskUsedGb / current.diskTotalGb) === 'degraded' ? 'var(--amber)' : 'var(--ash)'}
+              status={diskStatus(current.diskUsedGb / current.diskTotalGb)}
+              barPct={current.diskUsedGb / current.diskTotalGb} />
+          ) : (
+            <StatCard label="Disk" value="…" color="var(--ash)" status="nominal" />
+          )}
         </div>
 
         {/* Window selector */}
