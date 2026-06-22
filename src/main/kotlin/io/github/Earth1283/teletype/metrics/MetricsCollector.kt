@@ -53,7 +53,7 @@ class MetricsCollector(plugin: Teletype, private val db: MetricsDatabase, scope:
                     tps1          = tps1,
                     tps5          = tps[1].coerceIn(0.0, 20.0),
                     tps15         = tps[2].coerceIn(0.0, 20.0),
-                    tickTimeMs    = if (tps1 > 0) (1000.0 / tps1.coerceAtMost(20.0)) else 50.0,
+                    tickTimeMs    = Bukkit.getServer().tickTimes.takeLast(20).average() / 1_000_000.0,
                     memUsedMb     = (rt.totalMemory() - rt.freeMemory()) / 1_048_576L,
                     memTotalMb    = rt.totalMemory() / 1_048_576L,
                     memMaxMb      = rt.maxMemory()   / 1_048_576L,
