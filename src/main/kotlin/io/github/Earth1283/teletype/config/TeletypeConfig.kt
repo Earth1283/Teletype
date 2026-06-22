@@ -21,6 +21,8 @@ class TeletypeConfig(private val plugin: Teletype) {
         else config.getInt("web-port", 8080)
     val corsOrigins: List<String> get() = config.getStringList("server.cors-origins")
     val maxWebSocketConnections: Int get() = config.getInt("server.max-websocket-connections", 8)
+    val multiplexGamePort: Boolean get() = bool("server.multiplex-game-port", false)
+    val multiplexPort: Int get() = config.getInt("server.multiplex-port", 25565)
 
     // ── TLS ───────────────────────────────────────────────────────────────────
     val tlsEnabled: Boolean get() = bool("server.tls.enabled", false)

@@ -15,6 +15,7 @@ import io.github.Earth1283.teletype.console.ConsoleInterceptor
 import io.github.Earth1283.teletype.metrics.MetricsCollector
 import io.github.Earth1283.teletype.metrics.MetricsDatabase
 import io.github.Earth1283.teletype.metrics.RetentionJob
+import io.github.Earth1283.teletype.multiplex.PortMultiplexer
 import io.github.Earth1283.teletype.web.WebServer
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -35,6 +36,7 @@ class Teletype : JavaPlugin() {
     lateinit var snippetScheduler: SnippetScheduler
     lateinit var auditLog: AuditLog
     lateinit var webServer: WebServer
+    private var portMultiplexer: PortMultiplexer? = null
 
     private val pluginScope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
 
@@ -55,6 +57,9 @@ class Teletype : JavaPlugin() {
         auditLog = AuditLog(dataFolder)
         ConsoleInterceptor.install(consoleBroadcaster)
         webServer = WebServer(this).also { it.start() }
+        if (teletypeConfig.multiplexGamePort) {
+            portMultiplexer = PortMultiplexer(this).also { it.install() }
+        }
         getCommand("tty")?.setExecutor(TtyCommand(this))
 
         val url = if (teletypeConfig.tlsEnabled) "https://localhost:${teletypeConfig.tlsHttpsPort}"
@@ -63,6 +68,7 @@ class Teletype : JavaPlugin() {
     }
 
     override fun onDisable() {
+        portMultiplexer?.uninstall()
         snippetScheduler.stopAll()
         webServer.stop()
         ConsoleInterceptor.uninstall()
