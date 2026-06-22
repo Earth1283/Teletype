@@ -41,6 +41,9 @@ dependencies {
     implementation("io.ktor:ktor-server-cors-jvm:$ktorVersion")
     implementation("io.ktor:ktor-server-status-pages-jvm:$ktorVersion")
     implementation("io.ktor:ktor-server-call-logging-jvm:$ktorVersion")
+    implementation("io.ktor:ktor-server-rate-limit-jvm:$ktorVersion")
+    implementation("io.ktor:ktor-server-http-redirect-jvm:$ktorVersion")
+    implementation("io.ktor:ktor-network-tls-certificates-jvm:$ktorVersion")
 
     // Ktor Client (standalone mode)
     implementation("io.ktor:ktor-client-core-jvm:$ktorVersion")
@@ -55,6 +58,11 @@ dependencies {
 
     // JWT issuance (Auth0 library; Ktor's auth-jwt uses same HMAC256 algorithm for validation)
     implementation("com.auth0:java-jwt:4.5.0")
+
+    // SQLite — metrics time-series persistence
+    // Not relocated: Paper 1.21 doesn't expose org.xerial/org.sqlite to plugin classloader,
+    // and sqlite-jdbc's native-lib extraction breaks if the class path is changed.
+    implementation("org.xerial:sqlite-jdbc:3.47.1.0")
 
     // Logging (Ktor needs SLF4J; Logback satisfies it)
     implementation("ch.qos.logback:logback-classic:$logbackVersion")
@@ -106,6 +114,7 @@ tasks {
         relocate("org.jetbrains.annotations.", "teletype.shaded.jetbrains.annotations.")
         relocate("com.auth0.", "teletype.shaded.auth0.")
         relocate("com.typesafe.", "teletype.shaded.typesafe.")
+        relocate("org.bouncycastle.", "teletype.shaded.bouncycastle.")
 
         // Merge SPI service descriptors — required for Ktor's Netty engine and serialization
         mergeServiceFiles()

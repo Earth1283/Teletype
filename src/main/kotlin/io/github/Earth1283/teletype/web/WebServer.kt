@@ -4,11 +4,13 @@ import com.auth0.jwt.JWT
 import com.auth0.jwt.algorithms.Algorithm
 import io.github.Earth1283.teletype.Teletype
 import io.github.Earth1283.teletype.web.model.ErrorResponse
+import io.github.Earth1283.teletype.web.routing.actionRoutes
 import io.github.Earth1283.teletype.web.routing.apiRoutes
 import io.github.Earth1283.teletype.web.routing.authRoutes
 import io.github.Earth1283.teletype.web.routing.consoleWebSocket
 import io.github.Earth1283.teletype.web.routing.fileRoutes
 import io.github.Earth1283.teletype.web.routing.glanceRoutes
+import io.ktor.http.ContentType
 import io.ktor.http.HttpHeaders
 import io.ktor.http.HttpMethod
 import io.ktor.http.HttpStatusCode
@@ -19,22 +21,30 @@ import io.ktor.server.auth.authenticate
 import io.ktor.server.auth.jwt.JWTPrincipal
 import io.ktor.server.auth.jwt.jwt
 import io.ktor.server.engine.EmbeddedServer
+import io.ktor.server.engine.connector
 import io.ktor.server.engine.embeddedServer
-import io.ktor.http.ContentType
+import io.ktor.server.engine.sslConnector
 import io.ktor.server.http.content.staticResources
-import io.ktor.server.response.respondBytes
-import io.ktor.server.routing.get
 import io.ktor.server.netty.Netty
 import io.ktor.server.netty.NettyApplicationEngine
 import io.ktor.server.plugins.contentnegotiation.ContentNegotiation
 import io.ktor.server.plugins.cors.routing.CORS
+import io.ktor.server.plugins.httpsredirect.HttpsRedirect
+import io.ktor.server.auth.principal
+import io.ktor.server.plugins.origin
+import io.ktor.server.plugins.ratelimit.RateLimit
+import io.ktor.server.plugins.ratelimit.RateLimitName
+import io.ktor.server.plugins.ratelimit.rateLimit
 import io.ktor.server.plugins.statuspages.StatusPages
 import io.ktor.server.response.respond
+import io.ktor.server.response.respondBytes
+import io.ktor.server.routing.get
 import io.ktor.server.routing.route
 import io.ktor.server.routing.routing
 import io.ktor.server.websocket.WebSockets
 import io.ktor.server.websocket.webSocket
 import kotlinx.serialization.json.Json
+import kotlin.time.Duration.Companion.minutes
 
 class WebServer(private val plugin: Teletype) {
     private var server: EmbeddedServer<NettyApplicationEngine, NettyApplicationEngine.Configuration>? = null
@@ -42,10 +52,37 @@ class WebServer(private val plugin: Teletype) {
     val isRunning: Boolean get() = server != null
 
     fun start() {
-        val secret = plugin.teletypeConfig.jwtSecret
-        val port = plugin.teletypeConfig.port
+        val cfg = plugin.teletypeConfig
+        val secret = cfg.jwtSecret
+        val httpPort = cfg.port
+        val tlsEnabled = cfg.tlsEnabled
+        val httpsPort = cfg.tlsHttpsPort
+        val keyAlias = cfg.tlsKeyAlias
+        val keystorePass = cfg.tlsKeystorePassword.ifBlank { "teletype-tls" }
+        val keyPass = cfg.tlsKeyPassword.ifBlank { "teletype-tls" }
 
-        server = embeddedServer(Netty, port = port) {
+        val keyStore = if (tlsEnabled) TlsManager(plugin).loadKeyStore() else null
+
+        server = embeddedServer(Netty, configure = {
+            connector { port = httpPort }
+            if (tlsEnabled && keyStore != null) {
+                sslConnector(
+                    keyStore = keyStore,
+                    keyAlias = keyAlias,
+                    keyStorePassword = { keystorePass.toCharArray() },
+                    privateKeyPassword = { keyPass.toCharArray() }
+                ) {
+                    port = httpsPort
+                }
+            }
+        }) {
+            if (tlsEnabled && cfg.tlsHttpRedirect) {
+                install(HttpsRedirect) {
+                    sslPort = httpsPort
+                    permanentRedirect = false
+                }
+            }
+
             install(WebSockets) {
                 pingPeriodMillis = 30_000L
                 timeoutMillis = 60_000L
@@ -75,7 +112,39 @@ class WebServer(private val plugin: Teletype) {
                     )
                     validate { credential -> JWTPrincipal(credential.payload) }
                     challenge { _, _ ->
-                        call.respond(HttpStatusCode.Unauthorized, ErrorResponse("Unauthorized — provide a valid Bearer token"))
+                        call.respond(
+                            HttpStatusCode.Unauthorized,
+                            ErrorResponse("Unauthorized — provide a valid Bearer token")
+                        )
+                    }
+                }
+            }
+
+            // Always install; when disabled limits are set to Long.MAX_VALUE (effectively unlimited).
+            install(RateLimit) {
+                val authLimit = if (cfg.rateLimitEnabled) cfg.rateLimitAuthRequestsPerMin else Int.MAX_VALUE
+                val apiLimit = if (cfg.rateLimitEnabled) cfg.rateLimitApiRequestsPerMin else Int.MAX_VALUE
+                val execLimit = if (cfg.rateLimitEnabled) cfg.rateLimitExecuteRequestsPerMin else Int.MAX_VALUE
+
+                // Auth endpoints: IP-keyed, blocks brute-force on the challenge/poll flow
+                register(RateLimitName("auth")) {
+                    rateLimiter(limit = authLimit, refillPeriod = 1.minutes)
+                    requestKey { call -> call.request.origin.remoteAddress }
+                }
+                // General API: keyed by JWT subject (user identity) with IP fallback
+                register(RateLimitName("api")) {
+                    rateLimiter(limit = apiLimit, refillPeriod = 1.minutes)
+                    requestKey { call ->
+                        call.principal<JWTPrincipal>()?.payload?.subject
+                            ?: call.request.origin.remoteAddress
+                    }
+                }
+                // Console command dispatch: tighter limit within the api budget
+                register(RateLimitName("execute")) {
+                    rateLimiter(limit = execLimit, refillPeriod = 1.minutes)
+                    requestKey { call ->
+                        call.principal<JWTPrincipal>()?.payload?.subject
+                            ?: call.request.origin.remoteAddress
                     }
                 }
             }
@@ -83,14 +152,15 @@ class WebServer(private val plugin: Teletype) {
             install(StatusPages) {
                 exception<Throwable> { call, cause ->
                     plugin.logger.warning("Unhandled exception in web server: ${cause.message}")
-                    call.respond(HttpStatusCode.InternalServerError, ErrorResponse(cause.message ?: "Internal error"))
+                    call.respond(
+                        HttpStatusCode.InternalServerError,
+                        ErrorResponse(cause.message ?: "Internal error")
+                    )
                 }
             }
 
             routing {
-                // Serve the React SPA from classpath webroot/
                 staticResources("/", "webroot")
-                // SPA catch-all: any unmatched path returns index.html for client-side routing
                 get("{...}") {
                     val bytes = this::class.java.classLoader
                         .getResourceAsStream("webroot/index.html")?.readBytes()
@@ -98,28 +168,32 @@ class WebServer(private val plugin: Teletype) {
                     call.respondBytes(bytes, ContentType.Text.Html)
                 }
 
-                // Unauthenticated auth routes
-                route("/api/auth") {
-                    authRoutes(plugin)
+                rateLimit(RateLimitName("auth")) {
+                    route("/api/auth") { authRoutes(plugin) }
                 }
 
-                // REST API routes require a valid JWT via Bearer header
                 authenticate("auth-jwt") {
-                    route("/api") {
-                        apiRoutes(plugin)
-                        route("/files") { fileRoutes(plugin) }
-                        route("/glance") { glanceRoutes(plugin) }
+                    rateLimit(RateLimitName("api")) {
+                        route("/api") {
+                            apiRoutes(plugin)
+                            route("/files")   { fileRoutes(plugin) }
+                            route("/glance")  { glanceRoutes(plugin) }
+                            route("/actions") { actionRoutes(plugin) }
+                        }
                     }
                 }
 
-                // WebSocket: browsers can't send custom headers — validates JWT via ?token= query param
                 webSocket("/ws/console") {
                     consoleWebSocket(plugin)
                 }
             }
         }.start(wait = false)
 
-        plugin.logger.info("Teletype web server started on port $port")
+        if (tlsEnabled) {
+            plugin.logger.info("Teletype web server started — https://localhost:$httpsPort (HTTP :$httpPort redirects)")
+        } else {
+            plugin.logger.info("Teletype web server started — http://localhost:$httpPort")
+        }
     }
 
     fun stop() {

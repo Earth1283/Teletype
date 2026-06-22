@@ -1,13 +1,197 @@
-# Teletype Configuration
+# ─────────────────────────────────────────────────────────────────────────────
+# Teletype — Plugin Configuration
+# Changes take effect after /tty reload (or server restart for port changes).
+# ─────────────────────────────────────────────────────────────────────────────
 
-# Port for the embedded web server
-web-port: 8080
+# ── Web server ───────────────────────────────────────────────────────────────
+server:
+  # Port the embedded HTTP server listens on.
+  # When TLS is enabled this port serves only as an HTTP→HTTPS redirect.
+  port: 8080
 
-# JWT token expiry in hours
-jwt-expiry-hours: 24
+  # HTTPS port (only used when tls.enabled: true).
+  https-port: 8443
 
-# Root directory exposed by the file manager (defaults to server working directory)
-# files-root: /path/to/server
+  # Allowed CORS origins. Empty = allow all (fine for local use).
+  # Example: ["https://panel.example.com", "http://localhost:3000"]
+  cors-origins: []
 
-# JWT secret is auto-generated on first run — do not share this value
-# jwt-secret: (auto-generated)
+  # Cap on simultaneous authenticated WebSocket connections.
+  max-websocket-connections: 8
+
+  tls:
+    # Enable HTTPS. A self-signed certificate is generated automatically on first
+    # start (stored in plugins/Teletype/keystore.jks). Browsers will show a
+    # security warning for self-signed certs — accept it once or supply a real cert.
+    enabled: false
+
+    # Certificate source:
+    #   auto      — generate and reuse a self-signed certificate (default)
+    #   keystore  — load from an existing JKS / PKCS12 file
+    mode: auto
+
+    # Path to keystore file (mode: keystore only).
+    # Relative paths resolve from the Teletype plugin data folder.
+    keystore-path: ""
+
+    # Passwords for the keystore and private key (mode: keystore only).
+    # The auto-generated self-signed cert uses "teletype-tls" internally.
+    keystore-password: ""
+    key-password: ""
+
+    # Alias of the key entry inside the keystore.
+    key-alias: "teletype"
+
+    # Redirect plain HTTP requests to HTTPS (recommended).
+    http-redirect: true
+
+# ── Rate limiting ─────────────────────────────────────────────────────────────
+rate-limit:
+  # Master switch. Set false to disable all rate limiting.
+  enabled: true
+
+  auth:
+    # Max requests per minute per IP on /api/auth/* (challenge + poll).
+    # Protects against brute-force login attempts.
+    requests-per-minute: 10
+
+  api:
+    # Max requests per minute per authenticated user on all /api/* routes.
+    requests-per-minute: 300
+
+  execute:
+    # Tighter limit for POST /api/execute (console command dispatch).
+    # Applied in addition to the api limit above — whichever trips first wins.
+    requests-per-minute: 30
+
+# ── Authentication ────────────────────────────────────────────────────────────
+auth:
+  # HMAC-256 JWT signing secret. Auto-generated on first start.
+  # Changing this invalidates all existing browser sessions.
+  jwt-secret: ""
+
+  # Token lifetime in minutes. 0 = never expire.
+  jwt-expiry-minutes: 1440
+
+  # How long a /tty verify challenge UUID remains valid (seconds).
+  challenge-ttl-seconds: 300
+
+  # Require the verifying player to be an operator (/op).
+  # Set false to allow any player with console access to authenticate.
+  require-op: true
+
+# ── Console interceptor ───────────────────────────────────────────────────────
+console:
+  # Set false to disable the live log stream and /ws/console endpoint entirely.
+  enabled: true
+
+  # Log lines replayed to a client that connects after the server has started.
+  replay-buffer-lines: 1000
+
+  # Truncate lines exceeding this many characters. 0 = unlimited.
+  max-line-length: 2048
+
+# ── Metrics collection ────────────────────────────────────────────────────────
+metrics:
+  # Set false to disable all metric collection and /glance/* endpoints.
+  enabled: true
+
+  # Sampling interval in server ticks. 20 ticks = 1 second = 1 Hz.
+  # Higher values reduce overhead but coarsen chart resolution.
+  sample-interval-ticks: 20
+
+  # Seconds of 1-Hz samples kept in the JVM heap ring-buffer.
+  # This is the maximum window serveable without hitting SQLite.
+  in-memory-window-seconds: 900
+
+  sqlite:
+    # Set false to skip SQLite I/O; history beyond in-memory-window returns empty.
+    enabled: true
+
+    # How often the in-memory buffer is flushed to disk (seconds).
+    flush-interval-seconds: 15
+
+    retention:
+      # Nightly downsampling job. Set false to keep all raw 1-Hz rows forever
+      # (disk usage grows ~86 KB/day at 1 Hz).
+      enabled: true
+
+      # Compact 1-second rows to 1-minute averages for data older than N hours.
+      downsample-1s-after-hours: 24
+
+      # Compact 1-minute rows to 15-minute averages for data older than N days.
+      downsample-1m-after-days: 7
+
+      # Hard-delete 15-minute rows older than N days. 0 = keep forever.
+      delete-15m-after-days: 90
+
+# ── Actions / Snippets ────────────────────────────────────────────────────────
+actions:
+  # Set false to disable the actions subsystem and /actions/* endpoints.
+  enabled: true
+
+  # Allow snippets to be scheduled (cron / interval / once).
+  scheduling-enabled: true
+
+  # Category ID whose snippets appear in the console right-click Quick Actions menu.
+  quick-actions-category-id: "quick-actions"
+
+  # Hard caps to prevent abuse.
+  max-snippets: 200
+  max-scheduled-actions: 50
+
+# ── File manager ──────────────────────────────────────────────────────────────
+files:
+  # Set false to disable the file browser and /files/* endpoints.
+  enabled: true
+
+  # Root directory exposed to the browser. Relative to server working directory.
+  # Use an absolute path to lock it to a specific location.
+  # ".." traversal is always blocked regardless of this setting.
+  root: "."
+
+  # Files larger than this (MB) are download-only; the Monaco editor won't open them.
+  max-edit-size-mb: 4
+
+  # Extensions allowed for in-browser text editing. Empty = all detected text files.
+  # Example: ["yml", "json", "txt", "properties", "conf"]
+  editable-extensions: []
+
+# ── Glance thresholds ─────────────────────────────────────────────────────────
+# Semantic color breakpoints for the dashboard status badge, stat card accents,
+# and anomaly chart dots. Served via /api/glance/config so the frontend can
+# read server-defined defaults (users can still override per-browser).
+glance:
+  tps:
+    # TPS >= nominal-min  → green  (healthy)
+    # TPS >= degraded-min → amber  (degraded)
+    # TPS <  degraded-min → red    (incident)
+    nominal-min: 19.0
+    degraded-min: 15.0
+
+  tick-time:
+    # Tick <= nominal-max-ms  → green
+    # Tick <= degraded-max-ms → amber
+    # Tick >  degraded-max-ms → red
+    nominal-max-ms: 50
+    degraded-max-ms: 100
+
+  memory:
+    # Heap % <= nominal-max-pct  → blue (fine)
+    # Heap % <= degraded-max-pct → amber (elevated)
+    # Heap % >  degraded-max-pct → red  (critical)
+    nominal-max-pct: 65
+    degraded-max-pct: 85
+
+  anomaly:
+    # Z-score required to flag a data point as anomalous (chart dot + incident tooltip).
+    # Raise these on noisy servers to reduce false positives.
+    tps-sigma: 2.0
+    tick-sigma: 2.0
+    memory-sigma: 2.5
+
+# ── Legacy keys (kept for backwards compatibility) ─────────────────────────────
+# web-port: 8080          → now server.port
+# jwt-expiry-hours: 24    → now auth.jwt-expiry-minutes (= 1440)
+# jwt-secret: ""          → now auth.jwt-secret
+# files-root: ""          → now files.root

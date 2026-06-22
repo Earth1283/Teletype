@@ -15,7 +15,13 @@ fun Route.glanceRoutes(plugin: Teletype) {
     }
 
     get("/history") {
-        val window = call.request.queryParameters["window"]?.toIntOrNull()?.coerceIn(1, 15) ?: 5
-        call.respond(plugin.metricsCollector.history(window))
+        // window is in minutes; ≤15 uses in-memory (1-second), larger windows query SQLite.
+        val window = call.request.queryParameters["window"]?.toIntOrNull()?.coerceIn(1, 525_600) ?: 5
+        val data = if (window <= 15) {
+            plugin.metricsCollector.history(window)
+        } else {
+            plugin.metricsDatabase.history(window)
+        }
+        call.respond(data)
     }
 }

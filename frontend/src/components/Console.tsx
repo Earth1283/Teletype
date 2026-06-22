@@ -1,12 +1,14 @@
-import { useEffect, useRef, useState, useCallback } from 'react'
+import { useRef, useState, useCallback, useMemo } from 'react'
 import { Virtuoso, type VirtuosoHandle } from 'react-virtuoso'
 import AnsiConvert from 'ansi-to-html'
-import { ConsoleSocket } from '../api/websocket'
+import { useQuery } from '@tanstack/react-query'
+import { useLogs } from '../LogContext'
+import { useSettings } from '../SettingsContext'
+import { api } from '../api/client'
+import type { Snippet } from './actions/actionTypes'
+import RunModal from './actions/RunModal'
 
 const convert = new AnsiConvert({ escapeXML: true, newline: true })
-
-// Strip Minecraft §-color codes
-const stripMinecraft = (s: string) => s.replace(/§[0-9a-fklmnor]/gi, '')
 
 type LogLevel = 'info' | 'warn' | 'error' | 'debug'
 
@@ -18,50 +20,61 @@ function lineClass(raw: string): LogLevel {
   return 'info'
 }
 
+interface CtxState { x: number; y: number; line: string }
+
 export default function Console() {
-  const [lines, setLines] = useState<string[]>([])
+  const { lines, connected, send: socketSend } = useLogs()
+  const { settings } = useSettings()
+  const { fontSize, displayLines, wordWrap, showTimestamps } = settings.console
   const [input, setInput] = useState('')
-  const [connected, setConnected] = useState(false)
-  const socketRef = useRef<ConsoleSocket | null>(null)
+  const [ctx, setCtx] = useState<CtxState | null>(null)
+  const [runSnippet, setRunSnippet] = useState<Snippet | null>(null)
   const virtuosoRef = useRef<VirtuosoHandle>(null)
   const atBottom = useRef(true)
   const inputRef = useRef<HTMLInputElement>(null)
 
-  useEffect(() => {
-    const socket = new ConsoleSocket()
-    socketRef.current = socket
+  const displayedLines = useMemo(
+    () => lines.length > displayLines ? lines.slice(lines.length - displayLines) : lines,
+    [lines, displayLines]
+  )
 
-    const unsub = socket.onLog((line) => {
-      setLines((prev) => {
-        const next = [...prev, stripMinecraft(line)]
-        return next.length > 5000 ? next.slice(-5000) : next
-      })
-      if (atBottom.current) {
-        requestAnimationFrame(() =>
-          virtuosoRef.current?.scrollToIndex({ index: 'LAST', behavior: 'auto' })
-        )
-      }
-    })
+  const formatLine = useCallback(
+    (line: string) => showTimestamps ? line : line.replace(/^\[\d{2}:\d{2}:\d{2}\]\s*/, ''),
+    [showTimestamps]
+  )
 
-    socket.connect()
-
-    const tid = setInterval(() => {
-      if ((socket as any).ws?.readyState === 1) {
-        setConnected(true)
-        clearInterval(tid)
-      }
-    }, 300)
-
-    return () => { unsub(); socket.disconnect(); clearInterval(tid) }
-  }, [])
+  const { data: allSnippets = [] } = useQuery<Snippet[]>({
+    queryKey: ['snippets'],
+    queryFn: () => api.get('/actions/snippets').then(r => r.data),
+    staleTime: 30_000,
+  })
+  const quickActions = allSnippets.filter(s => s.categoryId === 'quick-actions')
 
   const send = useCallback(() => {
     const cmd = input.trim()
     if (!cmd) return
-    socketRef.current?.send(cmd)
+    socketSend(cmd)
     setInput('')
     inputRef.current?.focus()
-  }, [input])
+  }, [input, socketSend])
+
+  const openCtx = (e: React.MouseEvent, line: string) => {
+    e.preventDefault()
+    const x = Math.min(e.clientX, window.innerWidth - 220)
+    const y = Math.min(e.clientY, window.innerHeight - 200)
+    setCtx({ x, y, line })
+  }
+
+  const closeCtx = () => setCtx(null)
+
+  const handleQAClick = (s: Snippet) => {
+    closeCtx()
+    if (s.vars.length > 0) {
+      setRunSnippet(s)
+    } else {
+      api.post(`/actions/execute/${s.id}`, { vars: {} }).catch(() => {})
+    }
+  }
 
   return (
     <div className="console-root">
@@ -77,18 +90,20 @@ export default function Console() {
         ref={virtuosoRef}
         className="console-log"
         style={{ flex: 1 }}
-        data={lines}
+        data={displayedLines}
         followOutput
         atBottomStateChange={(b) => { atBottom.current = b }}
         itemContent={(_, line) => (
           <div
             className={`log-line ${lineClass(line)}`}
-            dangerouslySetInnerHTML={{ __html: convert.toHtml(line) }}
+            style={{ fontSize, whiteSpace: wordWrap ? 'pre-wrap' : 'pre' }}
+            dangerouslySetInnerHTML={{ __html: convert.toHtml(formatLine(line)) }}
+            onContextMenu={e => openCtx(e, line)}
           />
         )}
         components={{
           Footer: () => (
-            <div style={{ padding: '0 16px 8px', fontFamily: 'var(--mono)', fontSize: 12.5, color: 'var(--ghost)' }}>
+            <div style={{ padding: '0 16px 8px', fontFamily: 'var(--mono)', fontSize, color: 'var(--ghost)' }}>
               <span className="console-cursor" />
             </div>
           ),
@@ -110,6 +125,30 @@ export default function Console() {
         />
         <button className="console-send-btn" onClick={send}>Send</button>
       </div>
+
+      {ctx && (
+        <>
+          <div className="ctx-backdrop" onClick={closeCtx} />
+          <div className="ctx-menu" style={{ left: ctx.x, top: ctx.y }}>
+            <button className="ctx-item" onClick={() => { navigator.clipboard.writeText(ctx.line); closeCtx() }}>
+              📋 Copy line
+            </button>
+            {quickActions.length > 0 && (
+              <>
+                <div className="ctx-divider" />
+                <div className="ctx-section-label">Quick Actions</div>
+                {quickActions.map(s => (
+                  <button key={s.id} className="ctx-item ctx-qa" onClick={() => handleQAClick(s)}>
+                    ⚡ {s.name}
+                  </button>
+                ))}
+              </>
+            )}
+          </div>
+        </>
+      )}
+
+      {runSnippet && <RunModal snippet={runSnippet} onClose={() => setRunSnippet(null)} />}
     </div>
   )
 }

@@ -5,6 +5,8 @@ import io.github.Earth1283.teletype.web.model.ExecuteRequest
 import io.github.Earth1283.teletype.web.model.PlayerInfo
 import io.github.Earth1283.teletype.web.model.ServerStatus
 import io.github.Earth1283.teletype.web.model.StatusResponse
+import io.ktor.server.plugins.ratelimit.RateLimitName
+import io.ktor.server.plugins.ratelimit.rateLimit
 import io.ktor.server.request.receive
 import io.ktor.server.response.respond
 import io.ktor.server.routing.Route
@@ -38,11 +40,13 @@ fun Route.apiRoutes(plugin: Teletype) {
         call.respond(players)
     }
 
-    post("/execute") {
-        val body = call.receive<ExecuteRequest>()
-        Bukkit.getScheduler().runTask(plugin, Runnable {
-            Bukkit.dispatchCommand(Bukkit.getConsoleSender(), body.command)
-        })
-        call.respond(StatusResponse("dispatched"))
+    rateLimit(RateLimitName("execute")) {
+        post("/execute") {
+            val body = call.receive<ExecuteRequest>()
+            Bukkit.getScheduler().runTask(plugin, Runnable {
+                Bukkit.dispatchCommand(Bukkit.getConsoleSender(), body.command)
+            })
+            call.respond(StatusResponse("dispatched"))
+        }
     }
 }

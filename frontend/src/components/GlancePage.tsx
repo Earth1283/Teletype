@@ -1,10 +1,16 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import {
-  AreaChart, Area, LineChart, Line,
+  ComposedChart, Area,
   XAxis, YAxis, CartesianGrid, Tooltip,
-  ResponsiveContainer, ReferenceLine,
+  ResponsiveContainer, ReferenceArea, ReferenceLine,
 } from 'recharts'
+import { useQuery } from '@tanstack/react-query'
+import { Virtuoso, type VirtuosoHandle } from 'react-virtuoso'
 import { api } from '../api/client'
+import { useLogs, type TimestampedLog } from '../LogContext'
+import { useSettings } from '../SettingsContext'
+
+// ── Types ────────────────────────────────────────────────────────────────────
 
 interface Snap {
   timestamp: number
@@ -14,293 +20,619 @@ interface Snap {
   uptimeMs: number
 }
 
-type Window = 1 | 5 | 15
-const WINDOWS: Window[] = [1, 5, 15]
-const WINDOW_LABEL: Record<Window, string> = { 1: '1 min', 5: '5 min', 15: '15 min' }
+interface ProcessedSnap extends Snap { memPct: number }
 
-function fmtUptime(ms: number) {
-  const s = Math.floor(ms / 1000)
-  const d = Math.floor(s / 86400)
-  const h = Math.floor((s % 86400) / 3600)
-  const m = Math.floor((s % 3600) / 60)
-  const sec = s % 60
-  if (d > 0) return `${d}d ${h}h ${m}m`
-  if (h > 0) return `${h}h ${m}m ${sec}s`
-  return `${m}m ${sec}s`
+interface SeriesStats { mean: number; std: number }
+interface DataStats { tps1: SeriesStats; tickTimeMs: SeriesStats; memPct: SeriesStats }
+interface AnomalyThresholds { tps: number; tick: number; mem: number }
+
+type Status = 'nominal' | 'degraded' | 'incident'
+type WindowMin = 1 | 5 | 15 | 60 | 360 | 1440
+
+// ── Constants ────────────────────────────────────────────────────────────────
+
+const WINDOWS: { v: WindowMin; label: string }[] = [
+  { v: 1, label: '1m' }, { v: 5, label: '5m' }, { v: 15, label: '15m' },
+  { v: 60, label: '1h' }, { v: 360, label: '6h' }, { v: 1440, label: '24h' },
+]
+
+const FOCUS_SEC: Record<number, number> = {
+  1: 15, 5: 60, 15: 120, 60: 300, 360: 900, 1440: 1800,
 }
 
-function tpsColor(tps: number) {
-  if (tps >= 19) return 'var(--green)'
-  if (tps >= 15) return 'var(--yellow)'
+const MAX_DISPLAY_PTS = 600
+
+// ── Helpers ──────────────────────────────────────────────────────────────────
+
+function computeStats(values: number[]): SeriesStats {
+  if (values.length < 2) return { mean: values[0] ?? 0, std: 0 }
+  const mean = values.reduce((a, b) => a + b, 0) / values.length
+  return {
+    mean,
+    std: Math.sqrt(values.reduce((a, v) => a + (v - mean) ** 2, 0) / values.length),
+  }
+}
+
+function downsample(data: ProcessedSnap[]): ProcessedSnap[] {
+  if (data.length <= MAX_DISPLAY_PTS) return data
+  const step = Math.ceil(data.length / MAX_DISPLAY_PTS)
+  return data.filter((_, i) => i % step === 0 || i === data.length - 1)
+}
+
+function tpsColor(v: number): string {
+  if (v >= 19) return 'var(--green)'
+  if (v >= 15) return 'var(--amber)'
+  return 'var(--red)'
+}
+function tickColor(v: number): string {
+  if (v <= 50) return 'var(--green)'
+  if (v <= 100) return 'var(--amber)'
+  return 'var(--red)'
+}
+function memColor(pct: number): string {
+  if (pct < 0.65) return 'var(--blue)'
+  if (pct < 0.85) return 'var(--amber)'
   return 'var(--red)'
 }
 
-function memPct(snap: Snap) {
-  return snap.memMaxMb > 0 ? Math.round((snap.memUsedMb / snap.memMaxMb) * 100) : 0
+function tpsStatus(v: number): Status { return v >= 19 ? 'nominal' : v >= 15 ? 'degraded' : 'incident' }
+function tickStatus(v: number): Status { return v <= 50 ? 'nominal' : v <= 100 ? 'degraded' : 'incident' }
+function memStatus(pct: number): Status { return pct < 0.65 ? 'nominal' : pct < 0.85 ? 'degraded' : 'incident' }
+function globalStatus(snap: Snap): Status {
+  const p = snap.memMaxMb > 0 ? snap.memUsedMb / snap.memMaxMb : 0
+  if (snap.tps1 < 15 || snap.tickTimeMs > 100 || p > 0.9) return 'incident'
+  if (snap.tps1 < 19 || snap.tickTimeMs > 50 || p > 0.75) return 'degraded'
+  return 'nominal'
 }
-
-function xLabel(ts: number, window: Window) {
+function fmtUptime(ms: number): string {
+  const s = Math.floor(ms / 1000)
+  const d = Math.floor(s / 86400), h = Math.floor((s % 86400) / 3600), m = Math.floor((s % 3600) / 60)
+  return d > 0 ? `${d}d ${h}h` : h > 0 ? `${h}h ${m}m` : `${m}m`
+}
+function pad(n: number) { return n.toString().padStart(2, '0') }
+function fmtTime(ts: number): string {
   const d = new Date(ts)
-  if (window === 1) return `${String(d.getMinutes()).padStart(2,'0')}:${String(d.getSeconds()).padStart(2,'0')}`
-  return `${String(d.getHours()).padStart(2,'0')}:${String(d.getMinutes()).padStart(2,'0')}`
+  return `${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`
+}
+function fmtTimeFull(ts: number): string {
+  const d = new Date(ts)
+  return `${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}.${d.getMilliseconds().toString().padStart(3, '0')}`
+}
+function logLevel(line: string): string {
+  const u = line.toUpperCase()
+  if (u.includes('[WARN]') || u.includes('[WARNING]')) return 'warn'
+  if (u.includes('[ERROR]') || u.includes('[SEVERE]') || u.includes('[FATAL]')) return 'error'
+  return ''
 }
 
-const CHART_MARGIN = { top: 4, right: 16, left: 0, bottom: 0 }
+// ── Tooltips ─────────────────────────────────────────────────────────────────
 
-// Custom tooltip that fits the dark theme
-function ChartTooltip({ active, payload, label, unit }: any) {
+function SimpleTooltip({ active, payload }: any) {
   if (!active || !payload?.length) return null
+  const snap = payload[0].payload as ProcessedSnap
   return (
-    <div style={{
-      background: 'var(--surface)', border: '1px solid var(--border-hi)',
-      borderRadius: 6, padding: '6px 10px', fontFamily: 'var(--mono)', fontSize: 11,
-    }}>
-      <div style={{ color: 'var(--mist)', marginBottom: 3 }}>{label}</div>
-      {payload.map((p: any, i: number) => (
-        <div key={i} style={{ color: p.color ?? 'var(--ash)' }}>
-          {p.name}: {typeof p.value === 'number' ? p.value.toFixed(2) : p.value}{unit}
-        </div>
-      ))}
+    <div className="glance-tooltip">
+      <div className="glance-tooltip-time">{fmtTimeFull(snap.timestamp)}</div>
+      <div className="glance-tooltip-metrics">
+        {[
+          { label: 'TPS', val: snap.tps1.toFixed(2) },
+          { label: 'Tick', val: `${snap.tickTimeMs.toFixed(1)}ms` },
+          { label: 'Mem', val: `${Math.round(snap.memPct * 100)}%` },
+        ].map(r => (
+          <div key={r.label} className="tooltip-metric-row">
+            <span className="tm-sigma" /><span className="tm-label">{r.label}</span>
+            <span className="tm-value">{r.val}</span><span className="tm-mean" />
+          </div>
+        ))}
+      </div>
     </div>
   )
 }
 
-export default function GlancePage() {
-  const [window, setWindow] = useState<Window>(5)
-  const [data, setData] = useState<Snap[]>([])
-  const [latest, setLatest] = useState<Snap | null>(null)
-  const [loading, setLoading] = useState(true)
-  const [uptimeDisplay, setUptimeDisplay] = useState('—')
-  const pollRef = useRef<ReturnType<typeof setInterval> | null>(null)
+interface IncidentTooltipProps {
+  active?: boolean
+  payload?: any[]
+  allStats: DataStats
+  thresholds: AnomalyThresholds
+  getLogsAround: (ts: number, windowMs: number) => TimestampedLog[]
+  logWindowMs: number
+  onJumpToTs?: (ts: number) => void
+}
 
-  async function loadHistory(w: Window) {
-    setLoading(true)
-    try {
-      const res = await api.get('/glance/history', { params: { window: w } })
-      setData(res.data)
-      if (res.data.length > 0) setLatest(res.data[res.data.length - 1])
-    } finally { setLoading(false) }
+function IncidentTooltip({
+  active, payload, allStats, thresholds, getLogsAround, logWindowMs, onJumpToTs,
+}: IncidentTooltipProps) {
+  if (!active || !payload?.length) return null
+  const snap = payload[0].payload as ProcessedSnap
+
+  type Anomaly = { label: string; z: number; val: string; mean: string; heuristic: string }
+  const anomalies: Anomaly[] = []
+
+  if (allStats.tps1.std > 0.05) {
+    const z = (snap.tps1 - allStats.tps1.mean) / allStats.tps1.std
+    if (z < -thresholds.tps) anomalies.push({
+      label: 'TPS', z,
+      val: snap.tps1.toFixed(1), mean: allStats.tps1.mean.toFixed(1),
+      heuristic: snap.tps1 < 10 ? 'Server near-freeze' : snap.tps1 < 15 ? 'Significant lag event' : 'TPS below target',
+    })
   }
-
-  useEffect(() => { loadHistory(window) }, [window])
-
-  // Live polling — append current snapshot every 2s
-  useEffect(() => {
-    pollRef.current = setInterval(async () => {
-      try {
-        const res = await api.get('/glance/current')
-        const snap: Snap = res.data
-        setLatest(snap)
-        setData((prev) => {
-          const maxPts = window * 60
-          const next = [...prev, snap]
-          return next.length > maxPts ? next.slice(-maxPts) : next
-        })
-      } catch { /* server may be restarting */ }
-    }, 2000)
-    return () => { if (pollRef.current) clearInterval(pollRef.current) }
-  }, [window])
-
-  // Tick the uptime display every second without a server call
-  useEffect(() => {
-    if (!latest) return
-    const base = latest.uptimeMs
-    const captured = Date.now()
-    const tick = () => setUptimeDisplay(fmtUptime(base + (Date.now() - captured)))
-    tick()
-    const id = setInterval(tick, 1000)
-    return () => clearInterval(id)
-  }, [latest?.timestamp])
-
-  const tps = latest?.tps1 ?? 0
-  const mem = latest ? memPct(latest) : 0
-  const memColor = mem > 85 ? 'var(--red)' : mem > 65 ? 'var(--yellow)' : 'var(--blue)'
+  if (allStats.tickTimeMs.std > 0.5) {
+    const z = (snap.tickTimeMs - allStats.tickTimeMs.mean) / allStats.tickTimeMs.std
+    if (z > thresholds.tick) anomalies.push({
+      label: 'Tick', z,
+      val: `${Math.round(snap.tickTimeMs)}ms`, mean: `${Math.round(allStats.tickTimeMs.mean)}ms`,
+      heuristic: snap.tickTimeMs > 100 ? 'Main thread stalled' : 'Server lag spike',
+    })
+  }
+  if (allStats.memPct.std > 0.001) {
+    const z = (snap.memPct - allStats.memPct.mean) / allStats.memPct.std
+    if (z > thresholds.mem) anomalies.push({
+      label: 'Mem', z,
+      val: `${Math.round(snap.memPct * 100)}%`, mean: `${Math.round(allStats.memPct.mean * 100)}%`,
+      heuristic: snap.memPct > 0.9 ? 'Memory pressure critical' : 'Memory surge detected',
+    })
+  }
+  anomalies.sort((a, b) => Math.abs(b.z) - Math.abs(a.z))
+  const isIncident = anomalies.length > 0
+  const nearbyLogs = getLogsAround(snap.timestamp, logWindowMs)
 
   return (
-    <div className="section-root" style={{ display: 'flex', flexDirection: 'column', gap: 24 }}>
-
-      {/* Header row */}
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-        <div>
-          <div className="section-title" style={{ fontSize: 16 }}>Server at a glance</div>
-          <div style={{ fontFamily: 'var(--mono)', fontSize: 11, color: 'var(--mist)', marginTop: 2 }}>
-            Live metrics · updates every 2 s
-          </div>
+    <div className="glance-tooltip">
+      {isIncident ? (
+        <div className="glance-tooltip-incident">
+          <span className="incident-badge">⚠</span>
+          <span className="incident-heuristic">{anomalies[0].heuristic}</span>
+          <span className="incident-time">{fmtTimeFull(snap.timestamp)}</span>
         </div>
-        <div style={{ display: 'flex', gap: 4 }}>
-          {WINDOWS.map((w) => (
-            <button key={w}
-              onClick={() => setWindow(w)}
-              style={{
-                fontFamily: 'var(--mono)', fontSize: 11, padding: '4px 10px',
-                borderRadius: 'var(--r-sm)', cursor: 'pointer',
-                background: window === w ? 'var(--amber-dim)' : 'var(--elevated)',
-                border: `1px solid ${window === w ? 'var(--amber-glow)' : 'var(--border)'}`,
-                color: window === w ? 'var(--amber)' : 'var(--mist)',
-                transition: 'all 120ms',
-              }}
-            >
-              {WINDOW_LABEL[w]}
-            </button>
+      ) : (
+        <div className="glance-tooltip-time">{fmtTimeFull(snap.timestamp)}</div>
+      )}
+      <div className="glance-tooltip-metrics">
+        {isIncident ? anomalies.map((a, i) => (
+          <div key={i} className="tooltip-metric-row anomaly">
+            <span className="tm-sigma">{a.z > 0 ? '+' : ''}{a.z.toFixed(1)}σ</span>
+            <span className="tm-label">{a.label}</span>
+            <span className="tm-value">{a.val}</span>
+            <span className="tm-mean">μ {a.mean}</span>
+          </div>
+        )) : (
+          <>
+            <div className="tooltip-metric-row">
+              <span className="tm-sigma" /><span className="tm-label">TPS</span>
+              <span className="tm-value">{snap.tps1.toFixed(1)}</span><span className="tm-mean">/20</span>
+            </div>
+            <div className="tooltip-metric-row">
+              <span className="tm-sigma" /><span className="tm-label">Tick</span>
+              <span className="tm-value">{Math.round(snap.tickTimeMs)}ms</span><span className="tm-mean" />
+            </div>
+            <div className="tooltip-metric-row">
+              <span className="tm-sigma" /><span className="tm-label">Mem</span>
+              <span className="tm-value">{Math.round(snap.memPct * 100)}%</span><span className="tm-mean" />
+            </div>
+          </>
+        )}
+      </div>
+      {nearbyLogs.length > 0 && (
+        <div className="glance-tooltip-logs">
+          <div className="tooltip-log-header">nearest log</div>
+          {nearbyLogs.slice(0, 3).map((l, i) => (
+            <div key={i} className={`tooltip-log-line ${logLevel(l.line)}`}>
+              {l.line.length > 58 ? l.line.slice(0, 58) + '…' : l.line}
+            </div>
           ))}
         </div>
-      </div>
-
-      {/* Summary cards */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 12 }}>
-        <SummaryCard label="Uptime">
-          <span style={{ fontFamily: 'var(--mono)', fontSize: 22, fontWeight: 600, color: 'var(--ash)', letterSpacing: '-0.02em' }}>
-            {uptimeDisplay}
-          </span>
-        </SummaryCard>
-
-        <SummaryCard label="TPS (1 min)">
-          <span style={{ fontFamily: 'var(--mono)', fontSize: 28, fontWeight: 600, color: tpsColor(tps), letterSpacing: '-0.02em' }}>
-            {tps.toFixed(1)}
-          </span>
-          <span style={{ fontFamily: 'var(--mono)', fontSize: 11, color: 'var(--mist)', marginLeft: 4, alignSelf: 'flex-end', paddingBottom: 4 }}>/ 20.0</span>
-        </SummaryCard>
-
-        <SummaryCard label="Memory">
-          <span style={{ fontFamily: 'var(--mono)', fontSize: 28, fontWeight: 600, color: memColor, letterSpacing: '-0.02em' }}>
-            {mem}%
-          </span>
-          {latest && (
-            <span style={{ fontFamily: 'var(--mono)', fontSize: 11, color: 'var(--mist)', marginLeft: 6, alignSelf: 'flex-end', paddingBottom: 4 }}>
-              {latest.memUsedMb} / {latest.memMaxMb} MB
-            </span>
-          )}
-        </SummaryCard>
-      </div>
-
-      {/* Charts */}
-      {loading ? (
-        <div className="dim">Loading metrics…</div>
-      ) : (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
-          <ChartCard title="Ticks per Second" subtitle="Target: 20.0">
-            <ResponsiveContainer width="100%" height={160}>
-              <LineChart data={data} margin={CHART_MARGIN}>
-                <CartesianGrid strokeDasharray="2 4" stroke="var(--border)" vertical={false} />
-                <XAxis
-                  dataKey="timestamp" type="number" scale="time" domain={['auto', 'auto']}
-                  tickFormatter={(v) => xLabel(v, window)}
-                  tick={{ fill: 'var(--mist)', fontFamily: 'var(--mono)', fontSize: 10 }}
-                  tickLine={false} axisLine={false} interval="preserveStartEnd" minTickGap={40}
-                />
-                <YAxis
-                  domain={[0, 21]} width={28}
-                  tick={{ fill: 'var(--mist)', fontFamily: 'var(--mono)', fontSize: 10 }}
-                  tickLine={false} axisLine={false} tickCount={5}
-                />
-                <Tooltip content={<ChartTooltip unit="" />} />
-                <ReferenceLine y={20} stroke="var(--border-hi)" strokeDasharray="3 3" />
-                <Line dataKey="tps1" name="1m" stroke="var(--amber)" strokeWidth={1.5} dot={false} isAnimationActive={false} />
-                <Line dataKey="tps5" name="5m" stroke="rgba(245,158,11,.4)" strokeWidth={1} dot={false} strokeDasharray="3 3" isAnimationActive={false} />
-              </LineChart>
-            </ResponsiveContainer>
-          </ChartCard>
-
-          <ChartCard title="Memory Usage" subtitle={`Max: ${latest?.memMaxMb ?? '—'} MB`}>
-            <ResponsiveContainer width="100%" height={160}>
-              <AreaChart data={data} margin={CHART_MARGIN}>
-                <defs>
-                  <linearGradient id="memGrad" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="0%" stopColor="var(--blue)" stopOpacity={0.25} />
-                    <stop offset="100%" stopColor="var(--blue)" stopOpacity={0.02} />
-                  </linearGradient>
-                </defs>
-                <CartesianGrid strokeDasharray="2 4" stroke="var(--border)" vertical={false} />
-                <XAxis
-                  dataKey="timestamp" type="number" scale="time" domain={['auto', 'auto']}
-                  tickFormatter={(v) => xLabel(v, window)}
-                  tick={{ fill: 'var(--mist)', fontFamily: 'var(--mono)', fontSize: 10 }}
-                  tickLine={false} axisLine={false} interval="preserveStartEnd" minTickGap={40}
-                />
-                <YAxis
-                  width={40}
-                  tick={{ fill: 'var(--mist)', fontFamily: 'var(--mono)', fontSize: 10 }}
-                  tickLine={false} axisLine={false} tickCount={4}
-                  tickFormatter={(v) => `${v}m`}
-                  domain={[0, (latest?.memMaxMb ?? 'auto')]}
-                />
-                <Tooltip content={<ChartTooltip unit=" MB" />} />
-                <Area
-                  dataKey="memUsedMb" name="Used"
-                  stroke="var(--blue)" strokeWidth={1.5}
-                  fill="url(#memGrad)" dot={false} isAnimationActive={false}
-                />
-              </AreaChart>
-            </ResponsiveContainer>
-          </ChartCard>
-
-          <ChartCard title="Mean Tick Time" subtitle="Healthy: < 50 ms">
-            <ResponsiveContainer width="100%" height={140}>
-              <AreaChart data={data} margin={CHART_MARGIN}>
-                <defs>
-                  <linearGradient id="tickGrad" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="0%" stopColor="var(--green)" stopOpacity={0.2} />
-                    <stop offset="100%" stopColor="var(--green)" stopOpacity={0.02} />
-                  </linearGradient>
-                </defs>
-                <CartesianGrid strokeDasharray="2 4" stroke="var(--border)" vertical={false} />
-                <XAxis
-                  dataKey="timestamp" type="number" scale="time" domain={['auto', 'auto']}
-                  tickFormatter={(v) => xLabel(v, window)}
-                  tick={{ fill: 'var(--mist)', fontFamily: 'var(--mono)', fontSize: 10 }}
-                  tickLine={false} axisLine={false} interval="preserveStartEnd" minTickGap={40}
-                />
-                <YAxis
-                  width={36}
-                  tick={{ fill: 'var(--mist)', fontFamily: 'var(--mono)', fontSize: 10 }}
-                  tickLine={false} axisLine={false} tickCount={4}
-                  tickFormatter={(v) => `${v}ms`}
-                  domain={[0, 'auto']}
-                />
-                <Tooltip content={<ChartTooltip unit=" ms" />} />
-                <ReferenceLine y={50} stroke="rgba(248,113,113,.4)" strokeDasharray="3 3" />
-                <Area
-                  dataKey="tickTimeMs" name="Tick"
-                  stroke="var(--green)" strokeWidth={1.5}
-                  fill="url(#tickGrad)" dot={false} isAnimationActive={false}
-                />
-              </AreaChart>
-            </ResponsiveContainer>
-          </ChartCard>
-        </div>
+      )}
+      {(isIncident || nearbyLogs.length > 0) && onJumpToTs && (
+        <button
+          className="glance-tooltip-jump"
+          onMouseDown={e => { e.stopPropagation(); onJumpToTs(snap.timestamp) }}
+        >
+          jump to log →
+        </button>
       )}
     </div>
   )
 }
 
-function SummaryCard({ label, children }: { label: string; children: React.ReactNode }) {
+// ── BifurcatedChart ───────────────────────────────────────────────────────────
+
+interface GlanceChartProps {
+  title: string
+  data: ProcessedSnap[]
+  dataKey: keyof ProcessedSnap
+  color: string
+  yDomain: [number | string, number | string]
+  yFormatter: (v: number) => string
+  stats: SeriesStats
+  allStats: DataStats
+  thresholds: AnomalyThresholds
+  bifurTs: number
+  chartId: string
+  getLogsAround: (ts: number, windowMs: number) => TimestampedLog[]
+  logWindowMs: number
+  onPointClick: (ts: number) => void
+  greyBeardMode: boolean
+  showBifurcation: boolean
+  logCorrelation: boolean
+}
+
+function GlanceChart({
+  title, data, dataKey, color, yDomain, yFormatter,
+  stats, allStats, thresholds, bifurTs, chartId,
+  getLogsAround, logWindowMs, onPointClick,
+  greyBeardMode, showBifurcation, logCorrelation,
+}: GlanceChartProps) {
+  const latest = data[data.length - 1]
+  const currentVal = latest ? (latest[dataKey] as number) : 0
+
+  const bifurIdx = data.findIndex(d => d.timestamp >= bifurTs)
+  const bifurPct = bifurIdx < 0 ? 100 : (bifurIdx / data.length) * 100
+
+  const sigmaStr = !greyBeardMode && stats.std > 0.01
+    ? (() => { const z = (currentVal - stats.mean) / stats.std; return `${z > 0 ? '+' : ''}${z.toFixed(1)}σ` })()
+    : null
+
+  const renderDot = greyBeardMode ? false : (props: any) => {
+    const { cx, cy, payload } = props
+    if (cx == null || cy == null) return <g key="d-empty" />
+    const v = payload[dataKey] as number
+    if (stats.std < 0.01) return <g key={`d-${cx}`} />
+    const z = (v - stats.mean) / stats.std
+    const aboveThreshold = dataKey === 'tps1' ? z < -thresholds.tps
+      : dataKey === 'memPct' ? z > thresholds.mem
+      : z > thresholds.tick
+    if (!aboveThreshold) return <g key={`d-${cx}`} />
+    const dotColor = Math.abs(z) > (thresholds.tick + 1) ? 'var(--red)' : 'var(--amber)'
+    return (
+      <circle
+        key={`a-${cx}-${cy}`}
+        cx={cx} cy={cy} r={4}
+        fill={dotColor} fillOpacity={0.85}
+        style={{ filter: `drop-shadow(0 0 5px ${dotColor})` }}
+      />
+    )
+  }
+
+  const tooltipContent = greyBeardMode
+    ? (props: any) => <SimpleTooltip {...props} />
+    : (props: any) => (
+        <IncidentTooltip
+          {...props}
+          allStats={allStats}
+          thresholds={thresholds}
+          getLogsAround={logCorrelation ? getLogsAround : () => []}
+          logWindowMs={logWindowMs}
+          onJumpToTs={onPointClick}
+        />
+      )
+
+  const strokeProp = greyBeardMode
+    ? color
+    : `url(#${chartId}-stroke)`
+
+  const fillProp = greyBeardMode ? 'none' : `url(#${chartId}-fill)`
+
   return (
-    <div style={{
-      background: 'var(--surface)', border: '1px solid var(--border)',
-      borderRadius: 'var(--r-lg)', padding: '14px 18px',
-    }}>
-      <div style={{
-        fontSize: 11, fontWeight: 500, textTransform: 'uppercase',
-        letterSpacing: '0.08em', color: 'var(--mist)', marginBottom: 8,
-      }}>
-        {label}
+    <div className="glance-chart-card">
+      <div className="glance-chart-header">
+        <span className="glance-chart-title">{title}</span>
+        <span className="glance-chart-value" style={{ color }}>{yFormatter(currentVal)}</span>
+        {sigmaStr && <span className="glance-chart-sigma">{sigmaStr}</span>}
       </div>
-      <div style={{ display: 'flex', alignItems: 'baseline' }}>{children}</div>
+      <ResponsiveContainer width="100%" height={130}>
+        <ComposedChart
+          data={data}
+          margin={{ top: 4, right: 8, bottom: 0, left: 0 }}
+          onClick={(e: any) => {
+            const pt = e?.activePayload?.[0]?.payload as ProcessedSnap | undefined
+            if (pt) onPointClick(pt.timestamp)
+          }}
+        >
+          {!greyBeardMode && (
+            <defs>
+              <linearGradient id={`${chartId}-stroke`} x1="0%" y1="0%" x2="100%" y2="0%">
+                <stop offset="0%" stopColor={color} stopOpacity={0.12} />
+                <stop offset={`${Math.max(0, bifurPct - 1)}%`} stopColor={color} stopOpacity={0.25} />
+                <stop offset={`${bifurPct}%`} stopColor={color} stopOpacity={1} />
+                <stop offset="100%" stopColor={color} stopOpacity={1} />
+              </linearGradient>
+              <linearGradient id={`${chartId}-fill`} x1="0" y1="0" x2="0" y2="1">
+                <stop offset="5%" stopColor={color} stopOpacity={0.1} />
+                <stop offset="95%" stopColor={color} stopOpacity={0} />
+              </linearGradient>
+            </defs>
+          )}
+
+          <CartesianGrid strokeDasharray="2 4" stroke="var(--border)" vertical={false} />
+          <XAxis
+            dataKey="timestamp" type="number" scale="time" domain={['dataMin', 'dataMax']}
+            tickFormatter={fmtTime}
+            tick={{ fill: 'var(--mist)', fontFamily: 'var(--mono)', fontSize: 9 }}
+            tickLine={false} axisLine={false} interval="preserveStartEnd" minTickGap={60}
+          />
+          <YAxis
+            domain={yDomain} width={38}
+            tick={{ fill: 'var(--mist)', fontFamily: 'var(--mono)', fontSize: 9 }}
+            tickLine={false} axisLine={false} tickCount={3} tickFormatter={yFormatter}
+          />
+          <Tooltip content={tooltipContent} cursor={{ stroke: 'var(--border-hi)', strokeWidth: 1 }} />
+
+          {!greyBeardMode && showBifurcation && bifurTs > (data[0]?.timestamp ?? 0) && bifurPct < 98 && (
+            <>
+              <ReferenceArea
+                x1={bifurTs} x2={data[data.length - 1]?.timestamp}
+                fill="rgba(255,255,255,0.018)" stroke="none"
+              />
+              <ReferenceLine
+                x={bifurTs} stroke="var(--border-hi)" strokeDasharray="2 3" strokeWidth={1}
+                label={{ value: 'focus', position: 'insideTopRight', fill: 'var(--ghost)', fontSize: 8, fontFamily: 'var(--mono)' }}
+              />
+            </>
+          )}
+
+          <Area
+            type="monotone"
+            dataKey={dataKey as string}
+            stroke={strokeProp}
+            strokeWidth={greyBeardMode ? 1 : 1.5}
+            fill={fillProp}
+            dot={renderDot as any}
+            activeDot={{ r: 3, fill: color, stroke: 'var(--elevated)', strokeWidth: 1 }}
+            isAnimationActive={false}
+          />
+        </ComposedChart>
+      </ResponsiveContainer>
     </div>
   )
 }
 
-function ChartCard({ title, subtitle, children }: { title: string; subtitle: string; children: React.ReactNode }) {
+// ── Stat Card ─────────────────────────────────────────────────────────────────
+
+function StatCard({ label, value, sub, color, status, barPct, sigma }: {
+  label: string; value: string; sub?: string; color: string
+  status: Status; barPct?: number; sigma?: number | null
+}) {
   return (
-    <div style={{
-      background: 'var(--surface)', border: '1px solid var(--border)',
-      borderRadius: 'var(--r-lg)', padding: '16px 20px 10px',
-    }}>
-      <div style={{ display: 'flex', alignItems: 'baseline', gap: 8, marginBottom: 12 }}>
-        <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--ash)' }}>{title}</span>
-        <span style={{ fontFamily: 'var(--mono)', fontSize: 11, color: 'var(--mist)' }}>{subtitle}</span>
+    <div className={`glance-stat-card ${status}`}>
+      <div className="glance-stat-label">{label}</div>
+      <div className="glance-stat-value" style={{ color }}>{value}</div>
+      {sub && <div className="glance-stat-sub">{sub}</div>}
+      {barPct !== undefined && (
+        <div className="health-bar-track">
+          <div className="health-bar-fill" style={{ width: `${Math.max(0, Math.min(1, barPct)) * 100}%`, background: color }} />
+        </div>
+      )}
+      {sigma != null && Math.abs(sigma) > 0.1 && (
+        <div className="glance-stat-sigma">{sigma > 0 ? '+' : ''}{sigma.toFixed(1)}σ</div>
+      )}
+    </div>
+  )
+}
+
+// ── Log Viewer ────────────────────────────────────────────────────────────────
+
+function GlanceLogViewer({ tsLogs, clickedTs, onClear }: {
+  tsLogs: TimestampedLog[]; clickedTs: number | null; onClear: () => void
+}) {
+  const virtuosoRef = useRef<VirtuosoHandle>(null)
+  const [highlightRange, setHighlightRange] = useState<{ from: number; to: number } | null>(null)
+
+  useEffect(() => {
+    if (clickedTs === null) { setHighlightRange(null); return }
+    const W = 5000
+    setHighlightRange({ from: clickedTs - W, to: clickedTs + W })
+    const idx = tsLogs.findIndex(l => l.ts >= clickedTs - W)
+    if (idx >= 0) {
+      requestAnimationFrame(() => {
+        virtuosoRef.current?.scrollToIndex({ index: Math.max(0, idx), behavior: 'smooth', align: 'center' })
+      })
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [clickedTs])
+
+  return (
+    <>
+      <div className="glance-log-header">
+        <span className="glance-log-title">Logs</span>
+        {clickedTs !== null && (
+          <>
+            <span className="glance-log-ts-badge">{fmtTime(clickedTs)} ±5s</span>
+            <button className="glance-log-clear" onClick={onClear} title="Clear highlight">×</button>
+          </>
+        )}
       </div>
-      {children}
+      <Virtuoso
+        ref={virtuosoRef}
+        data={tsLogs}
+        style={{ flex: 1, minHeight: 0 }}
+        followOutput={clickedTs === null}
+        itemContent={(_, log) => {
+          const inRange = highlightRange !== null && log.ts >= highlightRange.from && log.ts <= highlightRange.to
+          const isExact = clickedTs !== null && Math.abs(log.ts - clickedTs) <= 1000
+          return (
+            <div className={`glance-log-line ${logLevel(log.line)}${inRange ? ' highlighted' : ''}${isExact ? ' exact' : ''}`}>
+              {log.line}
+            </div>
+          )
+        }}
+        components={{
+          EmptyPlaceholder: () => <div className="glance-log-empty">waiting for logs…</div>,
+        }}
+      />
+    </>
+  )
+}
+
+// ── Main page ─────────────────────────────────────────────────────────────────
+
+export default function GlancePage() {
+  const [windowMin, setWindowMin] = useState<WindowMin>(5)
+  const [clickedTs, setClickedTs] = useState<number | null>(null)
+  const logCtx = useLogs()
+  const { settings } = useSettings()
+  const { greyBeardMode: gbm, glance: gs } = settings
+
+  const { data: histData = [] } = useQuery<Snap[]>({
+    queryKey: ['glance-history', windowMin],
+    queryFn: () => api.get(`/glance/history?window=${windowMin}`).then(r => r.data),
+    refetchInterval: windowMin <= 5 ? Math.max(gs.refreshIntervalMs, 2000) : 30_000,
+    staleTime: 1_000,
+  })
+
+  const { data: current } = useQuery<Snap>({
+    queryKey: ['glance-current'],
+    queryFn: () => api.get('/glance/current').then(r => r.data),
+    refetchInterval: gs.refreshIntervalMs,
+  })
+
+  const rawData = useMemo(() => {
+    if (!current) return histData
+    const lastTs = histData[histData.length - 1]?.timestamp ?? 0
+    return current.timestamp > lastTs + 500 ? [...histData, current] : histData
+  }, [histData, current])
+
+  const data = useMemo(() =>
+    downsample(rawData.map(d => ({ ...d, memPct: d.memMaxMb > 0 ? d.memUsedMb / d.memMaxMb : 0 }))),
+    [rawData]
+  )
+
+  const allStats = useMemo<DataStats>(() => ({
+    tps1:       computeStats(data.map(d => d.tps1)),
+    tickTimeMs: computeStats(data.map(d => d.tickTimeMs)),
+    memPct:     computeStats(data.map(d => d.memPct)),
+  }), [data])
+
+  const thresholds: AnomalyThresholds = {
+    tps: gbm ? Infinity : gs.anomalyThresholdTps,
+    tick: gbm ? Infinity : gs.anomalyThresholdTick,
+    mem: gbm ? Infinity : gs.anomalyThresholdMem,
+  }
+
+  const bifurTs = useMemo(() => {
+    if (data.length === 0) return Date.now()
+    return data[data.length - 1].timestamp - (FOCUS_SEC[windowMin] ?? 60) * 1000
+  }, [data, windowMin])
+
+  const [uptimeStr, setUptimeStr] = useState('—')
+  useEffect(() => {
+    if (!current) return
+    const base = current.uptimeMs, captured = Date.now()
+    const tick = () => setUptimeStr(fmtUptime(base + (Date.now() - captured)))
+    tick()
+    const id = setInterval(tick, 1000)
+    return () => clearInterval(id)
+  }, [current?.timestamp])
+
+  const status = current ? globalStatus(current) : 'nominal'
+  const memP = current && current.memMaxMb > 0 ? current.memUsedMb / current.memMaxMb : 0
+
+  const sigmaOf = (val: number, s: SeriesStats) => s.std > 0.01 && !gbm ? (val - s.mean) / s.std : null
+  const tpsSigma  = current ? sigmaOf(current.tps1, allStats.tps1) : null
+  const tickSigma = current ? sigmaOf(current.tickTimeMs, allStats.tickTimeMs) : null
+  const memSigma  = current ? sigmaOf(memP, allStats.memPct) : null
+
+  const showLogPanel = !gbm && gs.showLogPanel
+
+  const SHARED = {
+    data,
+    bifurTs,
+    allStats,
+    thresholds,
+    getLogsAround: logCtx.getLogsAround,
+    logWindowMs: gs.logCorrelationWindowMs,
+    onPointClick: setClickedTs,
+    greyBeardMode: gbm,
+    showBifurcation: gs.showBifurcation,
+    logCorrelation: gs.logCorrelation,
+  }
+
+  // Badge animation class
+  const badgeClass = !gbm && gs.statusBadgePulse
+    ? `glance-status-badge ${status}`
+    : `glance-status-badge ${status} no-pulse`
+
+  return (
+    <div className="glance-root">
+      <div className="glance-left">
+
+        {/* Status bar */}
+        <div className="glance-status-bar">
+          <span className={badgeClass}>{status.toUpperCase()}{gbm ? ' (GBM)' : ''}</span>
+          <span className="glance-status-uptime">up {uptimeStr}</span>
+          <span style={{ flex: 1 }} />
+          <span className="glance-live-badge">
+            <span className="glance-live-dot" />
+            {(gs.refreshIntervalMs / 1000).toFixed(1)}s
+          </span>
+        </div>
+
+        {/* Stat rail */}
+        <div className="glance-stat-rail">
+          <StatCard label="TPS 1m" value={current ? current.tps1.toFixed(1) : '—'} sub="target 20.0"
+            color={tpsColor(current?.tps1 ?? 20)} status={tpsStatus(current?.tps1 ?? 20)}
+            barPct={current ? current.tps1 / 20 : undefined} sigma={tpsSigma} />
+          <StatCard label="Tick Time" value={current ? `${Math.round(current.tickTimeMs)}ms` : '—'} sub="healthy <50ms"
+            color={tickColor(current?.tickTimeMs ?? 0)} status={tickStatus(current?.tickTimeMs ?? 0)}
+            barPct={current ? 1 - Math.min(current.tickTimeMs / 200, 1) : undefined} sigma={tickSigma} />
+          <StatCard label="Memory" value={current ? `${Math.round(memP * 100)}%` : '—'}
+            sub={current ? `${current.memUsedMb} / ${current.memMaxMb} MB` : ''}
+            color={memColor(memP)} status={memStatus(memP)} barPct={memP} sigma={memSigma} />
+          <StatCard label="Uptime" value={uptimeStr} color="var(--ash)" status="nominal" />
+        </div>
+
+        {/* Window selector */}
+        <div className="glance-window-bar">
+          {WINDOWS.map(w => (
+            <button
+              key={w.v}
+              className={`glance-window-btn${windowMin === w.v ? ' active' : ''}`}
+              onClick={() => setWindowMin(w.v)}
+            >
+              {w.label}
+            </button>
+          ))}
+          {clickedTs !== null && (
+            <span className="glance-selection-badge">
+              ● {fmtTime(clickedTs)}
+              <button onClick={() => setClickedTs(null)}>×</button>
+            </span>
+          )}
+        </div>
+
+        {/* Charts */}
+        {data.length === 0 ? (
+          <div className="glance-empty">Waiting for metrics…</div>
+        ) : (
+          <>
+            {gs.showChartTps && (
+              <GlanceChart {...SHARED} title="TPS" dataKey="tps1"
+                color={tpsColor(current?.tps1 ?? 20)} yDomain={[0, 21]}
+                yFormatter={v => v.toFixed(0)} stats={allStats.tps1} chartId="tps" />
+            )}
+            {gs.showChartTick && (
+              <GlanceChart {...SHARED} title="Tick Time" dataKey="tickTimeMs"
+                color={tickColor(current?.tickTimeMs ?? 0)} yDomain={[0, 'auto']}
+                yFormatter={v => `${Math.round(v)}ms`} stats={allStats.tickTimeMs} chartId="tick" />
+            )}
+            {gs.showChartMem && (
+              <GlanceChart {...SHARED} title="Memory" dataKey="memPct"
+                color={memColor(memP)} yDomain={[0, 1]}
+                yFormatter={v => `${Math.round(v * 100)}%`} stats={allStats.memPct} chartId="mem" />
+            )}
+          </>
+        )}
+      </div>
+
+      {/* Log viewer */}
+      {showLogPanel && (
+        <div className="glance-right">
+          <GlanceLogViewer
+            tsLogs={logCtx.tsLogs}
+            clickedTs={clickedTs}
+            onClear={() => setClickedTs(null)}
+          />
+        </div>
+      )}
     </div>
   )
 }
