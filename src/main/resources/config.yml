@@ -19,19 +19,33 @@ server:
   # Cap on simultaneous authenticated WebSocket connections.
   max-websocket-connections: 8
 
-  # Share one public port for both the Minecraft game and the Teletype web panel.
-  # When true, a TCP multiplexer binds on multiplex-port (default 25565) and routes:
-  #   HTTP requests → Teletype (server.port above)
-  #   Everything else → Minecraft (server.port in server.properties)
-  # REQUIREMENT: server-port in server.properties must differ from multiplex-port.
-  # If they match on first enable, the plugin patches server.properties automatically
-  # and asks for a restart (safe — only port number changes). After that restart both
-  # players and browsers connect to multiplex-port only.
+  # ┌─ PORT SHARING (multiplex-game-port) ────────────────────────────────────┐
+  # │ Normally your server needs TWO open ports:                              │
+  # │   25565 — Minecraft players connect here                                │
+  # │   8080  — Teletype web panel                                            │
+  # │                                                                         │
+  # │ Set this to true to share ONE port for both. Players and browsers both  │
+  # │ connect to multiplex-port (default 25565). Teletype figures out which   │
+  # │ connection is which automatically.                                       │
+  # │                                                                         │
+  # │ HOW TO ENABLE (3 steps):                                                │
+  # │   1. Set multiplex-game-port below to: true                             │
+  # │   2. Restart the server. The plugin will automatically move Minecraft   │
+  # │      to an internal port and print a message in console — this is fine. │
+  # │   3. Restart the server ONE MORE TIME. Done.                            │
+  # │      Players still connect to 25565. No firewall changes needed.        │
+  # │                                                                         │
+  # │ TROUBLESHOOTING — players can't connect after enabling:                 │
+  # │   • Did you restart TWICE? One restart is not enough (see step 2-3).   │
+  # │   • Check console for "[Teletype] Port multiplexer on :25565" — if     │
+  # │     that line is missing the multiplexer didn't start; restart again.  │
+  # │   • Make sure multiplex-port (below) matches what players connect to.  │
+  # └─────────────────────────────────────────────────────────────────────────┘
   multiplex-game-port: false
 
-  # The public-facing port the multiplexer listens on. Only used when
-  # multiplex-game-port is true. Should equal the original Minecraft port (25565)
-  # so nothing changes for players or firewall rules.
+  # The port everyone connects to when multiplex-game-port is enabled.
+  # Leave this at 25565 unless your server runs on a different port.
+  # (Only used when multiplex-game-port is true.)
   multiplex-port: 25565
 
   tls:
