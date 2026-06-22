@@ -9,10 +9,15 @@ import io.ktor.websocket.CloseReason
 import io.ktor.websocket.Frame
 import io.ktor.websocket.close
 import io.ktor.websocket.readText
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
+import kotlinx.serialization.builtins.ListSerializer
+import kotlinx.serialization.builtins.serializer
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
 import org.bukkit.Bukkit
+import java.util.concurrent.TimeUnit
 
 private val json = Json { encodeDefaults = true }
 
@@ -37,10 +42,29 @@ suspend fun DefaultWebSocketServerSession.consoleWebSocket(plugin: Teletype) {
                     Json.decodeFromString<WsMessage>(frame.readText())
                 }.getOrNull() ?: continue
 
-                if (msg.type == "command" && msg.payload.isNotBlank()) {
-                    Bukkit.getScheduler().runTask(plugin, Runnable {
-                        Bukkit.dispatchCommand(Bukkit.getConsoleSender(), msg.payload)
-                    })
+                when {
+                    msg.type == "command" && msg.payload.isNotBlank() -> {
+                        Bukkit.getScheduler().runTask(plugin, Runnable {
+                            Bukkit.dispatchCommand(Bukkit.getConsoleSender(), msg.payload)
+                        })
+                    }
+                    msg.type == "tab_complete" && msg.payload.isNotBlank() -> {
+                        val completions: List<String> = withContext(Dispatchers.IO) {
+                            runCatching {
+                                Bukkit.getScheduler().callSyncMethod(plugin) {
+                                    runCatching {
+                                        val server = Bukkit.getServer()
+                                        val map = server.javaClass.getMethod("getCommandMap").invoke(server)
+                                            as? org.bukkit.command.CommandMap
+                                        map?.tabComplete(Bukkit.getConsoleSender(), msg.payload)
+                                            ?: emptyList()
+                                    }.getOrDefault(emptyList<String>())
+                                }.get(500L, TimeUnit.MILLISECONDS)
+                            }.getOrDefault(emptyList())
+                        }
+                        val payload = json.encodeToString(ListSerializer(String.serializer()), completions)
+                        send(Frame.Text(json.encodeToString(WsMessage(type = "tab_complete", payload = payload))))
+                    }
                 }
             }
         }

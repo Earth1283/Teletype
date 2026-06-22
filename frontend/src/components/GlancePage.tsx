@@ -96,6 +96,9 @@ function globalStatus(snap: Snap): Status {
   if (snap.tps1 < 19 || snap.tickTimeMs > 50 || p > 0.75) return 'degraded'
   return 'nominal'
 }
+function fmtMem(mb: number): string {
+  return mb >= 1024 ? `${(mb / 1024).toFixed(1)}G` : `${Math.round(mb)}M`
+}
 function fmtUptime(ms: number): string {
   const s = Math.floor(ms / 1000)
   const d = Math.floor(s / 86400), h = Math.floor((s % 86400) / 3600), m = Math.floor((s % 3600) / 60)
@@ -129,7 +132,7 @@ function SimpleTooltip({ active, payload }: any) {
         {[
           { label: 'TPS', val: snap.tps1.toFixed(2) },
           { label: 'Tick', val: `${snap.tickTimeMs.toFixed(1)}ms` },
-          { label: 'Mem', val: `${Math.round(snap.memPct * 100)}%` },
+          { label: 'Mem', val: fmtMem(snap.memUsedMb) },
         ].map(r => (
           <div key={r.label} className="tooltip-metric-row">
             <span className="tm-sigma" /><span className="tm-label">{r.label}</span>
@@ -180,7 +183,7 @@ function IncidentTooltip({
     const z = (snap.memPct - allStats.memPct.mean) / allStats.memPct.std
     if (z > thresholds.mem) anomalies.push({
       label: 'Mem', z,
-      val: `${Math.round(snap.memPct * 100)}%`, mean: `${Math.round(allStats.memPct.mean * 100)}%`,
+      val: fmtMem(snap.memUsedMb), mean: fmtMem(Math.round(allStats.memPct.mean * snap.memMaxMb)),
       heuristic: snap.memPct > 0.9 ? 'Memory pressure critical' : 'Memory surge detected',
     })
   }
@@ -219,7 +222,7 @@ function IncidentTooltip({
             </div>
             <div className="tooltip-metric-row">
               <span className="tm-sigma" /><span className="tm-label">Mem</span>
-              <span className="tm-value">{Math.round(snap.memPct * 100)}%</span><span className="tm-mean" />
+              <span className="tm-value">{fmtMem(snap.memUsedMb)}</span><span className="tm-mean" />
             </div>
           </>
         )}
@@ -531,6 +534,18 @@ export default function GlancePage() {
     memPct:     computeStats(data.map(d => d.memPct)),
   }), [data])
 
+  const memMaxMb = useMemo(() => {
+    const mx = Math.max(...data.map(d => d.memMaxMb))
+    return mx > 0 ? mx : 1
+  }, [data])
+
+  const cpuStats = useMemo(() => {
+    const vals = data.filter(d => d.cpuPercent != null && (d.cpuPercent as number) >= 0).map(d => d.cpuPercent as number)
+    return vals.length > 1 ? computeStats(vals) : { mean: 0, std: 0 }
+  }, [data])
+
+  const hasCpuData = current?.cpuPercent != null && current.cpuPercent >= 0
+
   const thresholds: AnomalyThresholds = {
     tps: gbm ? Infinity : gs.anomalyThresholdTps,
     tick: gbm ? Infinity : gs.anomalyThresholdTick,
@@ -684,10 +699,15 @@ export default function GlancePage() {
                 yFormatter={v => `${Math.round(v)}ms`} stats={allStats.tickTimeMs} chartId="tick" />
             )}
             {gs.showChartMem && (
-              <GlanceChart {...SHARED} title="Memory" dataKey="memPct"
-                color={memColor(memP)} yDomain={[0, 1]}
-                yFormatter={v => `${Math.round(v * 100)}%`} stats={allStats.memPct} chartId="mem"
+              <GlanceChart {...SHARED} title="Memory" dataKey="memUsedMb"
+                color={memColor(memP)} yDomain={[0, memMaxMb]}
+                yFormatter={fmtMem} stats={allStats.memPct} chartId="mem"
                 gcEvents={!gbm ? gcEvents : undefined} />
+            )}
+            {gs.showChartCpu && hasCpuData && (
+              <GlanceChart {...SHARED} title="Host CPU" dataKey="cpuPercent"
+                color={cpuColor(current!.cpuPercent!)} yDomain={[0, 100]}
+                yFormatter={v => `${v.toFixed(0)}%`} stats={cpuStats} chartId="cpu" />
             )}
           </>
         )}

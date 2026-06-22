@@ -218,6 +218,12 @@ export default function SettingsPage() {
             onChange={v => setGlance({ showChartMem: v })}
           />
         </Row>
+        <Row label="Host CPU">
+          <Toggle
+            value={settings.glance.showChartCpu}
+            onChange={v => setGlance({ showChartCpu: v })}
+          />
+        </Row>
 
         <div className="s-divider" />
         <Row label="Live refresh interval" sub="How often /glance/current is polled">

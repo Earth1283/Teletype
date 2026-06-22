@@ -49,9 +49,9 @@
   padding: 0 16px;
   white-space: pre-wrap;
   word-break: break-all;
-  color: var(--mist);
+  color: var(--ash);
 }
-.log-line.info  { color: var(--mist); }
+.log-line.info  { color: var(--ash); }
 .log-line.warn  { color: var(--yellow); }
 .log-line.error { color: var(--red); }
 .log-line.debug { color: var(--ghost); }
@@ -74,6 +74,37 @@
   border-top: 1px solid var(--border);
   background: var(--surface);
   flex-shrink: 0;
+  position: relative;
+}
+.console-completions {
+  position: absolute;
+  bottom: 100%;
+  left: 16px;
+  right: 16px;
+  background: var(--elevated);
+  border: 1px solid var(--border-hi);
+  border-radius: var(--r-md);
+  overflow-y: auto;
+  max-height: 220px;
+  box-shadow: 0 -8px 24px rgba(0,0,0,0.55);
+  z-index: 50;
+  margin-bottom: 4px;
+}
+.console-completion-item {
+  padding: 5px 12px;
+  font-family: var(--mono);
+  font-size: 12px;
+  color: var(--mist);
+  cursor: pointer;
+  transition: background 60ms, color 60ms;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.console-completion-item:hover { background: var(--border); color: var(--ash); }
+.console-completion-item.active {
+  background: var(--amber-dim);
+  color: var(--amber);
 }
 .console-prompt {
   font-family: var(--mono);

@@ -23,7 +23,9 @@ fun Route.apiRoutes(plugin: Teletype) {
                 version = server.version,
                 onlinePlayers = server.onlinePlayers.size,
                 maxPlayers = server.maxPlayers,
-                tps = Bukkit.getTPS().take(3).toList()
+                tps = Bukkit.getTPS().take(3).toList(),
+                worldCount = Bukkit.getWorlds().size,
+                pluginCount = Bukkit.getPluginManager().plugins.size,
             )
         )
     }

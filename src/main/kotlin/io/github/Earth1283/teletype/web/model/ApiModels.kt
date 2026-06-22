@@ -8,7 +8,9 @@ data class ServerStatus(
     val version: String,
     val onlinePlayers: Int,
     val maxPlayers: Int,
-    val tps: List<Double>
+    val tps: List<Double>,
+    val worldCount: Int,
+    val pluginCount: Int,
 )
 
 @Serializable

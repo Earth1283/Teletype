@@ -17,6 +17,7 @@ export interface TeletypeSettings {
     showChartTps: boolean
     showChartTick: boolean
     showChartMem: boolean
+    showChartCpu: boolean
     refreshIntervalMs: number
     statusBadgePulse: boolean
   }
@@ -58,6 +59,7 @@ export const DEFAULT_SETTINGS: TeletypeSettings = {
     showChartTps: true,
     showChartTick: true,
     showChartMem: true,
+    showChartCpu: true,
     refreshIntervalMs: 2000,
     statusBadgePulse: true,
   },

@@ -2,6 +2,7 @@ import { TOKEN_KEY } from './client'
 
 export type WsMessage = { type: string; payload: string }
 export type LogHandler = (line: string) => void
+export type TabCompleteHandler = (completions: string[]) => void
 
 type ConnHandler = () => void
 
@@ -10,6 +11,7 @@ export class ConsoleSocket {
   private logHandlers: LogHandler[] = []
   private connHandlers: ConnHandler[] = []
   private discHandlers: ConnHandler[] = []
+  private tabCompleteHandler: TabCompleteHandler | null = null
   private reconnectDelay = 1000
   private stopped = false
 
@@ -31,7 +33,15 @@ export class ConsoleSocket {
 
     this.ws.onmessage = (e) => {
       const msg: WsMessage = JSON.parse(e.data)
-      if (msg.type === 'log') this.logHandlers.forEach(h => h(msg.payload))
+      if (msg.type === 'log') {
+        this.logHandlers.forEach(h => h(msg.payload))
+      } else if (msg.type === 'tab_complete') {
+        try {
+          const completions = JSON.parse(msg.payload) as string[]
+          this.tabCompleteHandler?.(completions)
+        } catch {}
+        this.tabCompleteHandler = null
+      }
     }
 
     this.ws.onclose = () => {
@@ -47,6 +57,16 @@ export class ConsoleSocket {
     if (this.ws?.readyState === WebSocket.OPEN) {
       this.ws.send(JSON.stringify({ type: 'command', payload: command }))
     }
+  }
+
+  sendTabComplete(partial: string) {
+    if (this.ws?.readyState === WebSocket.OPEN) {
+      this.ws.send(JSON.stringify({ type: 'tab_complete', payload: partial }))
+    }
+  }
+
+  onTabComplete(handler: TabCompleteHandler) {
+    this.tabCompleteHandler = handler
   }
 
   onLog(handler: LogHandler) {

@@ -11,6 +11,7 @@ interface LogContextValue {
   tsLogs: TimestampedLog[]
   connected: boolean
   send: (cmd: string) => void
+  tabComplete: (partial: string, callback: (completions: string[]) => void) => void
   getLogsAround: (ts: number, windowMs: number) => TimestampedLog[]
 }
 
@@ -19,6 +20,7 @@ const LogContext = createContext<LogContextValue>({
   tsLogs: [],
   connected: false,
   send: () => {},
+  tabComplete: () => {},
   getLogsAround: () => [],
 })
 
@@ -77,6 +79,13 @@ export function LogProvider({ children }: { children: React.ReactNode }) {
     socketRef.current?.send(cmd)
   }, [])
 
+  const tabComplete = useCallback((partial: string, callback: (completions: string[]) => void) => {
+    const socket = socketRef.current
+    if (!socket) return
+    socket.onTabComplete(callback)
+    socket.sendTabComplete(partial)
+  }, [])
+
   const getLogsAround = useCallback((ts: number, windowMs: number): TimestampedLog[] => {
     const from = ts - windowMs
     const to = ts + windowMs
@@ -84,7 +93,7 @@ export function LogProvider({ children }: { children: React.ReactNode }) {
   }, [tsLogs])
 
   return (
-    <LogContext.Provider value={{ lines, tsLogs, connected, send, getLogsAround }}>
+    <LogContext.Provider value={{ lines, tsLogs, connected, send, tabComplete, getLogsAround }}>
       {children}
     </LogContext.Provider>
   )

@@ -211,14 +211,17 @@ export default function FileManager() {
         </div>
 
         <div className="fm-actions">
-          <button className="icon-btn" title="Fetch file from URL" onClick={() => { setFetchUrl(''); setFetchName(''); setModal({ type: 'fetch' }) }}>
-            <IconGlobe size={14} />
+          <button className="pill-btn" onClick={() => { setFetchUrl(''); setFetchName(''); setModal({ type: 'fetch' }) }}>
+            <IconGlobe size={13} />
+            Fetch
           </button>
-          <button className="icon-btn" title="New folder" onClick={() => openModal({ type: 'mkdir' })}>
-            <IconFolderPlus size={14} />
+          <button className="pill-btn" onClick={() => openModal({ type: 'mkdir' })}>
+            <IconFolderPlus size={13} />
+            New folder
           </button>
-          <button className="icon-btn primary" title="Upload files" onClick={() => fileInputRef.current?.click()}>
-            <IconUpload size={14} />
+          <button className="pill-btn primary" onClick={() => fileInputRef.current?.click()}>
+            <IconUpload size={13} />
+            Upload
           </button>
           <input ref={fileInputRef} type="file" multiple hidden onChange={(e) => upload(e.target.files)} />
         </div>
@@ -260,17 +263,18 @@ export default function FileManager() {
               {!editing && <span className="fm-row-date">{fmtDate(entry.lastModified)}</span>}
               <div className="fm-row-actions" onClick={(e) => e.stopPropagation()}>
                 {!entry.isDirectory && (
-                  <button className="row-action-btn" title="Download"
-                    onClick={(e) => { e.stopPropagation(); downloadFile(entry) }}>
-                    <IconDownload size={13} />
+                  <button className="row-action-btn" onClick={(e) => { e.stopPropagation(); downloadFile(entry) }}>
+                    <IconDownload size={12} />
+                    Download
                   </button>
                 )}
-                <button className="row-action-btn" title="Rename"
-                  onClick={(e) => { e.stopPropagation(); openModal({ type: 'rename', entry }, entry.name) }}>
-                  <IconPencil size={13} />
+                <button className="row-action-btn" onClick={(e) => { e.stopPropagation(); openModal({ type: 'rename', entry }, entry.name) }}>
+                  <IconPencil size={12} />
+                  Rename
                 </button>
-                <button className="row-action-btn del" title="Delete" onClick={(e) => deleteEntry(entry, e)}>
-                  <IconTrash size={13} />
+                <button className="row-action-btn del" onClick={(e) => deleteEntry(entry, e)}>
+                  <IconTrash size={12} />
+                  Delete
                 </button>
               </div>
             </div>
@@ -286,8 +290,9 @@ export default function FileManager() {
                 <IconSave size={13} />
                 {saving ? 'Saving…' : 'Save'}
               </button>
-              <button className="icon-btn" title="Close editor" onClick={() => setEditing(null)}>
+              <button className="pill-btn" onClick={() => setEditing(null)}>
                 <IconX size={13} />
+                Close
               </button>
             </div>
             <Editor
