@@ -1,0 +1,67 @@
+# Teletype Plugin Messages
+# Format: MiniMessage — https://docs.advntr.dev/minimessage/format
+# Available placeholders depend on the message; see comments on each key.
+# {prefix} is always available and resolved from the prefix key below.
+# To disable a message entirely, set it to an empty string: ""
+
+prefix: "<bold><aqua>Teletype</aqua></bold> <dark_gray>»</dark_gray> "
+
+# ── Lifecycle (console-only) ─────────────────────────────────────────────────
+# {version} {url}
+startup: "{prefix}<green>v{version} ready <dark_gray>—</dark_gray> <white>{url}"
+# (no placeholders)
+shutdown: "{prefix}<yellow>stopped"
+
+# ── /tty command ─────────────────────────────────────────────────────────────
+command:
+  usage: "{prefix}<yellow>Usage: <gray>/tty [verify|status|start|stop]"
+  unknown-subcommand: "{prefix}<red>Unknown subcommand. <dark_gray>Usage: <gray>/tty [verify|status|start|stop]"
+  no-permission: "{prefix}<red>No permission."
+
+  verify:
+    no-permission: "{prefix}<red>Only operators or console can verify challenges."
+    usage: "{prefix}<red>Usage: <gray>/tty verify [uuid]"
+    invalid-uuid: "{prefix}<red>Invalid UUID format."
+    # (no placeholders)
+    success: "{prefix}<green>Challenge verified. JWT issued to the waiting client."
+    # (no placeholders)
+    not-found: "{prefix}<red>Challenge not found or already expired."
+
+  status:
+    # {port}
+    running: "{prefix}<green>Web server running on port <white>{port}"
+    stopped: "{prefix}<red>Web server is stopped."
+
+  start:
+    already-running: "{prefix}<yellow>Web server is already running."
+    success: "{prefix}<green>Web server started."
+
+  stop:
+    not-running: "{prefix}<yellow>Web server is not running."
+    success: "{prefix}<yellow>Web server stopped."
+
+# ── TLS (console-only) ───────────────────────────────────────────────────────
+tls:
+  # {path}
+  generating: "{prefix}<gray>Generating self-signed certificate <dark_gray>→</dark_gray> <white>{path}"
+  cert-created: "{prefix}<gray>Self-signed cert created. <yellow>Browsers will warn — accept once."
+  production-hint: "{prefix}<gray>For production, use <white>server.tls.mode: keystore</white> in config.yml"
+
+# ── Metrics retention (console-only) ─────────────────────────────────────────
+metrics:
+  retention-start: "{prefix}<gray>Running nightly metrics retention…"
+  retention-done: "{prefix}<gray>Metrics retention complete."
+  # {error}
+  retention-failed: "{prefix}<red>Retention job failed: <white>{error}"
+
+# ── Web server (console-only) ─────────────────────────────────────────────────
+web:
+  # {error}
+  error: "{prefix}<red>Unhandled exception: <white>{error}"
+
+# ── Data file errors (console-only) ──────────────────────────────────────────
+data:
+  # {error}
+  snippets-load-failed: "{prefix}<red>Failed to load snippets.json: <white>{error}<red>. Seeding defaults."
+  # {error}
+  schedule-load-failed: "{prefix}<red>Failed to load schedule.json: <white>{error}"

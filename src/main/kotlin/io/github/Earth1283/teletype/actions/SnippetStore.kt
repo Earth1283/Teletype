@@ -32,7 +32,7 @@ class SnippetStore(private val plugin: Teletype) {
             categories.clear(); categories.addAll(data.categories)
             snippets.clear(); snippets.addAll(data.snippets)
         } catch (e: Exception) {
-            plugin.logger.warning("Failed to load snippets.json: ${e.message}. Seeding defaults.")
+            plugin.messages.console("data.snippets-load-failed", "error" to (e.message ?: "unknown"))
             seedDefaults(); save()
         }
     }

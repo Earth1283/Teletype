@@ -1,5 +1,5 @@
 import { useSettings } from '../SettingsContext'
-import { IconEyeOff, IconSliders, IconTerminal, IconCommand } from '../Icons'
+import { IconEyeOff, IconSliders, IconTerminal, IconCommand, IconCode } from '../Icons'
 
 // ── Primitive controls ────────────────────────────────────────────────────────
 
@@ -74,6 +74,8 @@ export default function SettingsPage() {
     update({ glance: patch })
   const setConsole = (patch: Partial<typeof settings.console>) =>
     update({ console: patch })
+  const setEditor = (patch: Partial<typeof settings.editor>) =>
+    update({ editor: patch })
 
   return (
     <div className="s-root">
@@ -235,6 +237,37 @@ export default function SettingsPage() {
             value={settings.palette.enabled}
             onChange={v => update({ palette: { enabled: v } })}
           />
+        </Row>
+      </Section>
+
+      {/* ── Editor ────────────────────────────────────────────────── */}
+      <Section title="Editor" icon={<IconCode size={13} />}>
+        <Row label="Font size">
+          <Slider
+            value={settings.editor.fontSize} min={10} max={20} step={0.5}
+            fmt={v => `${v}px`}
+            onChange={v => setEditor({ fontSize: v })}
+          />
+        </Row>
+        <Row label="Word wrap">
+          <Toggle value={settings.editor.wordWrap} onChange={v => setEditor({ wordWrap: v })} />
+        </Row>
+        <Row label="Line numbers">
+          <Toggle value={settings.editor.lineNumbers} onChange={v => setEditor({ lineNumbers: v })} />
+        </Row>
+        <div className="s-divider" />
+        <div className="s-subsection-label">Intelligence</div>
+        <Row label="Smooth caret" sub="Animate cursor movement">
+          <Toggle value={settings.editor.smoothCaret} onChange={v => setEditor({ smoothCaret: v })} />
+        </Row>
+        <Row label="Syntax suggestions" sub="IntelliSense autocomplete and parameter hints">
+          <Toggle value={settings.editor.suggestions} onChange={v => setEditor({ suggestions: v })} />
+        </Row>
+        <Row label="Linting / validation" sub="Inline errors for JSON, TypeScript, JavaScript">
+          <Toggle value={settings.editor.validate} onChange={v => setEditor({ validate: v })} />
+        </Row>
+        <Row label="Render whitespace" sub="Show space and tab markers at word boundaries">
+          <Toggle value={settings.editor.renderWhitespace} onChange={v => setEditor({ renderWhitespace: v })} />
         </Row>
       </Section>
 

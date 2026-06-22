@@ -12,7 +12,7 @@ class TtyCommand(private val plugin: Teletype) : CommandExecutor, TabCompleter {
 
     override fun onCommand(sender: CommandSender, command: Command, label: String, args: Array<String>): Boolean {
         if (args.isEmpty()) {
-            sender.sendMessage("§eUsage: /tty <verify|status|start|stop>")
+            plugin.messages.send(sender, "command.usage")
             return true
         }
         when (args[0].lowercase()) {
@@ -20,59 +20,59 @@ class TtyCommand(private val plugin: Teletype) : CommandExecutor, TabCompleter {
             "status" -> handleStatus(sender)
             "start"  -> handleStart(sender)
             "stop"   -> handleStop(sender)
-            else     -> sender.sendMessage("§cUnknown subcommand. Usage: /tty <verify|status|start|stop>")
+            else     -> plugin.messages.send(sender, "command.unknown-subcommand")
         }
         return true
     }
 
     private fun handleVerify(sender: CommandSender, args: Array<String>) {
         if (!sender.isOp && sender !is ConsoleCommandSender) {
-            sender.sendMessage("§cOnly operators or console can verify challenges.")
+            plugin.messages.send(sender, "command.verify.no-permission")
             return
         }
         if (args.size < 2) {
-            sender.sendMessage("§cUsage: /tty verify <uuid>")
+            plugin.messages.send(sender, "command.verify.usage")
             return
         }
         val uuid = runCatching { UUID.fromString(args[1]) }.getOrNull()
-            ?: run { sender.sendMessage("§cInvalid UUID format."); return }
+            ?: run { plugin.messages.send(sender, "command.verify.invalid-uuid"); return }
 
         val jwt = plugin.jwtService.issueToken(expiryHours = plugin.teletypeConfig.jwtExpiryHours)
         if (plugin.challengeStore.verify(uuid, jwt)) {
-            sender.sendMessage("§aChallenge verified. JWT issued to the waiting client.")
+            plugin.messages.send(sender, "command.verify.success")
         } else {
-            sender.sendMessage("§cChallenge not found or already expired.")
+            plugin.messages.send(sender, "command.verify.not-found")
         }
     }
 
     private fun handleStatus(sender: CommandSender) {
         if (plugin.webServer.isRunning) {
-            sender.sendMessage("§aTeletype web server is running on port ${plugin.teletypeConfig.port}")
+            plugin.messages.send(sender, "command.status.running", "port" to plugin.teletypeConfig.port.toString())
         } else {
-            sender.sendMessage("§cTeletype web server is stopped.")
+            plugin.messages.send(sender, "command.status.stopped")
         }
     }
 
     private fun handleStart(sender: CommandSender) {
         if (!sender.isOp && sender !is ConsoleCommandSender) {
-            sender.sendMessage("§cNo permission."); return
+            plugin.messages.send(sender, "command.no-permission"); return
         }
         if (plugin.webServer.isRunning) {
-            sender.sendMessage("§eWeb server is already running."); return
+            plugin.messages.send(sender, "command.start.already-running"); return
         }
         plugin.webServer.start()
-        sender.sendMessage("§aWeb server started.")
+        plugin.messages.send(sender, "command.start.success")
     }
 
     private fun handleStop(sender: CommandSender) {
         if (!sender.isOp && sender !is ConsoleCommandSender) {
-            sender.sendMessage("§cNo permission."); return
+            plugin.messages.send(sender, "command.no-permission"); return
         }
         if (!plugin.webServer.isRunning) {
-            sender.sendMessage("§eWeb server is not running."); return
+            plugin.messages.send(sender, "command.stop.not-running"); return
         }
         plugin.webServer.stop()
-        sender.sendMessage("§cWeb server stopped.")
+        plugin.messages.send(sender, "command.stop.success")
     }
 
     override fun onTabComplete(

@@ -1,7 +1,8 @@
-import { useState, useCallback, useRef } from 'react'
+import { useState, useCallback, useRef, useEffect } from 'react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
-import Editor from '@monaco-editor/react'
+import Editor, { useMonaco } from '@monaco-editor/react'
 import { api, TOKEN_KEY } from '../api/client'
+import { useSettings } from '../SettingsContext'
 import {
   IconFolder, IconFile, IconUpload, IconDownload,
   IconFolderPlus, IconPencil, IconTrash, IconSave, IconX, IconGlobe, IconChevronRight
@@ -49,6 +50,18 @@ export default function FileManager() {
   const [fetchLoading, setFetchLoading] = useState(false)
   const fileInputRef = useRef<HTMLInputElement>(null)
   const qc = useQueryClient()
+  const { settings } = useSettings()
+  const monacoInst = useMonaco()
+
+  // Apply linting / validation settings whenever Monaco loads or the setting changes
+  useEffect(() => {
+    if (!monacoInst) return
+    const on = settings.editor.validate
+    const langs = monacoInst.languages as any
+    langs.json?.jsonDefaults?.setDiagnosticsOptions({ validate: on, allowComments: true })
+    langs.typescript?.typescriptDefaults?.setDiagnosticsOptions({ noSemanticValidation: !on, noSyntaxValidation: !on })
+    langs.typescript?.javascriptDefaults?.setDiagnosticsOptions({ noSemanticValidation: !on, noSyntaxValidation: !on })
+  }, [monacoInst, settings.editor.validate])
 
   const qKey = ['files', cwd]
   const { data: entries = [], isLoading, error } = useQuery<FileEntry[]>({
@@ -135,7 +148,6 @@ export default function FileManager() {
         fileName: fetchName.trim() || undefined,
       })
       setModal(null); setFetchUrl(''); setFetchName(''); invalidate()
-      // Brief toast could go here; for now the file appears in the list
     } catch (e: any) { alert(e.response?.data?.error ?? 'Fetch failed') }
     finally { setFetchLoading(false) }
   }
@@ -159,6 +171,24 @@ export default function FileManager() {
 
   function openModal(m: Modal, initial = '') {
     setModal(m); setModalInput(initial)
+  }
+
+  const editorOptions = {
+    fontSize: settings.editor.fontSize,
+    fontFamily: "'JetBrains Mono', monospace",
+    minimap: { enabled: false },
+    wordWrap: (settings.editor.wordWrap ? 'on' : 'off') as 'on' | 'off',
+    lineHeight: 1.7,
+    scrollBeyondLastLine: false,
+    padding: { top: 12, bottom: 12 },
+    cursorSmoothCaretAnimation: (settings.editor.smoothCaret ? 'on' : 'off') as 'on' | 'off',
+    quickSuggestions: settings.editor.suggestions,
+    suggestOnTriggerCharacters: settings.editor.suggestions,
+    parameterHints: { enabled: settings.editor.suggestions },
+    lineNumbers: (settings.editor.lineNumbers ? 'on' : 'off') as 'on' | 'off',
+    renderWhitespace: (settings.editor.renderWhitespace ? 'boundary' : 'none') as 'boundary' | 'none',
+    bracketPairColorization: { enabled: true },
+    automaticLayout: true,
   }
 
   return (
@@ -204,38 +234,9 @@ export default function FileManager() {
         </div>
       )}
 
-      {/* Editor */}
-      {editing ? (
-        <div className="fm-editor-wrap">
-          <div className="fm-editor-bar">
-            <span className="fm-editor-path">{editing.path}</span>
-            <button className="pill-btn primary" onClick={saveFile} disabled={saving}>
-              <IconSave size={13} />
-              {saving ? 'Saving…' : 'Save'}
-            </button>
-            <button className="icon-btn" title="Close editor" onClick={() => setEditing(null)}>
-              <IconX size={13} />
-            </button>
-          </div>
-          <Editor
-            height="100%"
-            language={langFor(editing.path.split('/').pop() ?? '')}
-            value={editorContent}
-            onChange={(v) => setEditorContent(v ?? '')}
-            theme="vs-dark"
-            options={{
-              fontSize: 13,
-              fontFamily: "'JetBrains Mono', monospace",
-              minimap: { enabled: false },
-              wordWrap: 'on',
-              lineHeight: 1.7,
-              scrollBeyondLastLine: false,
-              padding: { top: 12, bottom: 12 },
-            }}
-          />
-        </div>
-      ) : (
-        <div className="fm-file-list">
+      {/* Body: file list (always) + editor side panel (when open) */}
+      <div className="fm-body">
+        <div className={`fm-file-list${editing ? ' compact' : ''}`}>
           {isLoading && <div className="dim">Loading…</div>}
           {error && <div className="err">Failed to read directory</div>}
 
@@ -254,8 +255,8 @@ export default function FileManager() {
                 {entry.isDirectory ? <IconFolder size={14} /> : <IconFile size={14} />}
               </span>
               <span className="fm-row-name">{entry.name}</span>
-              {!entry.isDirectory && <span className="fm-row-size">{fmtSize(entry.size)}</span>}
-              <span className="fm-row-date">{fmtDate(entry.lastModified)}</span>
+              {!entry.isDirectory && !editing && <span className="fm-row-size">{fmtSize(entry.size)}</span>}
+              {!editing && <span className="fm-row-date">{fmtDate(entry.lastModified)}</span>}
               <div className="fm-row-actions" onClick={(e) => e.stopPropagation()}>
                 {!entry.isDirectory && (
                   <button className="row-action-btn" title="Download"
@@ -274,7 +275,31 @@ export default function FileManager() {
             </div>
           ))}
         </div>
-      )}
+
+        {/* Editor side panel */}
+        {editing && (
+          <div className="fm-editor-panel">
+            <div className="fm-editor-bar">
+              <span className="fm-editor-path">{editing.path}</span>
+              <button className="pill-btn primary" onClick={saveFile} disabled={saving}>
+                <IconSave size={13} />
+                {saving ? 'Saving…' : 'Save'}
+              </button>
+              <button className="icon-btn" title="Close editor" onClick={() => setEditing(null)}>
+                <IconX size={13} />
+              </button>
+            </div>
+            <Editor
+              height="100%"
+              language={langFor(editing.path.split('/').pop() ?? '')}
+              value={editorContent}
+              onChange={(v) => setEditorContent(v ?? '')}
+              theme="vs-dark"
+              options={editorOptions}
+            />
+          </div>
+        )}
+      </div>
 
       {/* Rename modal */}
       {modal?.type === 'rename' && (

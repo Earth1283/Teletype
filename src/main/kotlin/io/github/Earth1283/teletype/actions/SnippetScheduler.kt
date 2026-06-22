@@ -30,7 +30,7 @@ class SnippetScheduler(private val plugin: Teletype, private val store: SnippetS
             val data = json.decodeFromString<ScheduleData>(file.readText())
             actions.clear(); actions.addAll(data.actions)
         } catch (e: Exception) {
-            plugin.logger.warning("Failed to load schedule.json: ${e.message}")
+            plugin.messages.console("data.schedule-load-failed", "error" to (e.message ?: "unknown"))
         }
     }
 

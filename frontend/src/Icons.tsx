@@ -1,6 +1,13 @@
 interface IconProps { size?: number; className?: string }
 const s = (size = 16) => ({ width: size, height: size, strokeWidth: 1.5 })
 
+export const IconCode = ({ size = 16, className }: IconProps) => (
+  <svg {...s(size)} viewBox="0 0 24 24" fill="none" stroke="currentColor" className={className}>
+    <polyline points="16 18 22 12 16 6" />
+    <polyline points="8 6 2 12 8 18" />
+  </svg>
+)
+
 export const IconActivity = ({ size = 16, className }: IconProps) => (
   <svg {...s(size)} viewBox="0 0 24 24" fill="none" stroke="currentColor" className={className}>
     <polyline points="22 12 18 12 15 21 9 3 6 12 2 12" />

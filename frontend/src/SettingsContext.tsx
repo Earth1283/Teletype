@@ -29,6 +29,16 @@ export interface TeletypeSettings {
   palette: {
     enabled: boolean
   }
+
+  editor: {
+    fontSize: number
+    wordWrap: boolean
+    lineNumbers: boolean
+    smoothCaret: boolean
+    suggestions: boolean
+    renderWhitespace: boolean
+    validate: boolean
+  }
 }
 
 export const DEFAULT_SETTINGS: TeletypeSettings = {
@@ -56,6 +66,16 @@ export const DEFAULT_SETTINGS: TeletypeSettings = {
   },
   palette: {
     enabled: true,
+  },
+
+  editor: {
+    fontSize: 13,
+    wordWrap: true,
+    lineNumbers: true,
+    smoothCaret: true,
+    suggestions: true,
+    renderWhitespace: false,
+    validate: true,
   },
 }
 

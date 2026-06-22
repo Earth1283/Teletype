@@ -31,14 +31,14 @@ class RetentionJob(
         val d8  = now -  8L * 86_400_000L
 
         try {
-            plugin.logger.info("[Teletype] Running nightly metrics retention…")
+            plugin.messages.console("metrics.retention-start")
             // Downsample 48h–24h ago: raw 1s → 1 min, delete raw rows
             db.downsampleToMinute(from = h48, to = h24)
             // Downsample 8d–7d ago: 1 min → 15 min, delete minute rows
             db.downsampleTo15Min(from = d8, to = d7)
-            plugin.logger.info("[Teletype] Metrics retention complete.")
+            plugin.messages.console("metrics.retention-done")
         } catch (e: Exception) {
-            plugin.logger.warning("[Teletype] Retention job failed: ${e.message}")
+            plugin.messages.console("metrics.retention-failed", "error" to (e.message ?: "unknown"))
         }
     }
 

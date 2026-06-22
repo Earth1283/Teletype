@@ -11,8 +11,8 @@
   --amber-glow:  rgba(245,158,11,.25);
 
   --ash:         #c9c6be;
-  --mist:        #52525e;
-  --ghost:       #333340;
+  --mist:        #80809a;
+  --ghost:       #5e5e72;
 
   --green:       #4ade80;
   --red:         #f87171;
@@ -536,10 +536,28 @@ body {
 }
 .text-input:focus { border-color: var(--amber-glow); }
 
+.fm-body {
+  display: flex;
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
+}
 .fm-file-list {
   flex: 1;
   overflow-y: auto;
   padding: 6px 8px;
+  min-width: 0;
+}
+.fm-file-list.compact {
+  flex: 0 0 260px;
+  border-right: 1px solid var(--border);
+}
+.fm-editor-panel {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  overflow: hidden;
 }
 .fm-row {
   display: flex;
@@ -1524,6 +1542,13 @@ body {
   color: var(--ghost);
   padding: 20px 0;
 }
+.glance-gc-hint {
+  font-family: var(--mono);
+  font-size: 9px;
+  color: var(--ghost);
+  padding: 3px 2px 0;
+  opacity: 0.7;
+}
 
 /* Incident tooltip */
 .glance-tooltip {
@@ -1853,6 +1878,7 @@ kbd {
 
 .s-root {
   flex: 1;
+  min-height: 0;
   display: flex;
   flex-direction: column;
   gap: 12px;

@@ -25,7 +25,6 @@ import io.ktor.server.engine.EmbeddedServer
 import io.ktor.server.engine.connector
 import io.ktor.server.engine.embeddedServer
 import io.ktor.server.engine.sslConnector
-import io.ktor.server.http.content.staticResources
 import io.ktor.server.netty.Netty
 import io.ktor.server.netty.NettyApplicationEngine
 import io.ktor.server.plugins.contentnegotiation.ContentNegotiation
@@ -152,7 +151,7 @@ class WebServer(private val plugin: Teletype) {
 
             install(StatusPages) {
                 exception<Throwable> { call, cause ->
-                    plugin.logger.warning("Unhandled exception in web server: ${cause.message}")
+                    plugin.messages.console("web.error", "error" to (cause.message ?: "unknown"))
                     call.respond(
                         HttpStatusCode.InternalServerError,
                         ErrorResponse(cause.message ?: "Internal error")
@@ -160,11 +159,39 @@ class WebServer(private val plugin: Teletype) {
                 }
             }
 
+            // Capture plugin classloader here — environment.classLoader may differ in Paper's plugin isolation
+            val cl = plugin.javaClass.classLoader
+
             routing {
-                staticResources("/", "webroot")
+                get("/") {
+                    val bytes = cl.getResourceAsStream("webroot/index.html")?.readBytes()
+                        ?: return@get call.respond(HttpStatusCode.NotFound, ErrorResponse("Not found"))
+                    call.respondBytes(bytes, ContentType.Text.Html)
+                }
+                get("/favicon.svg") {
+                    val bytes = cl.getResourceAsStream("webroot/favicon.svg")?.readBytes() ?: return@get
+                    call.respondBytes(bytes, ContentType.Image.SVG)
+                }
+                get("/icons.svg") {
+                    val bytes = cl.getResourceAsStream("webroot/icons.svg")?.readBytes() ?: return@get
+                    call.respondBytes(bytes, ContentType.Image.SVG)
+                }
+                get("/assets/{file...}") {
+                    val file = call.parameters.getAll("file")?.joinToString("/") ?: return@get
+                    val bytes = cl.getResourceAsStream("webroot/assets/$file")?.readBytes()
+                        ?: return@get call.respond(HttpStatusCode.NotFound, ErrorResponse("Not found"))
+                    call.respondBytes(bytes, when {
+                        file.endsWith(".js") || file.endsWith(".mjs") -> ContentType.Application.JavaScript
+                        file.endsWith(".css") -> ContentType.Text.CSS
+                        file.endsWith(".svg") -> ContentType.Image.SVG
+                        file.endsWith(".woff2") -> ContentType("font", "woff2")
+                        file.endsWith(".woff")  -> ContentType("font", "woff")
+                        else -> ContentType.Application.OctetStream
+                    })
+                }
+                // SPA fallback — must be after all asset routes
                 get("{...}") {
-                    val bytes = this::class.java.classLoader
-                        .getResourceAsStream("webroot/index.html")?.readBytes()
+                    val bytes = cl.getResourceAsStream("webroot/index.html")?.readBytes()
                         ?: return@get call.respond(HttpStatusCode.NotFound, ErrorResponse("Not found"))
                     call.respondBytes(bytes, ContentType.Text.Html)
                 }
@@ -190,17 +217,10 @@ class WebServer(private val plugin: Teletype) {
                 }
             }
         }.start(wait = false)
-
-        if (tlsEnabled) {
-            plugin.logger.info("Teletype web server started — https://localhost:$httpsPort (HTTP :$httpPort redirects)")
-        } else {
-            plugin.logger.info("Teletype web server started — http://localhost:$httpPort")
-        }
     }
 
     fun stop() {
         server?.stop(1000, 5000)
         server = null
-        plugin.logger.info("Teletype web server stopped")
     }
 }

@@ -1,0 +1,25 @@
+<configuration>
+    <!-- Suppress logback's own startup status output -->
+    <statusListener class="ch.qos.logback.core.status.NopStatusListener"/>
+
+    <appender name="NOP" class="ch.qos.logback.core.helpers.NOPAppender"/>
+
+    <!-- Ktor uses the string-based "ktor" logger hierarchy; silence it -->
+    <logger name="ktor" level="OFF" additivity="false">
+        <appender-ref ref="NOP"/>
+    </logger>
+
+    <!-- Netty class loggers are relocated to teletype.shaded.netty.* by shadow -->
+    <logger name="teletype.shaded.netty" level="OFF" additivity="false">
+        <appender-ref ref="NOP"/>
+    </logger>
+
+    <!-- Ktor class loggers are relocated to teletype.shaded.ktor.* by shadow -->
+    <logger name="teletype.shaded.ktor" level="OFF" additivity="false">
+        <appender-ref ref="NOP"/>
+    </logger>
+
+    <root level="OFF">
+        <appender-ref ref="NOP"/>
+    </root>
+</configuration>

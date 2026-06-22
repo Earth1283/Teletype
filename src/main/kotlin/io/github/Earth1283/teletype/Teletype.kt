@@ -7,6 +7,7 @@ import io.github.Earth1283.teletype.audit.AuditLog
 import io.github.Earth1283.teletype.auth.ChallengeStore
 import io.github.Earth1283.teletype.auth.JwtService
 import io.github.Earth1283.teletype.command.TtyCommand
+import io.github.Earth1283.teletype.config.MessageConfig
 import io.github.Earth1283.teletype.config.TeletypeConfig
 import io.github.Earth1283.teletype.console.ConsoleBroadcaster
 import io.github.Earth1283.teletype.console.ConsoleInterceptor
@@ -23,6 +24,7 @@ import org.bukkit.plugin.java.JavaPlugin
 
 class Teletype : JavaPlugin() {
     lateinit var teletypeConfig: TeletypeConfig
+    lateinit var messages: MessageConfig
     lateinit var challengeStore: ChallengeStore
     lateinit var jwtService: JwtService
     lateinit var consoleBroadcaster: ConsoleBroadcaster
@@ -38,6 +40,7 @@ class Teletype : JavaPlugin() {
     override fun onEnable() {
         saveDefaultConfig()
         teletypeConfig = TeletypeConfig(this)
+        messages = MessageConfig(this).also { it.load() }
         challengeStore = ChallengeStore(this)
         jwtService = JwtService(teletypeConfig.jwtSecret)
         consoleBroadcaster = ConsoleBroadcaster(pluginScope)
@@ -50,6 +53,10 @@ class Teletype : JavaPlugin() {
         ConsoleInterceptor.install(consoleBroadcaster)
         webServer = WebServer(this).also { it.start() }
         getCommand("tty")?.setExecutor(TtyCommand(this))
+
+        val url = if (teletypeConfig.tlsEnabled) "https://localhost:${teletypeConfig.tlsHttpsPort}"
+                  else "http://localhost:${teletypeConfig.port}"
+        messages.console("startup", "version" to description.version, "url" to url)
     }
 
     override fun onDisable() {
@@ -59,6 +66,7 @@ class Teletype : JavaPlugin() {
         pluginScope.cancel()
         metricsDatabase.close()
         auditLog.close()
+        messages.console("shutdown")
     }
 
     fun auditAsync(action: String, detail: String, actor: String, ip: String) {

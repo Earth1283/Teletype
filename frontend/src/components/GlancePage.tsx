@@ -266,6 +266,7 @@ interface GlanceChartProps {
   greyBeardMode: boolean
   showBifurcation: boolean
   logCorrelation: boolean
+  gcEvents?: number[]
 }
 
 function GlanceChart({
@@ -273,6 +274,7 @@ function GlanceChart({
   stats, allStats, thresholds, bifurTs, chartId,
   getLogsAround, logWindowMs, onPointClick,
   greyBeardMode, showBifurcation, logCorrelation,
+  gcEvents,
 }: GlanceChartProps) {
   const latest = data[data.length - 1]
   const currentVal = latest ? (latest[dataKey] as number) : 0
@@ -382,6 +384,18 @@ function GlanceChart({
             </>
           )}
 
+          {gcEvents && gcEvents.map(ts => (
+            <ReferenceLine
+              key={`gc-${ts}`}
+              x={ts}
+              stroke="var(--blue)"
+              strokeDasharray="2 3"
+              strokeWidth={1}
+              strokeOpacity={0.5}
+              label={{ value: 'GC?', position: 'insideTopLeft', fill: 'var(--blue)', fontSize: 7, fontFamily: 'var(--mono)', opacity: 0.7 }}
+            />
+          ))}
+
           <Area
             type="monotone"
             dataKey={dataKey as string}
@@ -394,6 +408,9 @@ function GlanceChart({
           />
         </ComposedChart>
       </ResponsiveContainer>
+      {gcEvents && gcEvents.length > 0 && !greyBeardMode && (
+        <div className="glance-gc-hint">GC? = heuristic — sharp memory drop detected, not a real JVM GC event</div>
+      )}
     </div>
   )
 }
@@ -545,6 +562,15 @@ export default function GlancePage() {
 
   const showLogPanel = !gbm && gs.showLogPanel
 
+  // Heuristic: a sharp drop in JVM heap usage likely indicates a GC event.
+  // This is NOT from a real JVM GC notification — it's inferred from the data.
+  const gcEvents = useMemo(() => {
+    const GC_DROP_THRESHOLD = 0.06  // 6 percentage-point drop between consecutive samples
+    return data
+      .filter((d, i) => i > 0 && data[i - 1].memPct - d.memPct >= GC_DROP_THRESHOLD)
+      .map(d => d.timestamp)
+  }, [data])
+
   const SHARED = {
     data,
     bifurTs,
@@ -660,7 +686,8 @@ export default function GlancePage() {
             {gs.showChartMem && (
               <GlanceChart {...SHARED} title="Memory" dataKey="memPct"
                 color={memColor(memP)} yDomain={[0, 1]}
-                yFormatter={v => `${Math.round(v * 100)}%`} stats={allStats.memPct} chartId="mem" />
+                yFormatter={v => `${Math.round(v * 100)}%`} stats={allStats.memPct} chartId="mem"
+                gcEvents={!gbm ? gcEvents : undefined} />
             )}
           </>
         )}

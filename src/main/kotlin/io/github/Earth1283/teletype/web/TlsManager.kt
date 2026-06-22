@@ -20,7 +20,7 @@ class TlsManager(private val plugin: Teletype) {
         val ksFile = File(plugin.dataFolder, "keystore.jks")
         val pass = "teletype-tls"
         if (!ksFile.exists()) {
-            plugin.logger.info("TLS: generating self-signed certificate → ${ksFile.absolutePath}")
+            plugin.messages.console("tls.generating", "path" to ksFile.absolutePath)
             val ks = buildKeyStore {
                 certificate("teletype") {
                     password = pass
@@ -29,8 +29,8 @@ class TlsManager(private val plugin: Teletype) {
                 }
             }
             ks.saveToFile(ksFile, pass)
-            plugin.logger.info("TLS: self-signed cert created. Browsers will show a security warning — accept once.")
-            plugin.logger.info("TLS: for production, supply a real certificate via server.tls.mode: keystore in config.yml")
+            plugin.messages.console("tls.cert-created")
+            plugin.messages.console("tls.production-hint")
             return ks
         }
         return KeyStore.getInstance("JKS").apply {
