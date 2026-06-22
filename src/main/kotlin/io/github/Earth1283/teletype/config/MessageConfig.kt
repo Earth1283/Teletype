@@ -13,6 +13,7 @@ class MessageConfig(private val plugin: Teletype) {
 
     fun load() {
         plugin.saveResource("messages.yml", false)
+        ConfigUpdater.update(plugin, "messages.yml")
         cfg = YamlConfiguration.loadConfiguration(File(plugin.dataFolder, "messages.yml"))
     }
 

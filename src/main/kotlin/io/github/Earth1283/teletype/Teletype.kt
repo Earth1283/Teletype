@@ -7,6 +7,7 @@ import io.github.Earth1283.teletype.audit.AuditLog
 import io.github.Earth1283.teletype.auth.ChallengeStore
 import io.github.Earth1283.teletype.auth.JwtService
 import io.github.Earth1283.teletype.command.TtyCommand
+import io.github.Earth1283.teletype.config.ConfigUpdater
 import io.github.Earth1283.teletype.config.MessageConfig
 import io.github.Earth1283.teletype.config.TeletypeConfig
 import io.github.Earth1283.teletype.console.ConsoleBroadcaster
@@ -39,6 +40,8 @@ class Teletype : JavaPlugin() {
 
     override fun onEnable() {
         saveDefaultConfig()
+        ConfigUpdater.update(this, "config.yml")
+        reloadConfig()
         teletypeConfig = TeletypeConfig(this)
         messages = MessageConfig(this).also { it.load() }
         challengeStore = ChallengeStore(this)
