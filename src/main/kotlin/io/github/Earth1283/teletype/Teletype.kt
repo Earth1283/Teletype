@@ -16,6 +16,8 @@ import io.github.Earth1283.teletype.events.PlayerEventListener
 import io.github.Earth1283.teletype.metrics.MetricsCollector
 import io.github.Earth1283.teletype.metrics.MetricsDatabase
 import io.github.Earth1283.teletype.metrics.RetentionJob
+import io.github.Earth1283.teletype.multiplex.PortForwardManager
+import io.github.Earth1283.teletype.multiplex.PortForwardStore
 import io.github.Earth1283.teletype.multiplex.PortMultiplexer
 import io.github.Earth1283.teletype.multiplex.RouteStore
 import io.github.Earth1283.teletype.web.WebServer
@@ -38,6 +40,8 @@ class Teletype : JavaPlugin() {
     lateinit var snippetScheduler: SnippetScheduler
     lateinit var auditLog: AuditLog
     lateinit var routeStore: RouteStore
+    lateinit var portForwardStore: PortForwardStore
+    lateinit var portForwardManager: PortForwardManager
     lateinit var webServer: WebServer
     private var portMultiplexer: PortMultiplexer? = null
 
@@ -59,6 +63,8 @@ class Teletype : JavaPlugin() {
         snippetScheduler = SnippetScheduler(this, snippetStore).also { it.load(); it.startAll() }
         auditLog = AuditLog(dataFolder)
         routeStore = RouteStore(dataFolder).also { it.load() }
+        portForwardStore = PortForwardStore(dataFolder).also { it.load() }
+        portForwardManager = PortForwardManager(this).also { it.start(portForwardStore.getForwards()) }
         ConsoleInterceptor.install(consoleBroadcaster)
         server.pluginManager.registerEvents(PlayerEventListener(metricsDatabase, pluginScope), this)
         webServer = WebServer(this).also { it.start() }
@@ -73,6 +79,7 @@ class Teletype : JavaPlugin() {
     }
 
     override fun onDisable() {
+        portForwardManager.shutdown()
         portMultiplexer?.uninstall()
         snippetScheduler.stopAll()
         webServer.stop()

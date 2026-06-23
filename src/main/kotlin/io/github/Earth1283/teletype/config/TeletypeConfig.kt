@@ -100,6 +100,7 @@ class TeletypeConfig(private val plugin: Teletype) {
     val networkEnabled: Boolean get() = bool("network.enabled", true)
     val networkMaxRoutes: Int get() = config.getInt("network.max-routes", 50)
     val networkDefaultRateLimitPerMinute: Int get() = config.getInt("network.default-rate-limit-per-minute", 120)
+    val networkMaxPortForwards: Int get() = config.getInt("network.max-port-forwards", 20)
 
     // ── Glance thresholds ─────────────────────────────────────────────────────
     val tpsNominalMin: Double   get() = double("glance.tps.nominal-min", 19.0)
