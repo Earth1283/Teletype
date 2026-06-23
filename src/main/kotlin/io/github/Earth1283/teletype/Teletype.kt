@@ -17,6 +17,7 @@ import io.github.Earth1283.teletype.metrics.MetricsCollector
 import io.github.Earth1283.teletype.metrics.MetricsDatabase
 import io.github.Earth1283.teletype.metrics.RetentionJob
 import io.github.Earth1283.teletype.multiplex.PortMultiplexer
+import io.github.Earth1283.teletype.multiplex.RouteStore
 import io.github.Earth1283.teletype.web.WebServer
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -36,6 +37,7 @@ class Teletype : JavaPlugin() {
     lateinit var snippetStore: SnippetStore
     lateinit var snippetScheduler: SnippetScheduler
     lateinit var auditLog: AuditLog
+    lateinit var routeStore: RouteStore
     lateinit var webServer: WebServer
     private var portMultiplexer: PortMultiplexer? = null
 
@@ -56,6 +58,7 @@ class Teletype : JavaPlugin() {
         snippetStore = SnippetStore(this).also { it.load() }
         snippetScheduler = SnippetScheduler(this, snippetStore).also { it.load(); it.startAll() }
         auditLog = AuditLog(dataFolder)
+        routeStore = RouteStore(dataFolder).also { it.load() }
         ConsoleInterceptor.install(consoleBroadcaster)
         server.pluginManager.registerEvents(PlayerEventListener(metricsDatabase, pluginScope), this)
         webServer = WebServer(this).also { it.start() }

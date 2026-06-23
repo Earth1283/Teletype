@@ -81,7 +81,17 @@ tasks {
         dependsOn(shadowJar)
     }
 
+    val npmInstall by registering(Exec::class) {
+        workingDir("frontend")
+        commandLine("npm", "install", "--prefer-offline")
+        inputs.file("frontend/package.json")
+        inputs.file("frontend/package-lock.json")
+        outputs.dir("frontend/node_modules")
+        onlyIf { !file("frontend/node_modules").exists() }
+    }
+
     val buildFrontend by registering(Exec::class) {
+        dependsOn(npmInstall)
         workingDir("frontend")
         commandLine("npm", "run", "build")
         inputs.dir("frontend/src")
@@ -90,6 +100,7 @@ tasks {
     }
 
     shadowJar {
+        dependsOn(buildFrontend)
         archiveClassifier.set("")
 
         manifest {

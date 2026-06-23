@@ -1,6 +1,7 @@
 package io.github.Earth1283.teletype.multiplex
 
 import io.github.Earth1283.teletype.Teletype
+import java.io.ByteArrayOutputStream
 import java.io.File
 import java.io.InputStream
 import java.io.OutputStream
@@ -14,14 +15,14 @@ class PortMultiplexer(private val plugin: Teletype) {
 
     private var serverSocket: ServerSocket? = null
     private var executor: ExecutorService? = null
+    private val rateLimiter = ProxyRateLimiter()
 
     fun install() {
         val publicPort = plugin.teletypeConfig.multiplexPort
-        val gamePort   = plugin.server.port   // port Minecraft actually bound
+        val gamePort   = plugin.server.port
         val ktorPort   = plugin.teletypeConfig.port
 
         if (publicPort == gamePort) {
-            // Ports conflict — patch server.properties so the next restart unblocks it
             val internalPort = gamePort + 1
             patchServerPort(gamePort, internalPort)
             plugin.logger.warning(
@@ -62,6 +63,7 @@ class PortMultiplexer(private val plugin: Teletype) {
     }
 
     fun uninstall() {
+        rateLimiter.shutdown()
         serverSocket?.close()
         serverSocket = null
         executor?.shutdownNow()
@@ -74,19 +76,73 @@ class PortMultiplexer(private val plugin: Teletype) {
             val n = readExact(client.getInputStream(), header)
             if (n < 4) return
 
-            val targetPort = if (isHttp(header)) ktorPort else gamePort
-            try {
-                Socket("127.0.0.1", targetPort).use { backend ->
-                    val backendOut = backend.getOutputStream()
-                    backendOut.write(header, 0, n)
-                    // Relay both directions concurrently; capture executor before lambda
-                    val pool = executor ?: return
-                    val upstream = pool.submit { relay(client.getInputStream(), backendOut) }
-                    relay(backend.getInputStream(), client.getOutputStream())
-                    upstream.get()
+            if (!isHttp(header)) {
+                proxyTo(client, gamePort, header, n)
+                return
+            }
+
+            // HTTP — read rest of first line to determine path for route matching
+            val lineRest = readUntilCRLF(client.getInputStream(), maxBytes = 8192)
+            val firstLine = String(header, Charsets.ISO_8859_1) + String(lineRest, Charsets.ISO_8859_1)
+            val buffered = header.copyOf(4) + lineRest
+
+            val path = parsePath(firstLine)
+            val route = if (path != null && plugin.teletypeConfig.networkEnabled)
+                plugin.routeStore.findMatch(path) else null
+
+            val targetPort = if (route != null) {
+                val clientIp = client.inetAddress.hostAddress
+                if (!rateLimiter.allow(route.id, clientIp, route.rateLimitPerMinute)) {
+                    runCatching {
+                        client.getOutputStream().write(
+                            "HTTP/1.1 429 Too Many Requests\r\nContent-Length: 0\r\nConnection: close\r\n\r\n"
+                                .toByteArray(Charsets.ISO_8859_1)
+                        )
+                    }
+                    return
                 }
-            } catch (_: Exception) {}
+                route.targetPort
+            } else {
+                ktorPort
+            }
+
+            proxyTo(client, targetPort, buffered, buffered.size)
         }
+    }
+
+    private fun proxyTo(client: Socket, targetPort: Int, prefixBytes: ByteArray, prefixLen: Int) {
+        try {
+            Socket("127.0.0.1", targetPort).use { backend ->
+                val backendOut = backend.getOutputStream()
+                backendOut.write(prefixBytes, 0, prefixLen)
+                backendOut.flush()
+                val pool = executor ?: return
+                val upstream = pool.submit { relay(client.getInputStream(), backendOut) }
+                relay(backend.getInputStream(), client.getOutputStream())
+                upstream.get()
+            }
+        } catch (_: Exception) {}
+    }
+
+    private fun readUntilCRLF(input: InputStream, maxBytes: Int): ByteArray {
+        val buf = ByteArrayOutputStream()
+        var prev = -1
+        var count = 0
+        while (count < maxBytes) {
+            val b = input.read()
+            if (b == -1) break
+            buf.write(b)
+            count++
+            if (prev == '\r'.code && b == '\n'.code) break
+            prev = b
+        }
+        return buf.toByteArray()
+    }
+
+    private fun parsePath(firstLine: String): String? {
+        val parts = firstLine.trim().split(" ")
+        if (parts.size < 2) return null
+        return parts[1].substringBefore('?').ifEmpty { "/" }
     }
 
     private fun readExact(input: InputStream, buf: ByteArray): Int {

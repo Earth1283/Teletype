@@ -13,10 +13,11 @@ import GlancePage from './components/GlancePage'
 import ActionsPage from './components/actions/ActionsPage'
 import SettingsPage from './components/SettingsPage'
 import AuditPage from './components/AuditPage'
+import NetworkPage from './components/NetworkPage'
 import CommandPalette from './CommandPalette'
 import {
   TeletypeLogo, IconTerminal, IconUsers, IconCpu, IconFolder,
-  IconLogOut, IconActivity, IconZap, IconSettings, IconList,
+  IconLogOut, IconActivity, IconZap, IconSettings, IconList, IconNetwork,
 } from './Icons'
 
 const qc = new QueryClient()
@@ -29,7 +30,7 @@ function ThemeApplier() {
   return null
 }
 
-type Tab = 'glance' | 'console' | 'players' | 'stats' | 'files' | 'actions' | 'audit' | 'settings'
+type Tab = 'glance' | 'console' | 'players' | 'stats' | 'files' | 'actions' | 'audit' | 'network' | 'settings'
 
 const TABS: { id: Tab; label: string; Icon: React.FC<{ size?: number }> }[] = [
   { id: 'glance',   label: 'Glance',   Icon: IconActivity  },
@@ -39,6 +40,7 @@ const TABS: { id: Tab; label: string; Icon: React.FC<{ size?: number }> }[] = [
   { id: 'files',    label: 'Files',    Icon: IconFolder    },
   { id: 'actions',  label: 'Actions',  Icon: IconZap       },
   { id: 'audit',    label: 'Audit',    Icon: IconList      },
+  { id: 'network',  label: 'Network',  Icon: IconNetwork   },
   { id: 'settings', label: 'Settings', Icon: IconSettings  },
 ]
 
@@ -108,6 +110,7 @@ function MainApp() {
         {tab === 'files'    && <FileManager />}
         {tab === 'actions'  && <ActionsPage />}
         {tab === 'audit'    && <AuditPage />}
+        {tab === 'network'  && <NetworkPage />}
         {tab === 'settings' && <SettingsPage />}
       </main>
 

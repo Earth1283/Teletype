@@ -219,6 +219,24 @@ glance:
     tick-sigma: 2.0
     memory-sigma: 2.5
 
+# ── Network routing ───────────────────────────────────────────────────────────
+# Requires multiplex-game-port: true (above). Routes HTTP traffic arriving on the
+# multiplexed port to internal services by URL path prefix. Minecraft connections
+# are unaffected. Changes to these keys take effect after /tty reload or restart;
+# routes themselves are managed live through the web panel (stored in routes.json).
+network:
+  # Master switch. Set false to disable path routing without removing saved routes.
+  # Multiplexer still runs — HTTP falls through to Teletype, Minecraft still works.
+  enabled: true
+
+  # Hard cap on the number of routes that can be created through the panel.
+  max-routes: 50
+
+  # Default connections-per-IP-per-minute for new routes created in the panel.
+  # Each route can override this individually. The window resets every 60 seconds.
+  # Set 0 to disable rate limiting on proxied routes entirely (not recommended).
+  default-rate-limit-per-minute: 120
+
 # ── Legacy keys (kept for backwards compatibility) ─────────────────────────────
 # web-port: 8080          → now server.port
 # jwt-expiry-hours: 24    → now auth.jwt-expiry-minutes (= 1440)

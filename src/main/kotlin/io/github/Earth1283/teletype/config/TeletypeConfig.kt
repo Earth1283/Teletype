@@ -96,6 +96,11 @@ class TeletypeConfig(private val plugin: Teletype) {
     val filesEditableExtensions: Set<String> get() =
         config.getStringList("files.editable-extensions").map { it.lowercase() }.toSet()
 
+    // ── Network routing ───────────────────────────────────────────────────────
+    val networkEnabled: Boolean get() = bool("network.enabled", true)
+    val networkMaxRoutes: Int get() = config.getInt("network.max-routes", 50)
+    val networkDefaultRateLimitPerMinute: Int get() = config.getInt("network.default-rate-limit-per-minute", 120)
+
     // ── Glance thresholds ─────────────────────────────────────────────────────
     val tpsNominalMin: Double   get() = double("glance.tps.nominal-min", 19.0)
     val tpsDegradedMin: Double  get() = double("glance.tps.degraded-min", 15.0)

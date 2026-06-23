@@ -203,6 +203,17 @@ export const IconPalette = ({ size = 16, className }: IconProps) => (
   </svg>
 )
 
+export const IconNetwork = ({ size = 16, className }: IconProps) => (
+  <svg {...s(size)} viewBox="0 0 24 24" fill="none" stroke="currentColor" className={className}>
+    <rect x="9" y="2" width="6" height="4" rx="1" />
+    <rect x="2" y="18" width="6" height="4" rx="1" />
+    <rect x="16" y="18" width="6" height="4" rx="1" />
+    <line x1="12" y1="6" x2="12" y2="12" />
+    <line x1="12" y1="12" x2="5" y2="18" />
+    <line x1="12" y1="12" x2="19" y2="18" />
+  </svg>
+)
+
 // Logo: stylized TTY terminal icon
 export const TeletypeLogo = ({ size = 22 }: { size?: number }) => (
   <svg width={size} height={size} viewBox="0 0 22 22" fill="none">
