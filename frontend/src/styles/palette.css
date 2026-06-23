@@ -10,6 +10,7 @@
   align-items: flex-start;
   justify-content: center;
   padding-top: 14vh;
+  animation: fade-in 150ms ease;
 }
 .palette-dialog {
   width: 560px;
@@ -21,6 +22,7 @@
   flex-direction: column;
   box-shadow: 0 24px 80px rgba(0,0,0,0.6);
   overflow: hidden;
+  animation: palette-in 180ms cubic-bezier(0.16, 1, 0.3, 1);
 }
 .palette-search-row {
   display: flex;
@@ -39,8 +41,8 @@
   background: none;
   border: none;
   outline: none;
-  font-family: var(--mono);
-  font-size: 13.5px;
+  font-family: var(--sans);
+  font-size: 14px;
   color: var(--ash);
   caret-color: var(--amber);
 }
@@ -64,10 +66,10 @@
   scrollbar-color: var(--border) transparent;
 }
 .palette-group-label {
-  font-family: var(--mono);
+  font-family: var(--sans);
   font-size: 9px;
   font-weight: 600;
-  letter-spacing: 0.12em;
+  letter-spacing: 0.1em;
   text-transform: uppercase;
   color: var(--ghost);
   padding: 8px 14px 4px;
@@ -99,15 +101,15 @@
 }
 .palette-item.active .palette-item-icon { color: var(--amber); }
 .palette-item-label {
-  font-family: var(--mono);
-  font-size: 12.5px;
+  font-family: var(--sans);
+  font-size: 13px;
   flex: 1;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 .palette-item-sub {
-  font-family: var(--mono);
+  font-family: var(--sans);
   font-size: 10px;
   color: var(--ghost);
   overflow: hidden;
@@ -122,7 +124,7 @@
   flex-shrink: 0;
 }
 .palette-empty {
-  font-family: var(--mono);
+  font-family: var(--sans);
   font-size: 12px;
   color: var(--ghost);
   text-align: center;

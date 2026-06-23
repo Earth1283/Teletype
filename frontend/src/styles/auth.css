@@ -15,9 +15,9 @@
   border-radius: var(--r-lg);
 }
 .auth-wordmark {
-  font-family: var(--mono);
-  font-size: 22px;
-  font-weight: 600;
+  font-family: var(--display);
+  font-size: 26px;
+  font-weight: 700;
   color: var(--amber);
   letter-spacing: -0.02em;
   margin-bottom: 4px;
@@ -60,7 +60,7 @@
   display: flex;
   align-items: center;
   gap: 8px;
-  font-family: var(--mono);
+  font-family: var(--sans);
   font-size: 12px;
   color: var(--mist);
 }

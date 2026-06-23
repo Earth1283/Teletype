@@ -31,12 +31,12 @@
   flex-shrink: 0;
 }
 .glance-status-badge {
-  font-family: var(--mono);
+  font-family: var(--sans);
   font-size: 10px;
   font-weight: 700;
-  letter-spacing: 0.1em;
+  letter-spacing: 0.08em;
   padding: 3px 8px;
-  border-radius: 3px;
+  border-radius: 4px;
 }
 .glance-status-badge.nominal {
   background: rgba(74,222,128,0.12);
@@ -67,7 +67,7 @@
   animation: none !important;
 }
 .glance-status-uptime {
-  font-family: var(--mono);
+  font-family: var(--sans);
   font-size: 11px;
   color: var(--mist);
 }
@@ -75,7 +75,7 @@
   display: flex;
   align-items: center;
   gap: 5px;
-  font-family: var(--mono);
+  font-family: var(--sans);
   font-size: 10px;
   color: var(--mist);
 }
@@ -99,39 +99,53 @@
   background: var(--elevated);
   border: 1px solid var(--border);
   border-radius: var(--r-md);
-  border-left: 3px solid transparent;
-  padding: 8px 10px;
+  padding: 10px 12px 12px;
   display: flex;
   flex-direction: column;
   gap: 4px;
-  transition: border-left-color 500ms;
+  position: relative;
+  overflow: hidden;
+  transition: transform 200ms, box-shadow 200ms, border-color 150ms;
 }
-.glance-stat-card.nominal  { border-left-color: var(--green); }
-.glance-stat-card.degraded { border-left-color: var(--amber); }
-.glance-stat-card.incident { border-left-color: var(--red); }
+.glance-stat-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 20px rgba(0,0,0,0.4);
+  border-color: var(--border-hi);
+}
+.glance-stat-card::after {
+  content: '';
+  position: absolute;
+  bottom: 0; left: 0; right: 0;
+  height: 2px;
+  background: var(--ghost);
+  transition: background 500ms;
+}
+.glance-stat-card.nominal::after  { background: var(--green); }
+.glance-stat-card.degraded::after { background: var(--amber); }
+.glance-stat-card.incident::after { background: var(--red); animation: rail-pulse 1.4s ease infinite; }
 .glance-stat-label {
-  font-family: var(--mono);
-  font-size: 9px;
-  font-weight: 600;
+  font-family: var(--sans);
+  font-size: 10px;
+  font-weight: 500;
   text-transform: uppercase;
-  letter-spacing: 0.1em;
+  letter-spacing: 0.07em;
   color: var(--mist);
 }
 .glance-stat-value {
-  font-family: var(--mono);
-  font-size: 20px;
-  font-weight: 600;
+  font-family: var(--display);
+  font-size: 22px;
+  font-weight: 700;
   letter-spacing: -0.02em;
   line-height: 1.1;
   transition: color 500ms;
 }
 .glance-stat-sub {
-  font-family: var(--mono);
+  font-family: var(--sans);
   font-size: 9px;
   color: var(--ghost);
 }
 .glance-stat-sigma {
-  font-family: var(--mono);
+  font-family: var(--sans);
   font-size: 9px;
   color: var(--mist);
   margin-top: 1px;
@@ -157,9 +171,9 @@
   flex-shrink: 0;
 }
 .glance-window-btn {
-  font-family: var(--mono);
+  font-family: var(--sans);
   font-size: 10px;
-  padding: 3px 8px;
+  padding: 3px 9px;
   border-radius: var(--r-sm);
   border: 1px solid var(--border);
   background: transparent;
@@ -178,7 +192,7 @@
   align-items: center;
   gap: 4px;
   margin-left: 8px;
-  font-family: var(--mono);
+  font-family: var(--sans);
   font-size: 10px;
   color: var(--amber);
   background: var(--amber-dim);
@@ -203,10 +217,14 @@
   border-radius: var(--r-md);
   padding: 10px 12px 4px;
   cursor: crosshair;
-  transition: border-color 120ms;
+  transition: border-color 120ms, transform 200ms, box-shadow 200ms;
   flex-shrink: 0;
 }
-.glance-chart-card:hover { border-color: var(--border-hi); }
+.glance-chart-card:hover {
+  border-color: var(--border-hi);
+  transform: translateY(-1px);
+  box-shadow: 0 4px 14px rgba(0,0,0,0.3);
+}
 .glance-chart-header {
   display: flex;
   align-items: baseline;
@@ -214,34 +232,34 @@
   margin-bottom: 6px;
 }
 .glance-chart-title {
-  font-family: var(--mono);
-  font-size: 9px;
-  font-weight: 600;
+  font-family: var(--sans);
+  font-size: 10px;
+  font-weight: 500;
   text-transform: uppercase;
-  letter-spacing: 0.1em;
+  letter-spacing: 0.07em;
   color: var(--mist);
 }
 .glance-chart-value {
-  font-family: var(--mono);
-  font-size: 17px;
-  font-weight: 600;
+  font-family: var(--display);
+  font-size: 18px;
+  font-weight: 700;
   letter-spacing: -0.02em;
   transition: color 400ms;
 }
 .glance-chart-sigma {
-  font-family: var(--mono);
+  font-family: var(--sans);
   font-size: 9px;
   color: var(--mist);
   margin-left: auto;
 }
 .glance-empty {
-  font-family: var(--mono);
+  font-family: var(--sans);
   font-size: 11px;
   color: var(--ghost);
   padding: 20px 0;
 }
 .glance-gc-hint {
-  font-family: var(--mono);
+  font-family: var(--sans);
   font-size: 9px;
   color: var(--ghost);
   padding: 3px 2px 0;
@@ -253,7 +271,7 @@
   background: var(--elevated);
   border: 1px solid var(--border-hi);
   border-radius: var(--r-md);
-  font-family: var(--mono);
+  font-family: var(--sans);
   font-size: 11px;
   min-width: 200px;
   max-width: 280px;
@@ -276,6 +294,7 @@
   padding: 6px 10px;
   color: var(--mist);
   border-bottom: 1px solid var(--border);
+  font-family: var(--sans);
   font-size: 10px;
 }
 .glance-tooltip-metrics { padding: 5px 10px; }
@@ -319,7 +338,7 @@
   display: block;
   width: 100%;
   padding: 5px 10px;
-  font-family: var(--mono);
+  font-family: var(--sans);
   font-size: 9px;
   color: var(--mist);
   background: none;
@@ -342,16 +361,16 @@
   flex-shrink: 0;
 }
 .glance-log-title {
-  font-family: var(--mono);
+  font-family: var(--sans);
   font-size: 9px;
   font-weight: 600;
   text-transform: uppercase;
-  letter-spacing: 0.1em;
+  letter-spacing: 0.08em;
   color: var(--mist);
   flex: 1;
 }
 .glance-log-ts-badge {
-  font-family: var(--mono);
+  font-family: var(--sans);
   font-size: 9px;
   color: var(--amber);
   background: var(--amber-dim);
@@ -395,7 +414,7 @@
   color: var(--amber);
 }
 .glance-log-empty {
-  font-family: var(--mono);
+  font-family: var(--sans);
   font-size: 10px;
   color: var(--ghost);
   padding: 20px;

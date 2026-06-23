@@ -1,5 +1,9 @@
 /* ── Color Themes ─────────────────────────────────────────────────────────── */
 
+/* Cyan / Teal — new defaults */
+html[data-theme="void-cyan"]   { --amber: #22d3ee; }
+html[data-theme="void-teal"]   { --amber: #00c896; }
+
 /* Dark accent variants — only --amber changes; all derived vars update automatically */
 html[data-theme="void-blue"]   { --amber: #60a5fa; }
 html[data-theme="void-green"]  { --amber: #4ade80; }

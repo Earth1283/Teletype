@@ -1,10 +1,10 @@
 /* ── Design system ──────────────────────────────────────────── */
 :root {
-  --void:        #09090b;
-  --surface:     #111115;
-  --elevated:    #18181d;
-  --border:      #222228;
-  --border-hi:   #2e2e38;
+  --void:        #0c0c10;
+  --surface:     #111118;
+  --elevated:    #18181f;
+  --border:      #24242e;
+  --border-hi:   #30303c;
 
   --amber:       #f59e0b;
   /* Derived from --amber so all themes get correct tints by only overriding --amber */
@@ -17,21 +17,22 @@
   --accent-40:   color-mix(in srgb, var(--amber) 40%, transparent);
   --accent-50:   color-mix(in srgb, var(--amber) 50%, transparent);
 
-  --ash:         #c9c6be;
-  --mist:        #80809a;
-  --ghost:       #5e5e72;
+  --ash:         #dddbe8;
+  --mist:        #8484a0;
+  --ghost:       #5c5c78;
 
   --green:       #4ade80;
   --red:         #f87171;
   --blue:        #60a5fa;
   --yellow:      #fbbf24;
 
-  --mono: 'JetBrains Mono', monospace;
-  --sans: 'Geist', system-ui, sans-serif;
+  --display: 'Space Grotesk', system-ui, sans-serif;
+  --sans:    'Geist', system-ui, sans-serif;
+  --mono:    'JetBrains Mono', monospace;
 
-  --r-sm: 4px;
-  --r-md: 8px;
-  --r-lg: 12px;
+  --r-sm: 6px;
+  --r-md: 10px;
+  --r-lg: 16px;
 }
 
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }

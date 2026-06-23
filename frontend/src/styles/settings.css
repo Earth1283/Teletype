@@ -27,7 +27,7 @@
 }
 .s-header-sub {
   display: block;
-  font-family: var(--mono);
+  font-family: var(--sans);
   font-size: 10.5px;
   color: var(--ghost);
   margin-top: 3px;
@@ -64,7 +64,7 @@
   margin-bottom: 2px;
 }
 .gbm-desc {
-  font-family: var(--mono);
+  font-family: var(--sans);
   font-size: 10px;
   color: var(--ghost);
   line-height: 1.5;
@@ -90,19 +90,19 @@
 }
 .s-section-icon { color: var(--mist); display: flex; align-items: center; }
 .s-section-title {
-  font-family: var(--mono);
+  font-family: var(--sans);
   font-size: 10px;
   font-weight: 600;
-  letter-spacing: 0.1em;
+  letter-spacing: 0.08em;
   text-transform: uppercase;
   color: var(--mist);
 }
 .s-section-body { padding: 4px 0; }
 .s-subsection-label {
-  font-family: var(--mono);
+  font-family: var(--sans);
   font-size: 9px;
   font-weight: 600;
-  letter-spacing: 0.1em;
+  letter-spacing: 0.08em;
   text-transform: uppercase;
   color: var(--ghost);
   padding: 8px 14px 2px;
@@ -125,13 +125,13 @@
 .s-row:hover { background: rgba(255,255,255,0.015); }
 .s-row-labels { flex: 1; min-width: 0; }
 .s-row-label {
-  font-family: var(--mono);
+  font-family: var(--sans);
   font-size: 12px;
   color: var(--ash);
   display: block;
 }
 .s-row-sub {
-  font-family: var(--mono);
+  font-family: var(--sans);
   font-size: 9.5px;
   color: var(--ghost);
   display: block;
@@ -193,7 +193,7 @@
   box-shadow: 0 0 6px var(--accent-40);
 }
 .s-slider-val {
-  font-family: var(--mono);
+  font-family: var(--sans);
   font-size: 11px;
   color: var(--mist);
   min-width: 44px;
@@ -208,7 +208,7 @@
   flex-shrink: 0;
 }
 .s-reset-btn {
-  font-family: var(--mono);
+  font-family: var(--sans);
   font-size: 11px;
   color: var(--ghost);
   background: none;
@@ -245,11 +245,11 @@
   border-radius: 6px;
   border: 2px solid var(--border);
   overflow: hidden;
-  transition: border-color 140ms;
+  transition: border-color 140ms, transform 150ms;
   display: flex;
   align-items: flex-end;
 }
-.s-theme-swatch:hover .s-theme-preview { border-color: var(--border-hi); }
+.s-theme-swatch:hover .s-theme-preview { border-color: var(--border-hi); transform: scale(1.08); }
 .s-theme-swatch.active .s-theme-preview {
   border-color: var(--amber);
   box-shadow: 0 0 0 1px var(--amber);
@@ -272,7 +272,7 @@
   opacity: 0.5;
 }
 .s-theme-name {
-  font-family: var(--mono);
+  font-family: var(--sans);
   font-size: 9px;
   color: var(--mist);
   text-align: center;
@@ -289,7 +289,7 @@
   padding: 2px;
 }
 .s-seg-btn {
-  font-family: var(--mono);
+  font-family: var(--sans);
   font-size: 10.5px;
   color: var(--mist);
   background: transparent;

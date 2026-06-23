@@ -25,11 +25,11 @@
   border-bottom: 1px solid var(--border);
 }
 .sidebar-logo-text {
-  font-family: var(--mono);
+  font-family: var(--display);
   font-size: 15px;
-  font-weight: 600;
+  font-weight: 700;
   color: var(--amber);
-  letter-spacing: -0.01em;
+  letter-spacing: -0.02em;
 }
 
 .sidebar-nav {
@@ -54,18 +54,21 @@
   font-size: 13.5px;
   font-weight: 400;
   cursor: pointer;
-  transition: background 120ms, color 120ms;
+  transition: background 120ms, color 120ms, transform 150ms;
   text-align: left;
 }
 .nav-btn:hover {
   background: var(--elevated);
   color: var(--ash);
+  transform: translateX(2px);
 }
 .nav-btn.active {
   background: var(--amber-dim);
   color: var(--amber);
+  box-shadow: inset 3px 0 0 0 var(--amber);
 }
-.nav-btn svg { flex-shrink: 0; opacity: 0.7; }
+.nav-btn svg { flex-shrink: 0; opacity: 0.7; transition: transform 150ms, opacity 120ms; }
+.nav-btn:hover svg { transform: scale(1.12); opacity: 0.9; }
 .nav-btn.active svg { opacity: 1; }
 
 .sidebar-footer {
@@ -87,7 +90,7 @@
   animation: pulse-dot 2.4s ease infinite;
 }
 .status-label {
-  font-family: var(--mono);
+  font-family: var(--sans);
   font-size: 11px;
   color: var(--mist);
   overflow: hidden;
