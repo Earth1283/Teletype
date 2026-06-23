@@ -1,6 +1,7 @@
 package io.github.Earth1283.teletype.metrics
 
 import io.github.Earth1283.teletype.web.model.MetricSnapshot
+import io.github.Earth1283.teletype.web.model.PlayerEvent
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
@@ -35,14 +36,28 @@ class MetricsDatabase(dataFolder: File) {
                 """.trimIndent())
                 stmt.executeUpdate("CREATE INDEX IF NOT EXISTS idx_${table}_ts ON $table(ts)")
             }
+            stmt.executeUpdate("""
+                CREATE TABLE IF NOT EXISTS player_events (
+                  ts     INTEGER NOT NULL,
+                  uuid   TEXT    NOT NULL,
+                  name   TEXT    NOT NULL,
+                  action TEXT    NOT NULL
+                )
+            """.trimIndent())
+            stmt.executeUpdate("CREATE INDEX IF NOT EXISTS idx_player_events_ts ON player_events(ts)")
         }
-        // Add system-metrics columns to existing tables if not yet present (idempotent migration).
+        // Idempotent column migrations — add new columns to existing tables without data loss.
         val newCols = linkedMapOf(
             "cpu_pct"        to "REAL",
             "sys_mem_used"   to "INTEGER",
             "sys_mem_total"  to "INTEGER",
             "disk_used_gb"   to "INTEGER",
             "disk_total_gb"  to "INTEGER",
+            "player_count"   to "INTEGER",
+            "entity_count"   to "INTEGER",
+            "loaded_chunks"  to "INTEGER",
+            "ping_p50"       to "INTEGER",
+            "ping_p95"       to "INTEGER",
         )
         for (table in listOf("metrics_1s", "metrics_1m", "metrics_15m")) {
             val existing = conn.prepareStatement("PRAGMA table_info($table)").use { ps ->
@@ -65,8 +80,9 @@ class MetricsDatabase(dataFolder: File) {
                 val sql = """
                     INSERT OR IGNORE INTO metrics_1s
                     (ts, tps1, tps5, tps15, tick_ms, mem_used, mem_total, mem_max, uptime_ms,
-                     cpu_pct, sys_mem_used, sys_mem_total, disk_used_gb, disk_total_gb)
-                    VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)
+                     cpu_pct, sys_mem_used, sys_mem_total, disk_used_gb, disk_total_gb,
+                     player_count, entity_count, loaded_chunks, ping_p50, ping_p95)
+                    VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
                 """.trimIndent()
                 conn.autoCommit = false
                 try {
@@ -86,6 +102,11 @@ class MetricsDatabase(dataFolder: File) {
                             ps.setObject(12, s.sysMemTotalMb)
                             ps.setObject(13, s.diskUsedGb)
                             ps.setObject(14, s.diskTotalGb)
+                            ps.setInt(15, s.playerCount)
+                            ps.setInt(16, s.entityCount)
+                            ps.setInt(17, s.loadedChunks)
+                            ps.setObject(18, s.pingP50)
+                            ps.setObject(19, s.pingP95)
                             ps.addBatch()
                         }
                         ps.executeBatch()
@@ -132,7 +153,8 @@ class MetricsDatabase(dataFolder: File) {
                 conn.prepareStatement("""
                     INSERT OR IGNORE INTO metrics_1m
                     (ts, tps1, tps5, tps15, tick_ms, mem_used, mem_total, mem_max, uptime_ms,
-                     cpu_pct, sys_mem_used, sys_mem_total, disk_used_gb, disk_total_gb)
+                     cpu_pct, sys_mem_used, sys_mem_total, disk_used_gb, disk_total_gb,
+                     player_count, entity_count, loaded_chunks, ping_p50, ping_p95)
                     SELECT (ts / 60000) * 60000,
                            AVG(tps1), AVG(tps5), AVG(tps15), AVG(tick_ms),
                            CAST(AVG(mem_used)   AS INTEGER),
@@ -143,7 +165,12 @@ class MetricsDatabase(dataFolder: File) {
                            CAST(AVG(sys_mem_used)   AS INTEGER),
                            CAST(AVG(sys_mem_total)  AS INTEGER),
                            CAST(AVG(disk_used_gb)   AS INTEGER),
-                           CAST(AVG(disk_total_gb)  AS INTEGER)
+                           CAST(AVG(disk_total_gb)  AS INTEGER),
+                           CAST(AVG(player_count)   AS INTEGER),
+                           CAST(AVG(entity_count)   AS INTEGER),
+                           CAST(AVG(loaded_chunks)  AS INTEGER),
+                           CAST(AVG(ping_p50)       AS INTEGER),
+                           CAST(AVG(ping_p95)       AS INTEGER)
                     FROM metrics_1s
                     WHERE ts >= ? AND ts < ?
                     GROUP BY (ts / 60000)
@@ -176,7 +203,8 @@ class MetricsDatabase(dataFolder: File) {
                 conn.prepareStatement("""
                     INSERT OR IGNORE INTO metrics_15m
                     (ts, tps1, tps5, tps15, tick_ms, mem_used, mem_total, mem_max, uptime_ms,
-                     cpu_pct, sys_mem_used, sys_mem_total, disk_used_gb, disk_total_gb)
+                     cpu_pct, sys_mem_used, sys_mem_total, disk_used_gb, disk_total_gb,
+                     player_count, entity_count, loaded_chunks, ping_p50, ping_p95)
                     SELECT (ts / 900000) * 900000,
                            AVG(tps1), AVG(tps5), AVG(tps15), AVG(tick_ms),
                            CAST(AVG(mem_used)   AS INTEGER),
@@ -187,7 +215,12 @@ class MetricsDatabase(dataFolder: File) {
                            CAST(AVG(sys_mem_used)   AS INTEGER),
                            CAST(AVG(sys_mem_total)  AS INTEGER),
                            CAST(AVG(disk_used_gb)   AS INTEGER),
-                           CAST(AVG(disk_total_gb)  AS INTEGER)
+                           CAST(AVG(disk_total_gb)  AS INTEGER),
+                           CAST(AVG(player_count)   AS INTEGER),
+                           CAST(AVG(entity_count)   AS INTEGER),
+                           CAST(AVG(loaded_chunks)  AS INTEGER),
+                           CAST(AVG(ping_p50)       AS INTEGER),
+                           CAST(AVG(ping_p95)       AS INTEGER)
                     FROM metrics_1m
                     WHERE ts >= ? AND ts < ?
                     GROUP BY (ts / 900000)
@@ -209,11 +242,52 @@ class MetricsDatabase(dataFolder: File) {
         }
     }
 
+    suspend fun insertPlayerEvent(ts: Long, uuid: String, name: String, action: String) = mutex.withLock {
+        withContext(Dispatchers.IO) {
+            conn.prepareStatement(
+                "INSERT INTO player_events (ts, uuid, name, action) VALUES (?,?,?,?)"
+            ).use { ps ->
+                ps.setLong(1, ts); ps.setString(2, uuid)
+                ps.setString(3, name); ps.setString(4, action)
+                ps.executeUpdate()
+            }
+        }
+    }
+
+    suspend fun playerEvents(from: Long, to: Long): List<PlayerEvent> = mutex.withLock {
+        withContext(Dispatchers.IO) {
+            val result = mutableListOf<PlayerEvent>()
+            conn.prepareStatement(
+                "SELECT ts, uuid, name, action FROM player_events WHERE ts >= ? AND ts <= ? ORDER BY ts"
+            ).use { ps ->
+                ps.setLong(1, from); ps.setLong(2, to)
+                ps.executeQuery().use { rs ->
+                    while (rs.next()) result += PlayerEvent(
+                        ts     = rs.getLong("ts"),
+                        uuid   = rs.getString("uuid"),
+                        name   = rs.getString("name"),
+                        action = rs.getString("action"),
+                    )
+                }
+            }
+            result
+        }
+    }
+
+    suspend fun prunePlayerEvents(before: Long) = mutex.withLock {
+        withContext(Dispatchers.IO) {
+            conn.prepareStatement("DELETE FROM player_events WHERE ts < ?").use { ps ->
+                ps.setLong(1, before); ps.executeUpdate()
+            }
+        }
+    }
+
     private fun queryTable(table: String, from: Long, to: Long): List<MetricSnapshot> {
         val result = mutableListOf<MetricSnapshot>()
         conn.prepareStatement(
             """SELECT ts, tps1, tps5, tps15, tick_ms, mem_used, mem_total, mem_max, uptime_ms,
-               cpu_pct, sys_mem_used, sys_mem_total, disk_used_gb, disk_total_gb
+               cpu_pct, sys_mem_used, sys_mem_total, disk_used_gb, disk_total_gb,
+               player_count, entity_count, loaded_chunks, ping_p50, ping_p95
                FROM $table WHERE ts >= ? AND ts <= ? ORDER BY ts"""
         ).use { ps ->
             ps.setLong(1, from); ps.setLong(2, to)
@@ -234,6 +308,11 @@ class MetricsDatabase(dataFolder: File) {
                         sysMemTotalMb = rs.getObject("sys_mem_total")?.let { rs.getLong("sys_mem_total") },
                         diskUsedGb    = rs.getObject("disk_used_gb")?.let { rs.getLong("disk_used_gb") },
                         diskTotalGb   = rs.getObject("disk_total_gb")?.let { rs.getLong("disk_total_gb") },
+                        playerCount   = rs.getObject("player_count")?.let { rs.getInt("player_count") } ?: 0,
+                        entityCount   = rs.getObject("entity_count")?.let { rs.getInt("entity_count") } ?: 0,
+                        loadedChunks  = rs.getObject("loaded_chunks")?.let { rs.getInt("loaded_chunks") } ?: 0,
+                        pingP50       = rs.getObject("ping_p50")?.let { rs.getInt("ping_p50") },
+                        pingP95       = rs.getObject("ping_p95")?.let { rs.getInt("ping_p95") },
                     )
                 }
             }

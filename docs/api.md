@@ -12,6 +12,8 @@ Errors always return JSON:
 { "error": "Human-readable error message" }
 ```
 
+> **Rate limiting order:** Spam-check runs before authentication on all routes. An IP that exceeds its rate limit never reaches JWT verification. Auth routes (`/api/auth/*`) and the WebSocket endpoint (`/ws/console`) each have their own IP-keyed limits.
+
 ---
 
 ## Authentication
@@ -32,7 +34,7 @@ Rate limited: 10 requests/minute per IP (configurable).
 
 ---
 
-### `POST /api/auth/poll/{uuid}`
+### `GET /api/auth/poll/{uuid}`
 
 Poll for the result of a challenge. Call this repeatedly (every 1–2 seconds) after requesting a challenge.
 
@@ -65,21 +67,25 @@ Long-poll: the server holds the request open for up to 30 seconds before returni
 
 Bidirectional console stream. The JWT is passed as a query parameter (browsers cannot set custom WebSocket headers).
 
-**Server → Client messages:**
-```json
-{ "type": "log", "payload": "[12:34:56] [Server thread/INFO]: Done (1.234s)!" }
-```
+Rate limited at the connection upgrade using the **auth** rate limit bucket (same as `/api/auth/*`, default 10 req/min per IP). Once connected, message exchange is not rate limited. The server closes idle connections after 60 seconds without a pong response to its 30-second ping.
 
-On connect, the server replays the last N lines from the replay buffer (default 1000, configurable).
+**Server → Client messages:**
+
+| `type` | `payload` | Description |
+|--------|-----------|-------------|
+| `log` | Log line string | Console output. On connect, the last N lines are replayed (default 1000). |
+| `tab_complete` | JSON-encoded `string[]` | Response to a `tab_complete` request. Empty array = no completions. |
 
 **Client → Server messages:**
-```json
-{ "type": "command", "payload": "say hello" }
-```
 
-Commands execute as the console sender (equivalent to typing in the server console). Output appears as subsequent `log` messages.
+| `type` | `payload` | Description |
+|--------|-----------|-------------|
+| `command` | Command string | Execute as console sender. Equivalent to typing in server console. |
+| `tab_complete` | Partial command string | Request tab completions. Server responds with a `tab_complete` message. |
 
-Max concurrent connections: 8 (configurable via `server.max-websocket-connections`).
+All messages are JSON objects: `{ "type": "...", "payload": "..." }`.
+
+Tab completions are fetched via `CommandMap.tabComplete()` on the Bukkit main thread with a 500 ms timeout. Max concurrent connections: 8 (configurable via `server.max-websocket-connections`).
 
 ---
 
@@ -94,11 +100,13 @@ Max concurrent connections: 8 (configurable via `server.max-websocket-connection
   "version": "git-Paper-453 (MC: 1.21.1)",
   "onlinePlayers": 3,
   "maxPlayers": 20,
-  "tps": [19.98, 19.95, 19.91]
+  "tps": [19.98, 19.95, 19.91],
+  "worldCount": 3,
+  "pluginCount": 12
 }
 ```
 
-`tps` array: 1-minute, 5-minute, 15-minute averages.
+`tps` array: 1-minute, 5-minute, 15-minute averages. These are raw Bukkit TPS values and are **not** clamped to 20 (unlike the metrics history endpoint, which clamps to [0, 20]).
 
 ---
 
@@ -132,7 +140,9 @@ Dispatch a command as the console sender. Audited.
 { "status": "dispatched" }
 ```
 
-Rate limited: 30 requests/minute per user (separate from the general API limit).
+The response returns immediately once the command is queued on the Bukkit scheduler. The command runs asynchronously — `200 OK` does not mean the command has completed, only that it was accepted. The audit log entry is also written asynchronously after dispatch.
+
+Rate limited: 30 requests/minute per IP (separate from the general API limit).
 
 ---
 
@@ -140,7 +150,7 @@ Rate limited: 30 requests/minute per user (separate from the general API limit).
 
 ### `GET /api/glance/current`
 
-Latest metric snapshot.
+Latest metric snapshot. Returns `503 Service Unavailable` if the sampler has not yet produced its first reading (normally resolves within one second of plugin start).
 
 **Response 200:**
 ```json
@@ -158,24 +168,60 @@ Latest metric snapshot.
   "sysMemUsedMb": 12000,
   "sysMemTotalMb": 32768,
   "diskUsedGb": 120,
-  "diskTotalGb": 500
+  "diskTotalGb": 500,
+  "playerCount": 3,
+  "entityCount": 1842,
+  "loadedChunks": 441,
+  "pingP50": 28,
+  "pingP95": 74
 }
 ```
 
-`cpuPercent` is `-1` if the JVM cannot read host CPU load (rare; IBM J9, some containers). System metric fields (`cpuPercent`, `sysMemUsedMb`, etc.) are `null` if metrics are not yet available.
+**Field notes:**
+
+| Field | Notes |
+|-------|-------|
+| `tps1`, `tps5`, `tps15` | Clamped to [0.0, 20.0]. |
+| `tickTimeMs` | Rolling average of the last 20 tick times in milliseconds (MSPT). Source: `Server.getTickTimes()` nanoseconds ÷ 1,000,000. |
+| `cpuPercent` | `-1.0` if the JVM's `OperatingSystemMXBean.getCpuLoad()` returns a negative value (JVM still warming up, or the container does not expose host CPU). `null` if the MXBean itself could not be cast to `com.sun.management.OperatingSystemMXBean` at all (non-Sun JVMs such as IBM J9). |
+| `sysMemUsedMb`, `sysMemTotalMb`, `diskUsedGb`, `diskTotalGb` | `null` if unavailable (same MXBean condition as `cpuPercent`). |
+| `pingP50`, `pingP95` | Player ping percentiles in milliseconds. `null` if no players are online or if `Player.getPing()` is unavailable (Spigot before 1.17, or non-Paper forks). P50 is the midpoint of the sorted ping list; P95 is the 95th percentile by index. |
+| `playerCount`, `entityCount`, `loadedChunks` | Sampled once per second on the Bukkit main thread. `entityCount` and `loadedChunks` are totals across all loaded worlds. |
 
 ### `GET /api/glance/history?window=<minutes>`
 
-Historical metric series. `window` range: 1–525600 (1 year).
+Historical metric series. `window` range: 1–525600 (1 year). Default: `5`.
 
-Returns an array of snapshots. Resolution is selected automatically:
+Returns an array of `MetricSnapshot` objects (same schema as `/glance/current`). Resolution is selected automatically:
 
 | `window` | Source | Interval |
 |----------|--------|----------|
-| ≤ 15 | In-memory | 1 second |
+| ≤ 15 | In-memory ring buffer | 1 second |
 | ≤ 60 | SQLite `metrics_1s` | 1 second |
 | ≤ 10080 (7d) | SQLite `metrics_1m` | 1 minute |
 | > 10080 | SQLite `metrics_15m` | 15 minutes |
+
+The ≤ 15 tier uses the in-memory ring buffer (no disk I/O). The ≤ 60 tier is the same 1-second resolution data read from SQLite, which holds up to 24 hours of raw rows before downsampling.
+
+---
+
+## Stats — Player Events
+
+### `GET /api/stats/player-events?minutes=<n>`
+
+Returns player join and leave events for the past `n` minutes. `minutes` range: 1–43200 (30 days). Default: 60.
+
+Events are recorded for every `PlayerJoinEvent` and `PlayerQuitEvent` and persisted to SQLite. Retained for 30 days (pruned nightly).
+
+**Response 200:**
+```json
+[
+  { "ts": 1700000100000, "uuid": "069a79f4-...", "name": "Notch", "action": "join" },
+  { "ts": 1700003700000, "uuid": "069a79f4-...", "name": "Notch", "action": "leave" }
+]
+```
+
+`action` is always `"join"` or `"leave"`. `uuid` is the player's persistent UUID (survives name changes).
 
 ---
 

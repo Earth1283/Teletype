@@ -33,6 +33,21 @@ export interface TeletypeSettings {
     enabled: boolean
   }
 
+  stats: {
+    defaultRange: '1h' | '6h' | '24h' | '7d'
+    showChartTps: boolean
+    showChartMspt: boolean
+    showChartPlayers: boolean
+    showChartEntities: boolean
+    showChartChunks: boolean
+    showChartPing: boolean
+    showOverlayPerf: boolean
+    showOverlayWorld: boolean
+    overlayAnomalyMarkers: boolean
+    overlayAnomalyThreshold: number
+    showCorrelation: boolean
+  }
+
   editor: {
     fontSize: number
     wordWrap: boolean
@@ -71,6 +86,21 @@ export const DEFAULT_SETTINGS: TeletypeSettings = {
   },
   palette: {
     enabled: true,
+  },
+
+  stats: {
+    defaultRange: '1h',
+    showChartTps: true,
+    showChartMspt: true,
+    showChartPlayers: true,
+    showChartEntities: true,
+    showChartChunks: true,
+    showChartPing: true,
+    showOverlayPerf: true,
+    showOverlayWorld: false,
+    overlayAnomalyMarkers: true,
+    overlayAnomalyThreshold: 2.0,
+    showCorrelation: true,
   },
 
   editor: {

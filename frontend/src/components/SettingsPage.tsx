@@ -77,6 +77,8 @@ export default function SettingsPage() {
     update({ console: patch })
   const setEditor = (patch: Partial<typeof settings.editor>) =>
     update({ editor: patch })
+  const setStats = (patch: Partial<typeof settings.stats>) =>
+    update({ stats: patch })
 
   return (
     <div className="s-root">
@@ -262,6 +264,66 @@ export default function SettingsPage() {
             value={settings.console.showTimestamps}
             onChange={v => setConsole({ showTimestamps: v })}
           />
+        </Row>
+      </Section>
+
+      {/* ── Stats ────────────────────────────────────────────────── */}
+      <Section title="Stats" icon={<IconSliders size={13} />}>
+        <div className="s-subsection-label">Default time range</div>
+        <Row label="Default range" sub="Time window shown when opening the Stats page">
+          <div className="s-seg">
+            {(['1h', '6h', '24h', '7d'] as const).map(r => (
+              <button
+                key={r}
+                className={`s-seg-btn${settings.stats.defaultRange === r ? ' active' : ''}`}
+                onClick={() => setStats({ defaultRange: r })}
+              >{r}</button>
+            ))}
+          </div>
+        </Row>
+        <div className="s-divider" />
+        <div className="s-subsection-label">Visible charts</div>
+        <Row label="TPS" sub="TPS 1m history with 5m average">
+          <Toggle value={settings.stats.showChartTps} onChange={v => setStats({ showChartTps: v })} />
+        </Row>
+        <Row label="MSPT" sub="Mean tick time history">
+          <Toggle value={settings.stats.showChartMspt} onChange={v => setStats({ showChartMspt: v })} />
+        </Row>
+        <Row label="Player count" sub="Online player count over time with join/leave markers">
+          <Toggle value={settings.stats.showChartPlayers} onChange={v => setStats({ showChartPlayers: v })} />
+        </Row>
+        <Row label="Entity count" sub="Total entities across all worlds">
+          <Toggle value={settings.stats.showChartEntities} onChange={v => setStats({ showChartEntities: v })} />
+        </Row>
+        <Row label="Loaded chunks" sub="Total loaded chunks across all worlds">
+          <Toggle value={settings.stats.showChartChunks} onChange={v => setStats({ showChartChunks: v })} />
+        </Row>
+        <Row label="Ping percentiles" sub="P50 / P95 player latency (Paper forks only)">
+          <Toggle value={settings.stats.showChartPing} onChange={v => setStats({ showChartPing: v })} />
+        </Row>
+
+        <div className="s-divider" />
+        <div className="s-subsection-label">Z-score overlay</div>
+        <Row label="Performance overlay" sub="TPS / MSPT / JVM mem / CPU on unified σ axis">
+          <Toggle value={settings.stats.showOverlayPerf} onChange={v => setStats({ showOverlayPerf: v })} />
+        </Row>
+        <Row label="World overlay" sub="Players / entities / chunks / ping on unified σ axis">
+          <Toggle value={settings.stats.showOverlayWorld} onChange={v => setStats({ showOverlayWorld: v })} />
+        </Row>
+        <Row label="Anomaly markers" sub="Vertical markers where any series exceeds threshold; click for logs">
+          <Toggle value={settings.stats.overlayAnomalyMarkers} onChange={v => setStats({ overlayAnomalyMarkers: v })} />
+        </Row>
+        <Row label="Anomaly threshold" sub="σ beyond which a point is flagged">
+          <Slider
+            value={settings.stats.overlayAnomalyThreshold} min={1} max={5} step={0.5}
+            fmt={v => `${v.toFixed(1)}σ`}
+            onChange={v => setStats({ overlayAnomalyThreshold: v })}
+          />
+        </Row>
+
+        <div className="s-divider" />
+        <Row label="Correlation table" sub="Pearson r between all metric pairs">
+          <Toggle value={settings.stats.showCorrelation} onChange={v => setStats({ showCorrelation: v })} />
         </Row>
       </Section>
 

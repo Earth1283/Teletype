@@ -11,6 +11,7 @@ import io.github.Earth1283.teletype.web.routing.authRoutes
 import io.github.Earth1283.teletype.web.routing.consoleWebSocket
 import io.github.Earth1283.teletype.web.routing.fileRoutes
 import io.github.Earth1283.teletype.web.routing.glanceRoutes
+import io.github.Earth1283.teletype.web.routing.statsRoutes
 import io.ktor.http.ContentType
 import io.ktor.http.HttpHeaders
 import io.ktor.http.HttpMethod
@@ -30,7 +31,6 @@ import io.ktor.server.netty.NettyApplicationEngine
 import io.ktor.server.plugins.contentnegotiation.ContentNegotiation
 import io.ktor.server.plugins.cors.routing.CORS
 import io.ktor.server.plugins.httpsredirect.HttpsRedirect
-import io.ktor.server.auth.principal
 import io.ktor.server.plugins.origin
 import io.ktor.server.plugins.ratelimit.RateLimit
 import io.ktor.server.plugins.ratelimit.RateLimitName
@@ -131,21 +131,15 @@ class WebServer(private val plugin: Teletype) {
                     rateLimiter(limit = authLimit, refillPeriod = 1.minutes)
                     requestKey { call -> call.request.origin.remoteAddress }
                 }
-                // General API: keyed by JWT subject (user identity) with IP fallback
+                // General API: IP-keyed (rate check runs before auth, principal not yet available)
                 register(RateLimitName("api")) {
                     rateLimiter(limit = apiLimit, refillPeriod = 1.minutes)
-                    requestKey { call ->
-                        call.principal<JWTPrincipal>()?.payload?.subject
-                            ?: call.request.origin.remoteAddress
-                    }
+                    requestKey { call -> call.request.origin.remoteAddress }
                 }
-                // Console command dispatch: tighter limit within the api budget
+                // Console command dispatch: tighter limit within the api budget, IP-keyed
                 register(RateLimitName("execute")) {
                     rateLimiter(limit = execLimit, refillPeriod = 1.minutes)
-                    requestKey { call ->
-                        call.principal<JWTPrincipal>()?.payload?.subject
-                            ?: call.request.origin.remoteAddress
-                    }
+                    requestKey { call -> call.request.origin.remoteAddress }
                 }
             }
 
@@ -200,20 +194,23 @@ class WebServer(private val plugin: Teletype) {
                     route("/api/auth") { authRoutes(plugin) }
                 }
 
-                authenticate("auth-jwt") {
-                    rateLimit(RateLimitName("api")) {
+                rateLimit(RateLimitName("api")) {
+                    authenticate("auth-jwt") {
                         route("/api") {
                             apiRoutes(plugin)
                             route("/files")   { fileRoutes(plugin) }
                             route("/glance")  { glanceRoutes(plugin) }
                             route("/actions") { actionRoutes(plugin) }
+                            route("/stats")   { statsRoutes(plugin) }
                             auditRoutes(plugin)
                         }
                     }
                 }
 
-                webSocket("/ws/console") {
-                    consoleWebSocket(plugin)
+                rateLimit(RateLimitName("auth")) {
+                    webSocket("/ws/console") {
+                        consoleWebSocket(plugin)
+                    }
                 }
             }
         }.start(wait = false)

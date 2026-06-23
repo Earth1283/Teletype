@@ -104,7 +104,7 @@ function MainApp() {
         {tab === 'glance'   && <GlancePage />}
         {tab === 'console'  && <Console />}
         {tab === 'players'  && <PlayerList />}
-        {tab === 'stats'    && <ServerStats />}
+        {tab === 'stats'    && <ServerStats onNavigate={t => setTab(t as Tab)} />}
         {tab === 'files'    && <FileManager />}
         {tab === 'actions'  && <ActionsPage />}
         {tab === 'audit'    && <AuditPage />}

@@ -263,18 +263,15 @@ export default function FileManager() {
               {!editing && <span className="fm-row-date">{fmtDate(entry.lastModified)}</span>}
               <div className="fm-row-actions" onClick={(e) => e.stopPropagation()}>
                 {!entry.isDirectory && (
-                  <button className="row-action-btn" onClick={(e) => { e.stopPropagation(); downloadFile(entry) }}>
+                  <button className="row-action-btn" title="Download" onClick={(e) => { e.stopPropagation(); downloadFile(entry) }}>
                     <IconDownload size={12} />
-                    Download
                   </button>
                 )}
-                <button className="row-action-btn" onClick={(e) => { e.stopPropagation(); openModal({ type: 'rename', entry }, entry.name) }}>
+                <button className="row-action-btn" title="Rename" onClick={(e) => { e.stopPropagation(); openModal({ type: 'rename', entry }, entry.name) }}>
                   <IconPencil size={12} />
-                  Rename
                 </button>
-                <button className="row-action-btn del" onClick={(e) => deleteEntry(entry, e)}>
+                <button className="row-action-btn del" title="Delete" onClick={(e) => deleteEntry(entry, e)}>
                   <IconTrash size={12} />
-                  Delete
                 </button>
               </div>
             </div>

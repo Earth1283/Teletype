@@ -32,10 +32,14 @@ Teletype/
 │   │   ├── config/
 │   │   │   └── TeletypeConfig.kt # Config loader (config.yml → data classes)
 │   │   ├── console/              # Log appender → WebSocket broadcast ring buffer
+│   │   ├── events/
+│   │   │   └── PlayerEventListener.kt  # PlayerJoinEvent / PlayerQuitEvent → player_events table
 │   │   ├── metrics/
 │   │   │   ├── MetricsCollector.kt  # BukkitRunnable sampling at 1 Hz
 │   │   │   ├── MetricsDatabase.kt   # SQLite storage + downsampling (teletype-metrics.db)
-│   │   │   └── RetentionJob.kt      # Background job for row expiry / downsampling
+│   │   │   └── RetentionJob.kt      # Nightly downsampling + player_events pruning
+│   │   ├── multiplex/
+│   │   │   └── PortMultiplexer.kt   # Optional single-port HTTP+Minecraft mux
 │   │   ├── standalone/           # Standalone (non-Paper) startup path
 │   │   └── web/
 │   │       ├── WebServer.kt      # Ktor engine + install blocks + route registration
@@ -49,7 +53,8 @@ Teletype/
 │   │           ├── AuthRoutes.kt
 │   │           ├── ConsoleWebSocket.kt
 │   │           ├── FileRoutes.kt
-│   │           └── GlanceRoutes.kt
+│   │           ├── GlanceRoutes.kt
+│   │           └── StatsRoutes.kt    # /api/stats/* (player events)
 │   └── resources/
 │       ├── config.yml            # Default config (copied to dataFolder on first start)
 │       └── webroot/              # Compiled frontend assets served by Ktor static handler
@@ -60,13 +65,14 @@ Teletype/
     │   └── mock-server.mjs       # Synthetic data server for testFrontend
     └── src/
         ├── App.tsx               # Tab bar, route render
-        ├── LogContext.tsx        # Single WebSocket source of truth for console logs
+        ├── LogContext.tsx        # Single WebSocket source of truth for console logs + tab complete
         ├── SettingsContext.tsx   # Persistent client settings (localStorage)
         ├── CommandPalette.tsx    # Cmd+K palette
         ├── Icons.tsx             # SVG icon components
         └── components/
             ├── GlancePage.tsx
-            ├── Console.tsx
+            ├── Console.tsx       # Live log stream, command input, Tab completion, right-click QA
+            ├── ServerStats.tsx   # Live cards + historical charts + Z-overlay + correlation table
             ├── SettingsPage.tsx
             ├── AuditPage.tsx
             └── actions/
@@ -100,15 +106,20 @@ Open `http://localhost:5173`. Auth is bypassed — clicking verify returns a tok
 - **JVM heap** — sawtooth: fills at ~0.3 MB/s, GC drop at 85% usage or 0.4% random chance
 - **CPU %** — random walk [5, 95]
 - **System RAM** — slow drift [40%, 80%]
+- **Entity/chunk/player counts** — slow random walks
 - Disk stays constant (no state machine needed)
 
 **Console:** WebSocket at `/ws/console`. On connect: 40-line log replay burst. Then variable-cadence stream (400–2600ms between lines) using recursive `setTimeout`. Commands echo back; `list` returns a fake player count, `gc` triggers a simulated GC drop.
+
+Tab completion: the mock returns a static list of common Minecraft commands for any partial input.
 
 **Actions:** In-memory CRUD stubs — categories, snippets, and schedule entries persist for the session, reset on server restart.
 
 **Files:** Returns a static directory tree. Read/write/delete operations acknowledge but don't touch disk.
 
 **Audit:** Seeded with 20 sample entries; new entries appended on relevant API calls.
+
+**Stats:** `/api/stats/player-events` returns a seeded list of join/leave events spread across the last 60 minutes.
 
 ### Proxy configuration
 
@@ -153,11 +164,16 @@ Useful when only Kotlin files changed and `webroot/` already has current assets.
 Browser
   │  HTTP/WS
   ▼
-Ktor (embedded, netty)
+[PortMultiplexer :25565]  ← optional; peeks first 4 bytes, routes by HTTP vs. game
+  │                  │
+  ▼ HTTP             ▼ Minecraft
+Ktor (embedded, netty)     Minecraft server (internal port)
+  ├── Rate limit (IP-keyed, before auth on all routes)
   ├── /api/auth/*        → AuthRoutes (no JWT check)
   ├── /api/*             → JWT auth → feature routes
   │     ├── ApiRoutes    → Bukkit thread dispatch for /execute
   │     ├── GlanceRoutes → MetricsCollector / MetricsDatabase
+  │     ├── StatsRoutes  → MetricsDatabase player events
   │     ├── ActionRoutes → in-memory + SQLite action store
   │     ├── FileRoutes   → server filesystem (canonicalized)
   │     └── AuditRoutes  → AuditLog SQLite
@@ -166,28 +182,65 @@ Ktor (embedded, netty)
 
 ### Threading model
 
-- **Bukkit main thread** — `MetricsCollector` BukkitRunnable reads TPS/tick/heap. Writing state then crosses to Ktor via a coroutine on `Dispatchers.Default`.
+- **Bukkit main thread** — `MetricsCollector` BukkitRunnable reads TPS/tick/heap/entities/chunks/pings at 1 Hz. `PlayerEventListener` handles join/quit events. Writing then crosses to Ktor via coroutines on `Dispatchers.Default`.
 - **Ktor I/O threads** — all HTTP route handlers run on `Dispatchers.IO` or the Ktor dispatcher. JDBC calls (`MetricsDatabase`, `AuditLog`) must explicitly `withContext(Dispatchers.IO)`.
-- **`pluginScope`** — `SupervisorJob + Dispatchers.Default`, lives from `onEnable` to `onDisable`. Fire-and-forget audit inserts use `pluginScope.launch(Dispatchers.IO)` to survive after the HTTP response is sent (Ktor request coroutines cancel on response completion).
+- **`pluginScope`** — `SupervisorJob + Dispatchers.Default`, `internal` visibility, lives from `onEnable` to `onDisable`. Fire-and-forget audit inserts and player event writes use `pluginScope.launch(Dispatchers.IO)`.
 - **`AuditLog`** — single JDBC `Connection`, `@Synchronized` on every public method to guard against concurrent `Dispatchers.IO` threads.
+- **Tab completion** — `ConsoleWebSocket` receives `tab_complete` WS messages, calls `Bukkit.getScheduler().callSyncMethod()` inside `withContext(Dispatchers.IO)` with a 500 ms timeout to marshal onto the Bukkit main thread, then sends the result back.
+- **PortMultiplexer** — dedicated `CachedThreadPool` of daemon threads; independent of `pluginScope`. Shuts down via `executor.shutdownNow()` on `uninstall()`.
 
 ### Data persistence
 
 | File | Format | Contents |
 |------|--------|---------|
-| `teletype-metrics.db` | SQLite WAL | Three resolution tiers: `metrics_1s`, `metrics_1m`, `metrics_15m` |
+| `teletype-metrics.db` | SQLite WAL | Three resolution tiers: `metrics_1s`, `metrics_1m`, `metrics_15m`; `player_events` join/leave log |
 | `teletype-audit.db` | SQLite WAL | `audit_log` table with indexes on `ts`, `actor`, `action` |
 | `schedule.json` | JSON | Serialized scheduled action list (survives restarts) |
 | `config.yml` | YAML | User config; never overwritten by the plugin |
+
+### MetricSnapshot fields
+
+Sampled once per second on the Bukkit main thread. All fields present in all three resolution tables via idempotent `ALTER TABLE` migrations on startup.
+
+| Field | Type | Notes |
+|-------|------|-------|
+| `tps1/5/15` | `REAL` | Bukkit `getTPS()` |
+| `tick_ms` | `REAL` | 20-tick rolling average of `Server.getTickTimes()` |
+| `mem_used/total/max` | `INTEGER` | JVM `Runtime` heap in MB |
+| `uptime_ms` | `INTEGER` | `RuntimeMXBean.uptime` |
+| `cpu_pct` | `REAL` | Host CPU via `OperatingSystemMXBean.getCpuLoad()`. `NULL` if unavailable. |
+| `sys_mem_used/total` | `INTEGER` | Host RAM in MB. `NULL` if unavailable. |
+| `disk_used/total_gb` | `INTEGER` | Server world container filesystem. `NULL` if unavailable. |
+| `player_count` | `INTEGER` | `Bukkit.getOnlinePlayers().size` |
+| `entity_count` | `INTEGER` | `world.entities.size` summed across all worlds |
+| `loaded_chunks` | `INTEGER` | `world.loadedChunks.size` summed across all worlds |
+| `ping_p50/p95` | `INTEGER` | Median and P95 player ping via `Player.getPing()`. `NULL` if no players or method unavailable. |
 
 ### WebSocket console
 
 `LogContext.tsx` is the **single WebSocket connection** for the whole frontend. It:
 1. Opens one WS connection on mount (or on tab focus after disconnect)
-2. Pushes log lines into a `useReducer` rolling buffer (capped at 5000 lines)
-3. Exposes `logs` and `sendCommand` via React context
+2. Pushes log lines into a `useState` rolling buffer (capped at 5000 lines)
+3. Exposes `lines`, `send`, `tabComplete`, and `getLogsAround` via React context
 
-All components that need logs read from `LogContext` — they don't open their own connections.
+All components that need logs read from `LogContext` — they don't open their own connections. Tab completion uses a one-shot callback registered before `sendTabComplete` fires; the callback is cleared after the first response or on WS disconnect.
+
+**Keep-alive settings** (configured in `WebServer.kt`):
+
+| Setting | Value |
+|---------|-------|
+| Ping period | 30 seconds |
+| Inactivity timeout | 60 seconds |
+
+The server sends a WebSocket ping every 30 seconds. If no pong is received within 60 seconds, the server closes the connection. The frontend reconnects automatically on disconnect.
+
+### Stats page analysis
+
+`ServerStats.tsx` computes all analysis client-side from the history array returned by `/api/glance/history`:
+
+- **Z-score overlay** — for each series, extracts values, computes mean/std from the full window, maps each point to `(v - mean) / std`. Anomaly timestamps (any |z| ≥ threshold) get amber vertical markers.
+- **Pearson correlation** — computed pairwise for all 8 metrics (TPS, MSPT, JVM Mem, CPU, Players, Entities, Chunks, Ping). Pairs with fewer than 5 shared non-null data points are excluded.
+- **Log lookup** — clicking an anomaly marker calls `getLogsAround(ts, ±30s)` on the in-memory `tsLogs` buffer. Returns empty if the timestamp is outside the buffer (which holds the last ~2000 parsed log lines with timestamps).
 
 ---
 
@@ -202,15 +255,40 @@ All components that need logs read from `LogContext` — they don't open their o
        }
    }
    ```
-2. Register in `WebServer.kt` inside the authenticated route block:
+2. Register in `WebServer.kt` inside the authenticated `rateLimit` → `authenticate` → `route("/api")` block:
    ```kotlin
-   authenticate("auth-jwt") {
-       route("/api") {
-           // ...
-           yourRoutes(plugin)
-       }
-   }
+   route("/stats") { statsRoutes(plugin) }
+   // add yours:
+   route("/yours") { yourRoutes(plugin) }
+   ```
 3. Add corresponding fetch in `frontend/src/` using TanStack Query.
 4. Add a stub handler in `frontend/scripts/mock-server.mjs` so `testFrontend` works.
 
 For audited endpoints, call `auditAsync(plugin, "action_name", detail)` inside the handler (the `RoutingContext` extension in `AuditExt.kt`).
+
+### Route registration order
+
+`WebServer.kt` wraps all authenticated routes as:
+```
+rateLimit("api") {
+    authenticate("auth-jwt") {
+        route("/api") { ... }
+    }
+}
+```
+Rate limiting is the outermost layer — a blocked IP never reaches JWT verification. Keep this order when adding new route groups.
+
+### Known config/behavior gaps
+
+These config keys are read by `TeletypeConfig` but not yet wired to the implementation:
+
+| Config key | Parsed | Actual behavior |
+|------------|--------|-----------------|
+| `server.cors-origins` | yes | Ignored — Ktor CORS always uses `anyHost()` |
+| `metrics.sample-interval-ticks` | yes | Hardcoded to 20 ticks (1 Hz) in `MetricsCollector` |
+| `metrics.sqlite.flush-interval-seconds` | yes | Hardcoded to 15 seconds in `MetricsCollector` |
+| `metrics.sqlite.retention.downsample-1s-after-hours` | yes | Hardcoded to 24 h in `RetentionJob` |
+| `metrics.sqlite.retention.downsample-1m-after-days` | yes | Hardcoded to 7 d in `RetentionJob` |
+| `metrics.sqlite.retention.delete-15m-after-days` | yes | Not implemented — 15m rows are never deleted |
+
+If you want to make any of these functional, wire the `TeletypeConfig` property into the relevant class constructor and replace the hardcoded constant.

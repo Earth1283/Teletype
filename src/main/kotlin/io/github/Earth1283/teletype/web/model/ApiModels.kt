@@ -64,6 +64,19 @@ data class MetricSnapshot(
     val sysMemTotalMb: Long? = null,
     val diskUsedGb: Long? = null,
     val diskTotalGb: Long? = null,
+    val playerCount: Int = 0,
+    val entityCount: Int = 0,
+    val loadedChunks: Int = 0,
+    val pingP50: Int? = null,
+    val pingP95: Int? = null,
+)
+
+@Serializable
+data class PlayerEvent(
+    val ts: Long,
+    val uuid: String,
+    val name: String,
+    val action: String,
 )
 
 @Serializable

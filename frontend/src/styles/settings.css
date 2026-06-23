@@ -278,3 +278,29 @@
   text-align: center;
   line-height: 1.2;
 }
+
+/* ── Segmented control ─────────────────────────────────────────────────────── */
+.s-seg {
+  display: flex;
+  gap: 2px;
+  background: var(--void);
+  border: 1px solid var(--border);
+  border-radius: var(--r-sm);
+  padding: 2px;
+}
+.s-seg-btn {
+  font-family: var(--mono);
+  font-size: 10.5px;
+  color: var(--mist);
+  background: transparent;
+  border: none;
+  border-radius: calc(var(--r-sm) - 2px);
+  padding: 3px 10px;
+  cursor: pointer;
+  transition: background 80ms, color 80ms;
+}
+.s-seg-btn:hover { color: var(--ash); }
+.s-seg-btn.active {
+  background: var(--amber-dim);
+  color: var(--amber);
+}

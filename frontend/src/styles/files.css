@@ -185,17 +185,14 @@
 .row-action-btn {
   display: flex;
   align-items: center;
-  gap: 4px;
-  padding: 0 8px;
+  justify-content: center;
+  width: 26px;
   height: 26px;
   background: transparent;
   border: 1px solid transparent;
   border-radius: var(--r-sm);
   color: var(--mist);
-  font-family: var(--mono);
-  font-size: 10.5px;
   cursor: pointer;
-  white-space: nowrap;
   transition: background 100ms, color 100ms, border-color 100ms;
 }
 .row-action-btn:hover { background: var(--elevated); color: var(--ash); border-color: var(--border); }

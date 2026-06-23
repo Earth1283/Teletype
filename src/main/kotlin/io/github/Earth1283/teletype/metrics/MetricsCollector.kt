@@ -29,7 +29,26 @@ class MetricsCollector(plugin: Teletype, private val db: MetricsDatabase, scope:
 
     private val diskRoot = plugin.server.worldContainer.absoluteFile
 
+    // getPing() is available on Paper forks and modern Spigot (1.17+).
+    // Use reflection so we fail gracefully on older servers instead of crashing.
+    private val pingMethod = runCatching {
+        org.bukkit.entity.Player::class.java.getMethod("getPing")
+    }.getOrNull()
+
     init {
+        val isPaper = runCatching {
+            Class.forName("io.papermc.paper.configuration.GlobalConfiguration"); true
+        }.getOrDefault(runCatching {
+            Class.forName("com.destroystokyo.paper.PaperConfig"); true
+        }.getOrDefault(false))
+
+        if (!isPaper) {
+            plugin.logger.warning(
+                "[Teletype] Server does not appear to be a Paper fork — " +
+                "player ping metrics will be unavailable. For full analytics support, use Paper or a Paper fork."
+            )
+        }
+
         // Sample at 1 Hz on the Bukkit main thread.
         object : BukkitRunnable() {
             override fun run() {
@@ -48,6 +67,19 @@ class MetricsCollector(plugin: Teletype, private val db: MetricsDatabase, scope:
                 val diskUsedGb  = if (diskTotal > 0) (diskTotal - diskFree) / 1_073_741_824L else null
                 val diskTotalGb = if (diskTotal > 0) diskTotal / 1_073_741_824L else null
 
+                val onlinePlayers = Bukkit.getOnlinePlayers()
+                val worlds = Bukkit.getWorlds()
+                val entityCount = worlds.sumOf { it.entities.size }
+                val loadedChunks = worlds.sumOf { it.loadedChunks.size }
+
+                val pings = if (pingMethod != null) {
+                    onlinePlayers.mapNotNull { p ->
+                        runCatching { pingMethod.invoke(p) as Int }.getOrNull()
+                    }.sorted()
+                } else emptyList()
+                val pingP50 = pings.getOrNull(pings.size / 2)
+                val pingP95 = pings.getOrNull(((pings.size - 1) * 95 / 100).coerceAtLeast(0))
+
                 val snap = MetricSnapshot(
                     timestamp     = System.currentTimeMillis(),
                     tps1          = tps1,
@@ -63,6 +95,11 @@ class MetricsCollector(plugin: Teletype, private val db: MetricsDatabase, scope:
                     sysMemTotalMb = sysMemTotalMb,
                     diskUsedGb    = diskUsedGb,
                     diskTotalGb   = diskTotalGb,
+                    playerCount   = onlinePlayers.size,
+                    entityCount   = entityCount,
+                    loadedChunks  = loadedChunks,
+                    pingP50       = pingP50,
+                    pingP95       = pingP95,
                 )
 
                 latest = snap

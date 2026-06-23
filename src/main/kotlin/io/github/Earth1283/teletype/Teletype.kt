@@ -12,6 +12,7 @@ import io.github.Earth1283.teletype.config.MessageConfig
 import io.github.Earth1283.teletype.config.TeletypeConfig
 import io.github.Earth1283.teletype.console.ConsoleBroadcaster
 import io.github.Earth1283.teletype.console.ConsoleInterceptor
+import io.github.Earth1283.teletype.events.PlayerEventListener
 import io.github.Earth1283.teletype.metrics.MetricsCollector
 import io.github.Earth1283.teletype.metrics.MetricsDatabase
 import io.github.Earth1283.teletype.metrics.RetentionJob
@@ -38,7 +39,7 @@ class Teletype : JavaPlugin() {
     lateinit var webServer: WebServer
     private var portMultiplexer: PortMultiplexer? = null
 
-    private val pluginScope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
+    internal val pluginScope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
 
     override fun onEnable() {
         saveDefaultConfig()
@@ -56,6 +57,7 @@ class Teletype : JavaPlugin() {
         snippetScheduler = SnippetScheduler(this, snippetStore).also { it.load(); it.startAll() }
         auditLog = AuditLog(dataFolder)
         ConsoleInterceptor.install(consoleBroadcaster)
+        server.pluginManager.registerEvents(PlayerEventListener(metricsDatabase, pluginScope), this)
         webServer = WebServer(this).also { it.start() }
         if (teletypeConfig.multiplexGamePort) {
             portMultiplexer = PortMultiplexer(this).also { it.install() }

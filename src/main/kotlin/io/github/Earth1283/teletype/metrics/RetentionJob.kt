@@ -24,11 +24,12 @@ class RetentionJob(
     }
 
     private suspend fun runRetention() {
-        val now = System.currentTimeMillis()
-        val h24 = now - 24L * 3_600_000L
-        val h48 = now - 48L * 3_600_000L
-        val d7  = now -  7L * 86_400_000L
-        val d8  = now -  8L * 86_400_000L
+        val now  = System.currentTimeMillis()
+        val h24  = now - 24L *  3_600_000L
+        val h48  = now - 48L *  3_600_000L
+        val d7   = now -  7L * 86_400_000L
+        val d8   = now -  8L * 86_400_000L
+        val d30  = now - 30L * 86_400_000L
 
         try {
             plugin.messages.console("metrics.retention-start")
@@ -36,6 +37,8 @@ class RetentionJob(
             db.downsampleToMinute(from = h48, to = h24)
             // Downsample 8d–7d ago: 1 min → 15 min, delete minute rows
             db.downsampleTo15Min(from = d8, to = d7)
+            // Prune player events older than 30 days
+            db.prunePlayerEvents(before = d30)
             plugin.messages.console("metrics.retention-done")
         } catch (e: Exception) {
             plugin.messages.console("metrics.retention-failed", "error" to (e.message ?: "unknown"))
