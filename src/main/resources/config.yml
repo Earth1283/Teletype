@@ -236,9 +236,3 @@ network:
   # Each route can override this individually. The window resets every 60 seconds.
   # Set 0 to disable rate limiting on proxied routes entirely (not recommended).
   default-rate-limit-per-minute: 120
-
-# ── Legacy keys (kept for backwards compatibility) ─────────────────────────────
-# web-port: 8080          → now server.port
-# jwt-expiry-hours: 24    → now auth.jwt-expiry-minutes (= 1440)
-# jwt-secret: ""          → now auth.jwt-secret
-# files-root: ""          → now files.root

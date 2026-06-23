@@ -4,6 +4,7 @@ version: '${version}'
 main: io.github.Earth1283.teletype.Teletype
 api-version: '1.21'
 load: STARTUP
+description: Removing the hosts's web panel something that actually works.
 
 authors: [ Earth1283 ]
 
@@ -12,6 +13,7 @@ commands:
     description: Teletype web server control
     usage: /tty <verify|status|start|stop>
     permission: teletype.admin
+    aliases: ["teletype", "teletypewriter"]
 
 permissions:
   teletype.admin:
