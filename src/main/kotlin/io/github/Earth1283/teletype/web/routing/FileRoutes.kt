@@ -166,6 +166,34 @@ fun Route.fileRoutes(plugin: Teletype) {
         } else call.respond(HttpStatusCode.InternalServerError, ErrorResponse("Rename failed"))
     }
 
+    get("/search") {
+        val q = call.request.queryParameters["q"] ?: ""
+        val scope = call.request.queryParameters["scope"] ?: "local"
+        val path = call.request.queryParameters["path"] ?: ""
+        val fuzzyLevel = call.request.queryParameters["fuzzyLevel"]?.toIntOrNull()?.coerceIn(0, 100) ?: 0
+
+        if (q.isBlank()) return@get call.respond(emptyList<FileEntry>())
+
+        val searchRoot = if (scope == "global") root else (resolve(path) ?: root)
+
+        val results = searchRoot.walkTopDown()
+            .filter { it != searchRoot }
+            .filter { fileMatchesQuery(it.name, q, fuzzyLevel) }
+            .take(200)
+            .map { file ->
+                FileEntry(
+                    name = file.name,
+                    path = file.relativeTo(root).path,
+                    isDirectory = file.isDirectory,
+                    size = if (file.isFile) file.length() else 0L,
+                    lastModified = file.lastModified()
+                )
+            }
+            .toList()
+
+        call.respond(results)
+    }
+
     post("/fetch") {
         val req = call.receive<FetchRequest>()
         val dir = resolve(req.destPath)
@@ -186,6 +214,18 @@ fun Route.fileRoutes(plugin: Teletype) {
         }
 
         call.respond(StatusResponse("fetched ${dest.name} (${dest.length()} bytes)"))
+    }
+}
+
+private fun fileMatchesQuery(name: String, q: String, fuzzyLevel: Int): Boolean {
+    val nameLower = name.lowercase()
+    val qLower = q.lowercase()
+    return if (fuzzyLevel < 50) {
+        nameLower.contains(qLower)
+    } else {
+        var qi = 0
+        for (c in nameLower) { if (qi < qLower.length && c == qLower[qi]) qi++ }
+        qi == qLower.length
     }
 }
 

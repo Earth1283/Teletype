@@ -119,6 +119,12 @@ class PortMultiplexer(private val plugin: Teletype) {
                 val pool = executor ?: return
                 val upstream = pool.submit { relay(client.getInputStream(), backendOut) }
                 relay(backend.getInputStream(), client.getOutputStream())
+                // One direction closed; close both sockets so the other relay unblocks immediately.
+                // Without this, upstream.get() blocks until the browser times out the TCP connection,
+                // which means the browser never receives a TCP close, onclose never fires, and the
+                // WebSocket never reconnects — leaving the console permanently empty.
+                runCatching { client.close() }
+                runCatching { backend.close() }
                 upstream.get()
             }
         } catch (_: Exception) {}

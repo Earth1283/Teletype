@@ -6,7 +6,7 @@ import { useSettings } from '../SettingsContext'
 import { getTheme } from '../themes'
 import {
   IconFolder, IconFile, IconUpload, IconDownload,
-  IconFolderPlus, IconPencil, IconTrash, IconSave, IconX, IconGlobe, IconChevronRight
+  IconFolderPlus, IconPencil, IconTrash, IconSave, IconX, IconGlobe, IconChevronRight, IconSearch
 } from '../Icons'
 
 interface FileEntry {
@@ -49,6 +49,10 @@ export default function FileManager() {
   const [fetchUrl, setFetchUrl] = useState('')
   const [fetchName, setFetchName] = useState('')
   const [fetchLoading, setFetchLoading] = useState(false)
+  const [searchOpen, setSearchOpen] = useState(false)
+  const [searchQuery, setSearchQuery] = useState('')
+  const [searchScope, setSearchScope] = useState<'local' | 'global'>('local')
+  const [fuzzyLevel, setFuzzyLevel] = useState(0)
   const fileInputRef = useRef<HTMLInputElement>(null)
   const qc = useQueryClient()
   const { settings } = useSettings()
@@ -68,6 +72,15 @@ export default function FileManager() {
   const { data: entries = [], isLoading, error } = useQuery<FileEntry[]>({
     queryKey: qKey,
     queryFn: () => api.get('/files/list', { params: { path: cwd } }).then((r) => r.data),
+  })
+
+  const { data: searchResults = [], isFetching: searching } = useQuery<FileEntry[]>({
+    queryKey: ['file-search', searchQuery, searchScope, fuzzyLevel, cwd],
+    queryFn: () => api.get('/files/search', {
+      params: { q: searchQuery, scope: searchScope, path: cwd, fuzzyLevel }
+    }).then(r => r.data),
+    enabled: searchOpen && searchQuery.trim().length > 0,
+    staleTime: 5_000,
   })
 
   const breadcrumbs = cwd ? cwd.split('/').filter(Boolean) : []
@@ -211,6 +224,13 @@ export default function FileManager() {
         </div>
 
         <div className="fm-actions">
+          <button
+            className={`icon-btn${searchOpen ? ' active' : ''}`}
+            title="Search files"
+            onClick={() => { setSearchOpen(v => !v); if (searchOpen) setSearchQuery('') }}
+          >
+            <IconSearch size={13} />
+          </button>
           <button className="pill-btn" onClick={() => { setFetchUrl(''); setFetchName(''); setModal({ type: 'fetch' }) }}>
             <IconGlobe size={13} />
             Fetch
@@ -227,6 +247,47 @@ export default function FileManager() {
         </div>
       </div>
 
+      {searchOpen && (
+        <div className="fm-search-panel">
+          <div className="fm-search-row">
+            <IconSearch size={13} />
+            <input
+              className="text-input fm-search-input"
+              autoFocus
+              placeholder="Search filenames…"
+              value={searchQuery}
+              onChange={e => setSearchQuery(e.target.value)}
+              spellCheck={false}
+            />
+            <div className="fm-scope-toggle">
+              <button
+                className={`scope-btn${searchScope === 'local' ? ' active' : ''}`}
+                onClick={() => setSearchScope('local')}
+                title="Search current directory"
+              >
+                Local
+              </button>
+              <button
+                className={`scope-btn${searchScope === 'global' ? ' active' : ''}`}
+                onClick={() => setSearchScope('global')}
+                title="Search from root (.)"
+              >
+                Global
+              </button>
+            </div>
+          </div>
+          <div className="fuzzy-slider-wrap fm-fuzzy">
+            <span className="fuzzy-label">Precise</span>
+            <input
+              type="range" min={0} max={100} value={fuzzyLevel}
+              onChange={e => setFuzzyLevel(+e.target.value)}
+              className="fuzzy-slider"
+            />
+            <span className="fuzzy-label">Fuzzy</span>
+          </div>
+        </div>
+      )}
+
       {/* Inline forms */}
       {modal?.type === 'mkdir' && (
         <div className="fm-inline-form">
@@ -241,41 +302,80 @@ export default function FileManager() {
       {/* Body: file list (always) + editor side panel (when open) */}
       <div className="fm-body">
         <div className={`fm-file-list${editing ? ' compact' : ''}`}>
-          {isLoading && <div className="dim">Loading…</div>}
-          {error && <div className="err">Failed to read directory</div>}
+          {searchOpen && searchQuery.trim() ? (
+            <>
+              {searching && <div className="dim" style={{ padding: '8px 10px' }}>Searching…</div>}
+              {!searching && searchResults.length === 0 && (
+                <div className="dim" style={{ padding: '8px 10px' }}>No results for "{searchQuery}"</div>
+              )}
+              {searchResults.map((entry) => (
+                <div key={entry.path} className="fm-row"
+                  onClick={() => {
+                    if (entry.isDirectory) {
+                      navigate(entry.path)
+                    } else {
+                      navigate(entry.path.split('/').slice(0, -1).join('/'))
+                      openFile(entry)
+                    }
+                    setSearchOpen(false)
+                    setSearchQuery('')
+                  }}
+                >
+                  <span className={`fm-row-icon${entry.isDirectory ? ' dir' : ''}`}>
+                    {entry.isDirectory ? <IconFolder size={14} /> : <IconFile size={14} />}
+                  </span>
+                  <span className="fm-row-name">{entry.name}</span>
+                  <span className="fm-row-path">{entry.path}</span>
+                  {!entry.isDirectory && <span className="fm-row-size">{fmtSize(entry.size)}</span>}
+                  <div className="fm-row-actions" onClick={(e) => e.stopPropagation()}>
+                    {!entry.isDirectory && (
+                      <button className="row-action-btn" title="Download" onClick={(e) => { e.stopPropagation(); downloadFile(entry) }}>
+                        <IconDownload size={12} />
+                      </button>
+                    )}
+                  </div>
+                </div>
+              ))}
+            </>
+          ) : (
+            <>
+              {isLoading && <div className="dim">Loading…</div>}
+              {error && <div className="err">Failed to read directory</div>}
 
-          {cwd && (
-            <div className="fm-row" onClick={() => navigate(breadcrumbs.slice(0, -1).join('/'))}>
-              <span className="fm-row-icon dir"><IconFolder size={14} /></span>
-              <span className="fm-row-name">..</span>
-            </div>
+              {cwd && (
+                <div className="fm-row" onClick={() => navigate(breadcrumbs.slice(0, -1).join('/'))}>
+                  <span className="fm-row-icon dir"><IconFolder size={14} /></span>
+                  <span className="fm-row-name">..</span>
+                </div>
+              )}
+
+              {entries.map((entry) => (
+                <div key={entry.path} className="fm-row"
+                  onClick={() => entry.isDirectory ? navigate(entry.path) : openFile(entry)}
+                >
+                  <span className={`fm-row-icon${entry.isDirectory ? ' dir' : ''}`}>
+                    {entry.isDirectory ? <IconFolder size={14} /> : <IconFile size={14} />}
+                  </span>
+                  <span className="fm-row-name">{entry.name}</span>
+                  {!entry.isDirectory && !editing && <span className="fm-row-size">{fmtSize(entry.size)}</span>}
+                  {!editing && <span className="fm-row-date">{fmtDate(entry.lastModified)}</span>}
+                  <div className="fm-row-actions" onClick={(e) => e.stopPropagation()}>
+                    {!entry.isDirectory && (
+                      <button className="row-action-btn" title="Download" onClick={(e) => { e.stopPropagation(); downloadFile(entry) }}>
+                        <IconDownload size={12} />
+                      </button>
+                    )}
+                    <button className="row-action-btn" title="Rename" onClick={(e) => { e.stopPropagation(); openModal({ type: 'rename', entry }, entry.name) }}>
+                      <IconPencil size={12} />
+                    </button>
+                    <button className="row-action-btn del" title="Delete" onClick={(e) => deleteEntry(entry, e)}>
+                      <IconTrash size={12} />
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </>
           )}
-
-          {entries.map((entry) => (
-            <div key={entry.path} className="fm-row"
-              onClick={() => entry.isDirectory ? navigate(entry.path) : openFile(entry)}
-            >
-              <span className={`fm-row-icon${entry.isDirectory ? ' dir' : ''}`}>
-                {entry.isDirectory ? <IconFolder size={14} /> : <IconFile size={14} />}
-              </span>
-              <span className="fm-row-name">{entry.name}</span>
-              {!entry.isDirectory && !editing && <span className="fm-row-size">{fmtSize(entry.size)}</span>}
-              {!editing && <span className="fm-row-date">{fmtDate(entry.lastModified)}</span>}
-              <div className="fm-row-actions" onClick={(e) => e.stopPropagation()}>
-                {!entry.isDirectory && (
-                  <button className="row-action-btn" title="Download" onClick={(e) => { e.stopPropagation(); downloadFile(entry) }}>
-                    <IconDownload size={12} />
-                  </button>
-                )}
-                <button className="row-action-btn" title="Rename" onClick={(e) => { e.stopPropagation(); openModal({ type: 'rename', entry }, entry.name) }}>
-                  <IconPencil size={12} />
-                </button>
-                <button className="row-action-btn del" title="Delete" onClick={(e) => deleteEntry(entry, e)}>
-                  <IconTrash size={12} />
-                </button>
-              </div>
-            </div>
-          ))}
         </div>
 
         {/* Editor side panel */}

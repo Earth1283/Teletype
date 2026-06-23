@@ -7,6 +7,7 @@ import { useSettings } from '../SettingsContext'
 import { api } from '../api/client'
 import type { Snippet } from './actions/actionTypes'
 import RunModal from './actions/RunModal'
+import { IconSearch, IconX } from '../Icons'
 
 const convert = new AnsiConvert({ escapeXML: true, newline: true })
 
@@ -22,11 +23,24 @@ function lineClass(raw: string): LogLevel {
 
 interface CtxState { x: number; y: number; line: string }
 
+function matchLine(line: string, q: string, fuzzyLevel: number): boolean {
+  if (!q) return true
+  const l = line.toLowerCase()
+  const ql = q.toLowerCase()
+  if (fuzzyLevel < 50) return l.includes(ql)
+  let qi = 0
+  for (const c of l) { if (qi < ql.length && c === ql[qi]) qi++ }
+  return qi === ql.length
+}
+
 export default function Console() {
   const { lines, connected, send: socketSend, tabComplete } = useLogs()
   const { settings } = useSettings()
   const { fontSize, displayLines, wordWrap, showTimestamps } = settings.console
   const [input, setInput] = useState('')
+  const [searchOpen, setSearchOpen] = useState(false)
+  const [searchQuery, setSearchQuery] = useState('')
+  const [fuzzyLevel, setFuzzyLevel] = useState(0)
   const [ctx, setCtx] = useState<CtxState | null>(null)
   const [runSnippet, setRunSnippet] = useState<Snippet | null>(null)
   const [completions, setCompletions] = useState<string[]>([])
@@ -41,6 +55,13 @@ export default function Console() {
   const displayedLines = useMemo(
     () => lines.length > displayLines ? lines.slice(lines.length - displayLines) : lines,
     [lines, displayLines]
+  )
+
+  const filteredLines = useMemo(
+    () => searchOpen && searchQuery
+      ? displayedLines.filter(l => matchLine(l, searchQuery, fuzzyLevel))
+      : displayedLines,
+    [displayedLines, searchOpen, searchQuery, fuzzyLevel]
   )
 
   const formatLine = useCallback(
@@ -130,6 +151,44 @@ export default function Console() {
     <div className="console-root">
       <div className="console-header">
         <span className="console-header-title">Live Console</span>
+        {searchOpen && (
+          <div className="console-search-bar">
+            <IconSearch size={12} />
+            <input
+              className="console-search-input"
+              value={searchQuery}
+              onChange={e => setSearchQuery(e.target.value)}
+              placeholder="Search logs…"
+              autoFocus
+              spellCheck={false}
+            />
+            <div className="fuzzy-slider-wrap">
+              <span className="fuzzy-label">Precise</span>
+              <input
+                type="range" min={0} max={100} value={fuzzyLevel}
+                onChange={e => setFuzzyLevel(+e.target.value)}
+                className="fuzzy-slider"
+              />
+              <span className="fuzzy-label">Fuzzy</span>
+            </div>
+            {searchOpen && searchQuery && (
+              <span className="console-search-count">
+                {filteredLines.length}/{displayedLines.length}
+              </span>
+            )}
+            <button className="console-search-close" onClick={() => { setSearchOpen(false); setSearchQuery('') }}>
+              <IconX size={12} />
+            </button>
+          </div>
+        )}
+        <button
+          className={`icon-btn${searchOpen ? ' active' : ''}`}
+          onClick={() => { setSearchOpen(v => !v); if (searchOpen) setSearchQuery('') }}
+          title="Search logs"
+          style={{ flexShrink: 0 }}
+        >
+          <IconSearch size={13} />
+        </button>
         <div className="conn-badge">
           <span className={`dot ${connected ? 'on' : 'off'}`} />
           {connected ? 'connected' : 'connecting'}
@@ -140,7 +199,7 @@ export default function Console() {
         ref={virtuosoRef}
         className="console-log"
         style={{ flex: 1 }}
-        data={displayedLines}
+        data={filteredLines}
         followOutput={(isAtBottom) => isAtBottom ? 'smooth' : false}
         atBottomStateChange={(b) => { atBottom.current = b }}
         itemContent={(_, line) => (

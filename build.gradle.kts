@@ -87,7 +87,6 @@ tasks {
         inputs.file("frontend/package.json")
         inputs.file("frontend/package-lock.json")
         outputs.dir("frontend/node_modules")
-        onlyIf { !file("frontend/node_modules").exists() }
     }
 
     val buildFrontend by registering(Exec::class) {
@@ -137,6 +136,7 @@ tasks {
     }
 
     processResources {
+        dependsOn(buildFrontend)
         val props = mapOf("version" to version)
         filesMatching("plugin.yml") {
             expand(props)
