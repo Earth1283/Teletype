@@ -87,6 +87,19 @@ export default function SettingsPage() {
         <span className="s-header-sub">Stored in your browser. Reset returns to factory defaults.</span>
       </div>
 
+      {/* ── Fun Mode ─────────────────────────────────────────────── */}
+      <div className={`fun-card${settings.fun ? ' fun-active' : ''}`}>
+        <span className="fun-card-emoji">🖥️</span>
+        <div className="fun-card-text">
+          <div className="fun-card-title">Fun Mode</div>
+          <div className="fun-card-desc">
+            Transforms Teletype into a simulated macOS desktop. Drag windows, resize them,
+            use Spotlight (⌘K) to navigate. Finder opens the server filesystem.
+          </div>
+        </div>
+        <Toggle value={settings.fun} onChange={v => update({ fun: v })} />
+      </div>
+
       {/* ── Theme ────────────────────────────────────────────────── */}
       <Section title="Theme" icon={<IconPalette size={13} />}>
         <div className="s-theme-grid">

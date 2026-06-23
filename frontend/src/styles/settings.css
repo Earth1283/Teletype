@@ -304,3 +304,12 @@
   background: var(--amber-dim);
   color: var(--amber);
 }
+
+/* ── Mobile (≤640px) ───────────────────────────────────────────────────────── */
+@media (max-width: 640px) {
+  .s-root { padding: 16px 14px 24px; max-width: 100%; }
+  .s-section { padding: 14px; }
+  .s-row { gap: 8px; flex-wrap: wrap; }
+  .s-row-ctrl { flex-shrink: 0; }
+  .s-theme-grid { grid-template-columns: repeat(auto-fill, minmax(56px, 1fr)); }
+}

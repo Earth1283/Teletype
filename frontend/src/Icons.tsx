@@ -1,4 +1,4 @@
-interface IconProps { size?: number; className?: string }
+interface IconProps { size?: number; className?: string; style?: React.CSSProperties }
 const s = (size = 16) => ({ width: size, height: size, strokeWidth: 1.5 })
 
 export const IconCode = ({ size = 16, className }: IconProps) => (
@@ -112,9 +112,14 @@ export const IconLogOut = ({ size = 16, className }: IconProps) => (
     <line x1="21" y1="12" x2="9" y2="12" />
   </svg>
 )
-export const IconChevronRight = ({ size = 12, className }: IconProps) => (
-  <svg {...s(size)} viewBox="0 0 24 24" fill="none" stroke="currentColor" className={className}>
+export const IconChevronRight = ({ size = 12, className, style }: IconProps) => (
+  <svg {...s(size)} style={style} viewBox="0 0 24 24" fill="none" stroke="currentColor" className={className}>
     <polyline points="9 18 15 12 9 6" />
+  </svg>
+)
+export const IconChevronLeft = ({ size = 12, className, style }: IconProps) => (
+  <svg {...s(size)} style={style} viewBox="0 0 24 24" fill="none" stroke="currentColor" className={className}>
+    <polyline points="15 18 9 12 15 6" />
   </svg>
 )
 export const IconHeart = ({ size = 12, className }: IconProps) => (
@@ -216,9 +221,9 @@ export const IconNetwork = ({ size = 16, className }: IconProps) => (
 
 // Logo: stylized TTY terminal icon
 export const TeletypeLogo = ({ size = 22 }: { size?: number }) => (
-  <svg width={size} height={size} viewBox="0 0 22 22" fill="none">
-    <rect x="1" y="1" width="20" height="20" rx="4" stroke="#f59e0b" strokeWidth="1.5" />
-    <path d="M5 7l4 4-4 4" stroke="#f59e0b" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
-    <line x1="12" y1="15" x2="18" y2="15" stroke="#f59e0b" strokeWidth="1.5" strokeLinecap="round" />
+  <svg width={size} height={size} viewBox="0 0 22 22" fill="none" style={{ color: 'var(--amber)' }}>
+    <rect x="1" y="1" width="20" height="20" rx="4" stroke="currentColor" strokeWidth="1.5" />
+    <path d="M5 7l4 4-4 4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+    <line x1="12" y1="15" x2="18" y2="15" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
   </svg>
 )

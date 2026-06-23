@@ -295,3 +295,9 @@
   min-width: 44px;
   transition: background 150ms;
 }
+
+/* ── Mobile ─────────────────────────────────────────────────── */
+@media (max-width: 640px) {
+  .section-root { padding: 14px; }
+  .player-row { padding: 8px 10px; }
+}

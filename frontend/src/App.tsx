@@ -15,9 +15,11 @@ import SettingsPage from './components/SettingsPage'
 import AuditPage from './components/AuditPage'
 import NetworkPage from './components/NetworkPage'
 import CommandPalette from './CommandPalette'
+import MacOSDesktop from './components/MacOSDesktop'
 import {
   TeletypeLogo, IconTerminal, IconUsers, IconCpu, IconFolder,
   IconLogOut, IconActivity, IconZap, IconSettings, IconList, IconNetwork,
+  IconChevronLeft, IconChevronRight,
 } from './Icons'
 
 const qc = new QueryClient()
@@ -47,6 +49,7 @@ const TABS: { id: Tab; label: string; Icon: React.FC<{ size?: number }> }[] = [
 function MainApp() {
   const [tab, setTab] = useState<Tab>('glance')
   const [paletteOpen, setPaletteOpen] = useState(false)
+  const [sidebarOpen, setSidebarOpen] = useState(true)
   const { settings } = useSettings()
 
   useEffect(() => {
@@ -60,12 +63,28 @@ function MainApp() {
     return () => window.removeEventListener('keydown', handler)
   }, [settings.palette.enabled])
 
+  if (settings.fun) return <MacOSDesktop />
+
   return (
     <div className="shell">
-      <aside className="sidebar">
+      <header className="mobile-header">
+        <TeletypeLogo size={18} />
+        <span className="mobile-header-title">Teletype</span>
+        <span className="status-dot live" />
+        <button
+          className="sidebar-logout"
+          title="Sign out"
+          style={{ marginLeft: 'auto' }}
+          onClick={() => { localStorage.removeItem(TOKEN_KEY); window.location.reload() }}
+        >
+          <IconLogOut size={14} />
+        </button>
+      </header>
+
+      <aside className={`sidebar${sidebarOpen ? '' : ' collapsed'}`}>
         <div className="sidebar-logo">
           <TeletypeLogo />
-          <span className="sidebar-logo-text">Teletype</span>
+          {sidebarOpen && <span className="sidebar-logo-text">Teletype</span>}
         </div>
 
         <nav className="sidebar-nav">
@@ -74,17 +93,18 @@ function MainApp() {
               key={id}
               className={`nav-btn${tab === id ? ' active' : ''}`}
               onClick={() => setTab(id)}
+              title={!sidebarOpen ? label : undefined}
             >
               <Icon size={15} />
-              {label}
+              {sidebarOpen && <span className="nav-label">{label}</span>}
             </button>
           ))}
         </nav>
 
         <div className="sidebar-footer">
           <span className="status-dot live" />
-          <span className="status-label">server online</span>
-          {settings.palette.enabled && (
+          {sidebarOpen && <span className="status-label">server online</span>}
+          {settings.palette.enabled && sidebarOpen && (
             <button
               className="sidebar-palette-hint"
               onClick={() => setPaletteOpen(true)}
@@ -93,6 +113,13 @@ function MainApp() {
               ⌘K
             </button>
           )}
+          <button
+            className="sidebar-collapse-btn"
+            title={sidebarOpen ? 'Collapse sidebar' : 'Expand sidebar'}
+            onClick={() => setSidebarOpen(o => !o)}
+          >
+            {sidebarOpen ? <IconChevronLeft size={13} /> : <IconChevronRight size={13} />}
+          </button>
           <button className="sidebar-logout" title="Sign out" onClick={() => {
             localStorage.removeItem(TOKEN_KEY)
             window.location.reload()
@@ -113,6 +140,20 @@ function MainApp() {
         {tab === 'network'  && <NetworkPage />}
         {tab === 'settings' && <SettingsPage />}
       </main>
+
+      <nav className="mobile-nav">
+        {TABS.map(({ id, label, Icon }) => (
+          <button
+            key={id}
+            className={`mobile-nav-btn${tab === id ? ' active' : ''}`}
+            onClick={() => setTab(id)}
+            title={label}
+          >
+            <Icon size={20} />
+            <span className="mobile-nav-label">{label}</span>
+          </button>
+        ))}
+      </nav>
 
       <CommandPalette
         open={paletteOpen}

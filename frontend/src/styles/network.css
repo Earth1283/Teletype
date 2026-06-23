@@ -210,3 +210,9 @@
   transform: translateX(12px);
   background: var(--amber);
 }
+
+/* ── Mobile ─────────────────────────────────────────────────── */
+@media (max-width: 640px) {
+  .net-page { padding: 14px; gap: 12px; overflow-y: auto; }
+  .net-table-wrap { overflow-x: auto; }
+}

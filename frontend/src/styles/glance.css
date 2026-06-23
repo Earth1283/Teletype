@@ -29,14 +29,33 @@
   align-items: center;
   gap: 10px;
   flex-shrink: 0;
+  border-radius: var(--r-md);
+  padding: 4px 0;
+  transition: background 400ms, border-color 400ms, padding 260ms;
+  border: 1px solid transparent;
+}
+.glance-status-bar:has(.glance-status-badge.degraded) {
+  background: var(--amber-dim);
+  border-color: var(--amber-glow);
+  padding: 7px 12px;
+}
+.glance-status-bar:has(.glance-status-badge.incident) {
+  background: rgba(248, 113, 113, 0.09);
+  border-color: rgba(248, 113, 113, 0.25);
+  padding: 7px 12px;
+  animation: incident-bar 2s ease infinite;
+}
+@keyframes incident-bar {
+  0%, 100% { border-color: rgba(248, 113, 113, 0.2); }
+  50%       { border-color: rgba(248, 113, 113, 0.55); }
 }
 .glance-status-badge {
   font-family: var(--sans);
-  font-size: 10px;
+  font-size: 11px;
   font-weight: 700;
-  letter-spacing: 0.08em;
-  padding: 3px 8px;
-  border-radius: 4px;
+  letter-spacing: 0.07em;
+  padding: 4px 10px;
+  border-radius: 5px;
 }
 .glance-status-badge.nominal {
   background: rgba(74,222,128,0.12);
@@ -352,6 +371,64 @@
 .glance-tooltip-jump:hover { color: var(--amber); background: var(--amber-dim); }
 
 /* Glance log viewer (right panel) */
+.glance-right {
+  transition: width 280ms cubic-bezier(0.4, 0, 0.2, 1);
+}
+.glance-right.collapsed {
+  width: 0;
+  border-left: none;
+  overflow: hidden;
+}
+.glance-show-logs-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 3px 7px;
+  background: transparent;
+  border: 1px solid var(--border);
+  border-radius: var(--r-sm);
+  color: var(--mist);
+  cursor: pointer;
+  gap: 4px;
+  font-family: var(--sans);
+  font-size: 10px;
+  transition: color 120ms, border-color 120ms, background 120ms;
+  flex-shrink: 0;
+}
+.glance-show-logs-btn:hover {
+  color: var(--amber);
+  border-color: var(--amber-glow);
+  background: var(--amber-dim);
+}
+.glance-log-body {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  opacity: 1;
+  transition: opacity 160ms;
+}
+.glance-log-body.hidden {
+  opacity: 0;
+  pointer-events: none;
+}
+.glance-log-toggle-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  background: transparent;
+  border: none;
+  border-radius: var(--r-sm);
+  color: var(--mist);
+  cursor: pointer;
+  flex-shrink: 0;
+  transition: color 120ms, background 120ms;
+}
+.glance-log-toggle-btn:hover { color: var(--amber); background: var(--amber-dim); }
+.glance-right.collapsed .glance-log-header { justify-content: center; padding: 10px 6px; }
+
 .glance-log-header {
   padding: 8px 10px;
   border-bottom: 1px solid var(--border);
@@ -419,4 +496,20 @@
   color: var(--ghost);
   padding: 20px;
   text-align: center;
+}
+
+/* ── Mobile (≤640px) ─────────────────────────────────────────── */
+@media (max-width: 640px) {
+  .glance-root { flex-direction: column; }
+  .glance-right { display: none; }
+  .glance-left {
+    padding: 10px 12px;
+    gap: 8px;
+  }
+  .glance-stat-rail {
+    grid-template-columns: repeat(auto-fill, minmax(100px, 1fr));
+    gap: 6px;
+  }
+  .glance-stat-card { padding: 8px 10px 10px; }
+  .glance-stat-value { font-size: 18px; }
 }

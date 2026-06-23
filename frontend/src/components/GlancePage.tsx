@@ -9,6 +9,7 @@ import { Virtuoso, type VirtuosoHandle } from 'react-virtuoso'
 import { api } from '../api/client'
 import { useLogs, type TimestampedLog } from '../LogContext'
 import { useSettings } from '../SettingsContext'
+import { IconChevronRight, IconChevronLeft } from '../Icons'
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
@@ -364,12 +365,12 @@ function GlanceChart({
           <XAxis
             dataKey="timestamp" type="number" scale="time" domain={['dataMin', 'dataMax']}
             tickFormatter={fmtTime}
-            tick={{ fill: 'var(--mist)', fontFamily: 'var(--mono)', fontSize: 9 }}
+            tick={{ fill: 'var(--mist)', fontFamily: 'var(--sans)', fontSize: 9 }}
             tickLine={false} axisLine={false} interval="preserveStartEnd" minTickGap={60}
           />
           <YAxis
             domain={yDomain} width={38}
-            tick={{ fill: 'var(--mist)', fontFamily: 'var(--mono)', fontSize: 9 }}
+            tick={{ fill: 'var(--mist)', fontFamily: 'var(--sans)', fontSize: 9 }}
             tickLine={false} axisLine={false} tickCount={3} tickFormatter={yFormatter}
           />
           <Tooltip content={tooltipContent} cursor={{ stroke: 'var(--border-hi)', strokeWidth: 1 }} />
@@ -443,8 +444,12 @@ function StatCard({ label, value, sub, color, status, barPct, sigma }: {
 
 // ── Log Viewer ────────────────────────────────────────────────────────────────
 
-function GlanceLogViewer({ tsLogs, clickedTs, onClear }: {
-  tsLogs: TimestampedLog[]; clickedTs: number | null; onClear: () => void
+function GlanceLogViewer({ tsLogs, clickedTs, onClear, isOpen, onToggle }: {
+  tsLogs: TimestampedLog[]
+  clickedTs: number | null
+  onClear: () => void
+  isOpen: boolean
+  onToggle: () => void
 }) {
   const virtuosoRef = useRef<VirtuosoHandle>(null)
   const [highlightRange, setHighlightRange] = useState<{ from: number; to: number } | null>(null)
@@ -465,32 +470,49 @@ function GlanceLogViewer({ tsLogs, clickedTs, onClear }: {
   return (
     <>
       <div className="glance-log-header">
-        <span className="glance-log-title">Logs</span>
-        {clickedTs !== null && (
-          <>
-            <span className="glance-log-ts-badge">{fmtTime(clickedTs)} ±5s</span>
-            <button className="glance-log-clear" onClick={onClear} title="Clear highlight">×</button>
-          </>
-        )}
+        <button
+          className="glance-log-toggle-btn"
+          onClick={onToggle}
+          title={isOpen ? 'Collapse log panel' : 'Expand log panel'}
+        >
+          <IconChevronRight
+            size={11}
+            style={{
+              transform: isOpen ? 'rotate(0deg)' : 'rotate(180deg)',
+              transition: 'transform 260ms cubic-bezier(0.4, 0, 0.2, 1)',
+            }}
+          />
+        </button>
+        {isOpen && <>
+          <span className="glance-log-title">Logs</span>
+          {clickedTs !== null && (
+            <>
+              <span className="glance-log-ts-badge">{fmtTime(clickedTs)} ±5s</span>
+              <button className="glance-log-clear" onClick={onClear} title="Clear highlight">×</button>
+            </>
+          )}
+        </>}
       </div>
-      <Virtuoso
-        ref={virtuosoRef}
-        data={tsLogs}
-        style={{ flex: 1, minHeight: 0 }}
-        followOutput={clickedTs === null}
-        itemContent={(_, log) => {
-          const inRange = highlightRange !== null && log.ts >= highlightRange.from && log.ts <= highlightRange.to
-          const isExact = clickedTs !== null && Math.abs(log.ts - clickedTs) <= 1000
-          return (
-            <div className={`glance-log-line ${logLevel(log.line)}${inRange ? ' highlighted' : ''}${isExact ? ' exact' : ''}`}>
-              {log.line}
-            </div>
-          )
-        }}
-        components={{
-          EmptyPlaceholder: () => <div className="glance-log-empty">waiting for logs…</div>,
-        }}
-      />
+      <div className={`glance-log-body${isOpen ? '' : ' hidden'}`}>
+        <Virtuoso
+          ref={virtuosoRef}
+          data={tsLogs}
+          style={{ flex: 1, minHeight: 0 }}
+          followOutput={clickedTs === null}
+          itemContent={(_, log) => {
+            const inRange = highlightRange !== null && log.ts >= highlightRange.from && log.ts <= highlightRange.to
+            const isExact = clickedTs !== null && Math.abs(log.ts - clickedTs) <= 1000
+            return (
+              <div className={`glance-log-line ${logLevel(log.line)}${inRange ? ' highlighted' : ''}${isExact ? ' exact' : ''}`}>
+                {log.line}
+              </div>
+            )
+          }}
+          components={{
+            EmptyPlaceholder: () => <div className="glance-log-empty">waiting for logs…</div>,
+          }}
+        />
+      </div>
     </>
   )
 }
@@ -500,6 +522,7 @@ function GlanceLogViewer({ tsLogs, clickedTs, onClear }: {
 export default function GlancePage() {
   const [windowMin, setWindowMin] = useState<WindowMin>(5)
   const [clickedTs, setClickedTs] = useState<number | null>(null)
+  const [logPanelOpen, setLogPanelOpen] = useState(true)
   const logCtx = useLogs()
   const { settings } = useSettings()
   const { greyBeardMode: gbm, glance: gs } = settings
@@ -617,6 +640,16 @@ export default function GlancePage() {
             <span className="glance-live-dot" />
             {(gs.refreshIntervalMs / 1000).toFixed(1)}s
           </span>
+          {showLogPanel && !logPanelOpen && (
+            <button
+              className="glance-show-logs-btn"
+              onClick={() => setLogPanelOpen(true)}
+              title="Show log panel"
+            >
+              <IconChevronLeft size={11} />
+              logs
+            </button>
+          )}
         </div>
 
         {/* Stat rail */}
@@ -715,11 +748,13 @@ export default function GlancePage() {
 
       {/* Log viewer */}
       {showLogPanel && (
-        <div className="glance-right">
+        <div className={`glance-right${logPanelOpen ? '' : ' collapsed'}`}>
           <GlanceLogViewer
             tsLogs={logCtx.tsLogs}
             clickedTs={clickedTs}
             onClear={() => setClickedTs(null)}
+            isOpen={logPanelOpen}
+            onToggle={() => setLogPanelOpen(o => !o)}
           />
         </div>
       )}
