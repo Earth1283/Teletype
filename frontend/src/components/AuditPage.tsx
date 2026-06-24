@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useRef } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { api } from '../api/client'
 
@@ -37,10 +37,14 @@ function fmtTs(ts: number): string {
   return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`
 }
 
+interface Ctx { x: number; y: number; entry: AuditEntry }
+
 export default function AuditPage() {
   const [actorFilter, setActorFilter]   = useState('')
   const [actionFilter, setActionFilter] = useState('')
   const [sinceInput, setSinceInput]     = useState('')
+  const [ctx, setCtx] = useState<Ctx | null>(null)
+  const ctxRef = useRef<HTMLDivElement>(null)
 
   const since = sinceInput ? new Date(sinceInput).getTime() || undefined : undefined
 
@@ -59,8 +63,7 @@ export default function AuditPage() {
   const exportCsv = () => {
     const header = 'Timestamp,Actor,IP,Action,Detail'
     const rows = entries.map(e => [
-      fmtTs(e.ts),
-      e.actor, e.ip, e.action,
+      fmtTs(e.ts), e.actor, e.ip, e.action,
       `"${e.detail.replace(/"/g, '""')}"`,
     ].join(','))
     const blob = new Blob([[header, ...rows].join('\n')], { type: 'text/csv' })
@@ -72,65 +75,55 @@ export default function AuditPage() {
 
   const reset = () => { setActorFilter(''); setActionFilter(''); setSinceInput('') }
 
-  return (
-    <div style={{ display: 'flex', flexDirection: 'column', height: '100%', padding: '20px', gap: '12px', overflow: 'hidden' }}>
-      <div style={{ display: 'flex', alignItems: 'baseline', gap: '12px', flexShrink: 0 }}>
-        <span style={{ fontSize: '13px', fontWeight: 600, letterSpacing: '0.06em', textTransform: 'uppercase', color: 'var(--ash)' }}>
-          Audit Log
-        </span>
-        <span style={{ fontSize: '11px', color: 'var(--mist)', fontFamily: 'var(--mono)' }}>
-          {entries.length} entries · refreshes every 30s
-          {dataUpdatedAt ? ` · updated ${new Date(dataUpdatedAt).toLocaleTimeString()}` : ''}
-        </span>
-        <span style={{ flex: 1 }} />
-        <button onClick={exportCsv} style={{
-          background: 'var(--elevated)', border: '1px solid var(--border)', borderRadius: '4px',
-          color: 'var(--ash)', padding: '4px 10px', fontSize: '11px', cursor: 'pointer',
-          fontFamily: 'var(--mono)',
-        }}>
-          Export CSV
-        </button>
-      </div>
+  const openCtx = (e: React.MouseEvent, entry: AuditEntry) => {
+    e.preventDefault()
+    const x = Math.min(e.clientX, window.innerWidth - 200)
+    const y = Math.min(e.clientY, window.innerHeight - 120)
+    setCtx({ x, y, entry })
+  }
 
-      {/* Filter bar */}
-      <div style={{ display: 'flex', gap: '8px', flexShrink: 0, flexWrap: 'wrap' }}>
+  return (
+    <div className="audit-root">
+      <div className="audit-toolbar">
+        <span className="audit-title">Audit Log</span>
+        <span className="audit-meta">
+          {entries.length} entries · refreshes every 30s
+          {dataUpdatedAt ? ` · ${new Date(dataUpdatedAt).toLocaleTimeString()}` : ''}
+        </span>
+
         <input
+          className="audit-filter-input"
           placeholder="Filter by actor…"
           value={actorFilter}
           onChange={e => setActorFilter(e.target.value)}
-          style={inputStyle}
         />
         <select
+          className="audit-filter-select"
           value={actionFilter}
           onChange={e => setActionFilter(e.target.value)}
-          style={{ ...inputStyle, color: actionFilter ? 'var(--ash)' : 'var(--mist)' }}
         >
           <option value="">All actions</option>
           {KNOWN_ACTIONS.map(a => <option key={a} value={a}>{a}</option>)}
         </select>
         <input
           type="datetime-local"
+          className="audit-filter-input"
           value={sinceInput}
           onChange={e => setSinceInput(e.target.value)}
-          style={inputStyle}
         />
         {(actorFilter || actionFilter || sinceInput) && (
-          <button onClick={reset} style={{
-            background: 'none', border: '1px solid var(--border)', borderRadius: '4px',
-            color: 'var(--mist)', padding: '4px 8px', fontSize: '11px', cursor: 'pointer',
-          }}>
-            Reset
-          </button>
+          <button className="audit-reset-btn" onClick={reset}>Reset</button>
         )}
+        <span style={{ flex: 1 }} />
+        <button className="audit-export-btn" onClick={exportCsv}>Export CSV</button>
       </div>
 
-      {/* Table */}
-      <div style={{ flex: 1, overflow: 'auto', borderRadius: '6px', border: '1px solid var(--border)' }}>
-        <table style={{ width: '100%', borderCollapse: 'collapse', fontFamily: 'var(--mono)', fontSize: '11px' }}>
+      <div className="mac-tbl-wrap" style={{ borderRadius: 0, border: 'none', flex: 1 }}>
+        <table className="mac-tbl">
           <thead>
-            <tr style={{ background: 'var(--elevated)', position: 'sticky', top: 0, zIndex: 1 }}>
+            <tr>
               {['Timestamp', 'Actor', 'IP', 'Action', 'Detail'].map(h => (
-                <th key={h} style={thStyle}>{h}</th>
+                <th key={h}>{h}</th>
               ))}
             </tr>
           </thead>
@@ -142,19 +135,16 @@ export default function AuditPage() {
                 </td>
               </tr>
             ) : entries.map(e => (
-              <tr key={e.id} style={{ borderTop: '1px solid var(--border)' }}>
-                <td style={tdStyle}>{fmtTs(e.ts)}</td>
-                <td style={{ ...tdStyle, color: 'var(--ash)' }}>{e.actor}</td>
-                <td style={{ ...tdStyle, color: 'var(--mist)' }}>{e.ip}</td>
-                <td style={tdStyle}>
-                  <span style={{
-                    color: ACTION_COLORS[e.action] ?? 'var(--ash)',
-                    fontWeight: 500,
-                  }}>
+              <tr key={e.id} onContextMenu={ev => openCtx(ev, e)}>
+                <td style={{ fontFamily: 'var(--mono)', fontSize: 11, whiteSpace: 'nowrap' }}>{fmtTs(e.ts)}</td>
+                <td style={{ fontWeight: 500 }}>{e.actor}</td>
+                <td style={{ fontFamily: 'var(--mono)', fontSize: 11, color: 'var(--mist)' }}>{e.ip}</td>
+                <td>
+                  <span style={{ color: ACTION_COLORS[e.action] ?? 'var(--ash)', fontWeight: 500 }}>
                     {e.action}
                   </span>
                 </td>
-                <td style={{ ...tdStyle, color: 'var(--mist)', maxWidth: '320px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}
+                <td style={{ maxWidth: 320, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', color: 'var(--mist)' }}
                   title={e.detail}>
                   {e.detail}
                 </td>
@@ -163,34 +153,29 @@ export default function AuditPage() {
           </tbody>
         </table>
       </div>
+
+      {ctx && (
+        <div ref={ctxRef} className="mac-ctx" style={{ left: ctx.x, top: ctx.y }}
+          onMouseLeave={() => setCtx(null)}>
+          <button className="mac-ctx-item" onClick={() => { navigator.clipboard.writeText(ctx.entry.detail); setCtx(null) }}>
+            <span className="mac-ctx-label">Copy Detail</span>
+          </button>
+          <button className="mac-ctx-item" onClick={() => {
+            const line = [fmtTs(ctx.entry.ts), ctx.entry.actor, ctx.entry.ip, ctx.entry.action, ctx.entry.detail].join('\t')
+            navigator.clipboard.writeText(line)
+            setCtx(null)
+          }}>
+            <span className="mac-ctx-label">Copy Row</span>
+          </button>
+          <div className="mac-ctx-sep" />
+          <button className="mac-ctx-item" onClick={() => { setActorFilter(ctx.entry.actor); setCtx(null) }}>
+            <span className="mac-ctx-label">Filter by Actor</span>
+          </button>
+          <button className="mac-ctx-item" onClick={() => { setActionFilter(ctx.entry.action); setCtx(null) }}>
+            <span className="mac-ctx-label">Filter by Action</span>
+          </button>
+        </div>
+      )}
     </div>
   )
-}
-
-const inputStyle: React.CSSProperties = {
-  background: 'var(--elevated)',
-  border: '1px solid var(--border)',
-  borderRadius: '4px',
-  color: 'var(--ash)',
-  padding: '4px 8px',
-  fontSize: '11px',
-  fontFamily: 'var(--mono)',
-  outline: 'none',
-}
-
-const thStyle: React.CSSProperties = {
-  padding: '8px 12px',
-  textAlign: 'left',
-  fontSize: '10px',
-  fontWeight: 600,
-  letterSpacing: '0.08em',
-  textTransform: 'uppercase',
-  color: 'var(--mist)',
-  borderBottom: '1px solid var(--border)',
-  whiteSpace: 'nowrap',
-}
-
-const tdStyle: React.CSSProperties = {
-  padding: '6px 12px',
-  color: 'var(--ash)',
 }

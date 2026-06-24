@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect, useCallback } from 'react'
-import { TOKEN_KEY } from '../api/client'
+import { TOKEN_KEY, api } from '../api/client'
 import { useSettings } from '../SettingsContext'
 import Console from './Console'
 import PlayerList from './PlayerList'
@@ -12,7 +12,7 @@ import AuditPage from './AuditPage'
 import NetworkPage from './NetworkPage'
 import CommandPalette from '../CommandPalette'
 
-type Tab = 'glance' | 'console' | 'players' | 'stats' | 'files' | 'actions' | 'audit' | 'network' | 'settings'
+type Tab = 'glance' | 'console' | 'players' | 'stats' | 'files' | 'actions' | 'audit' | 'network' | 'settings' | 'thread-dump'
 
 interface WinState {
   id: Tab
@@ -29,16 +29,19 @@ interface AppDef {
 }
 
 const APPS: AppDef[] = [
-  { id: 'glance',   label: 'Glance',   dw: 920,  dh: 620 },
-  { id: 'console',  label: 'Console',  dw: 820,  dh: 520 },
-  { id: 'players',  label: 'Players',  dw: 720,  dh: 540 },
-  { id: 'stats',    label: 'Stats',    dw: 1020, dh: 660 },
-  { id: 'files',    label: 'Finder',   dw: 840,  dh: 560 },
-  { id: 'actions',  label: 'Actions',  dw: 680,  dh: 500 },
-  { id: 'audit',    label: 'Audit',    dw: 780,  dh: 540 },
-  { id: 'network',  label: 'Network',  dw: 740,  dh: 500 },
-  { id: 'settings', label: 'Settings', dw: 620,  dh: 740 },
+  { id: 'glance',      label: 'Glance',       dw: 920,  dh: 620 },
+  { id: 'console',     label: 'Console',       dw: 820,  dh: 520 },
+  { id: 'players',     label: 'Players',       dw: 720,  dh: 540 },
+  { id: 'stats',       label: 'Stats',         dw: 1020, dh: 660 },
+  { id: 'files',       label: 'Finder',        dw: 900,  dh: 600 },
+  { id: 'actions',     label: 'Actions',       dw: 680,  dh: 500 },
+  { id: 'audit',       label: 'Audit',         dw: 780,  dh: 540 },
+  { id: 'network',     label: 'Network',       dw: 740,  dh: 500 },
+  { id: 'settings',    label: 'Settings',      dw: 620,  dh: 740 },
+  { id: 'thread-dump', label: 'Thread Dump',   dw: 900,  dh: 580 },
 ]
+
+const DOCK_APPS = APPS.filter(a => a.id !== 'thread-dump')
 
 // ── App icons ──────────────────────────────────────────────────────────────
 
@@ -119,6 +122,17 @@ const APP_ICONS: Record<Tab, { bg: string; icon: React.ReactNode }> = {
       <circle cx="58" cy="74" r="9" fill="white"/>
     </>
   },
+  'thread-dump': {
+    bg: 'linear-gradient(145deg, #374151 0%, #111827 100%)',
+    icon: <>
+      <line x1="22" y1="28" x2="78" y2="28" stroke="rgba(255,255,255,0.82)" strokeWidth="6" strokeLinecap="round"/>
+      <line x1="22" y1="42" x2="78" y2="42" stroke="rgba(255,255,255,0.82)" strokeWidth="6" strokeLinecap="round"/>
+      <line x1="22" y1="56" x2="78" y2="56" stroke="rgba(255,255,255,0.82)" strokeWidth="6" strokeLinecap="round"/>
+      <line x1="22" y1="70" x2="55" y2="70" stroke="rgba(255,255,255,0.82)" strokeWidth="6" strokeLinecap="round"/>
+      <circle cx="72" cy="72" r="14" fill="none" stroke="rgba(255,255,255,0.4)" strokeWidth="5"/>
+      <line x1="80" y1="80" x2="90" y2="90" stroke="rgba(255,255,255,0.6)" strokeWidth="5" strokeLinecap="round"/>
+    </>
+  },
 }
 
 function AppIcon({ id }: { id: Tab }) {
@@ -132,6 +146,40 @@ function AppIcon({ id }: { id: Tab }) {
   )
 }
 
+// ── Menu types ─────────────────────────────────────────────────────────────
+
+type MenuItem = {
+  label: string
+  shortcut?: string
+  action?: () => void
+  disabled?: boolean
+  danger?: boolean
+  checked?: boolean
+} | null
+
+// ── Menu dropdown ──────────────────────────────────────────────────────────
+
+function MenuDropdown({ items }: { items: MenuItem[] }) {
+  return (
+    <div className="mac-menu-dropdown">
+      {items.map((item, i) =>
+        item === null
+          ? <div key={i} className="mac-menu-sep" />
+          : <button
+              key={i}
+              className={`mac-menu-item${item.danger ? ' danger' : ''}`}
+              disabled={item.disabled}
+              onClick={item.action}
+            >
+              <span className="mac-menu-item-check">{item.checked ? '✓' : ''}</span>
+              <span className="mac-menu-item-label">{item.label}</span>
+              {item.shortcut && <span className="mac-menu-item-shortcut">{item.shortcut}</span>}
+            </button>
+      )}
+    </div>
+  )
+}
+
 // ── Context menu ────────────────────────────────────────────────────────────
 
 type CtxItem = {
@@ -140,7 +188,7 @@ type CtxItem = {
   action?: () => void
   disabled?: boolean
   danger?: boolean
-} | null  // null = separator
+} | null
 
 interface CtxMenuData { x: number; y: number; items: CtxItem[] }
 
@@ -193,7 +241,13 @@ export default function MacOSDesktop() {
   const [paletteOpen, setPaletteOpen] = useState(false)
   const [clock, setClock] = useState(() => new Date())
   const [ctxMenu, setCtxMenu] = useState<CtxMenuData | null>(null)
+  const [activeMenu, setActiveMenu] = useState<string | null>(null)
+  const [finderViewMode, setFinderViewMode] = useState<'icons' | 'list'>('icons')
+  const [threadDumpText, setThreadDumpText] = useState('')
+  const [showAbout, setShowAbout] = useState(false)
+  const [showRestartConfirm, setShowRestartConfirm] = useState(false)
   const iRef = useRef<Interaction | null>(null)
+  const menuBarRef = useRef<HTMLDivElement>(null)
   const { settings, update } = useSettings()
 
   useEffect(() => {
@@ -230,6 +284,16 @@ export default function MacOSDesktop() {
     return () => window.removeEventListener('keydown', h)
   }, [])
 
+  // Close menu bar dropdowns on outside click
+  useEffect(() => {
+    if (!activeMenu) return
+    const h = (e: MouseEvent) => {
+      if (!menuBarRef.current?.contains(e.target as Node)) setActiveMenu(null)
+    }
+    document.addEventListener('mousedown', h)
+    return () => document.removeEventListener('mousedown', h)
+  }, [activeMenu])
+
   const openCtx = useCallback((e: React.MouseEvent, items: CtxItem[]) => {
     e.preventDefault()
     e.stopPropagation()
@@ -238,6 +302,10 @@ export default function MacOSDesktop() {
     const y = e.clientY + est > window.innerHeight - 8 ? e.clientY - est : e.clientY
     setCtxMenu({ x, y, items })
   }, [])
+
+  function toggleMenu(name: string) {
+    setActiveMenu(m => m === name ? null : name)
+  }
 
   function openApp(id: Tab) {
     setTopZ(z => {
@@ -314,7 +382,7 @@ export default function MacOSDesktop() {
         ? [
             { label: 'Show Window', action: () => openApp(app.id) },
             null,
-            { label: 'Close',  action: () => closeWin(app.id), danger: true },
+            { label: 'Close', action: () => closeWin(app.id), danger: true },
           ]
         : [
             { label: 'Bring to Front', action: () => focusWin(app.id) },
@@ -329,7 +397,7 @@ export default function MacOSDesktop() {
     const win = wins.find(w => w.id === id)
     if (!win) return
     openCtx(e, [
-      { label: 'Minimize',                   shortcut: '⌘M', action: () => minWin(id) },
+      { label: 'Minimize', shortcut: '⌘M', action: () => minWin(id) },
       { label: win.max ? 'Restore' : 'Zoom', shortcut: '⌘⇧F', action: () => maxWin(id) },
       null,
       { label: 'Close', shortcut: '⌘W', action: () => closeWin(id), danger: true },
@@ -338,28 +406,186 @@ export default function MacOSDesktop() {
 
   function desktopCtx(e: React.MouseEvent) {
     openCtx(e, [
-      { label: 'Bring All to Front', disabled: wins.filter(w => !w.min).length === 0 },
+      { label: 'Bring All to Front', disabled: wins.filter(w => !w.min).length === 0, action: bringAllToFront },
       null,
       { label: 'Exit Fun Mode', action: () => update({ fun: false }) },
     ])
   }
+
+  function bringAllToFront() {
+    setTopZ(z => {
+      let nz = z
+      setWins(prev => prev.map(w => w.min ? w : { ...w, z: ++nz }))
+      return nz
+    })
+  }
+
+  function minimizeAll() {
+    setWins(prev => prev.map(w => ({ ...w, min: true })))
+    setActiveId(null)
+  }
+
+  function closeAll() {
+    setWins([])
+    setActiveId(null)
+  }
+
+  // ── Thread dump ────────────────────────────────────────────────────────
+
+  async function triggerThreadDump() {
+    setActiveMenu(null)
+    try {
+      const res = await api.get('/system/thread-dump', { responseType: 'text' })
+      const text = res.data as string
+      const blob = new Blob([text], { type: 'text/plain' })
+      const url = URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      a.href = url
+      a.download = `thread-dump-${Date.now()}.txt`
+      a.click()
+      URL.revokeObjectURL(url)
+      setThreadDumpText(text)
+      openApp('thread-dump')
+    } catch (e: any) {
+      alert(e.response?.data?.error ?? 'Thread dump failed')
+    }
+  }
+
+  async function doRestart() {
+    setShowRestartConfirm(false)
+    try {
+      await api.post('/system/restart')
+    } catch (e: any) {
+      alert(e.response?.data?.error ?? 'Restart request failed')
+    }
+  }
+
+  // ── Menu content ───────────────────────────────────────────────────────
+
+  const activeWin = wins.find(w => w.id === activeId)
+  const openWins = wins.filter(w => !w.min)
+  const finderWinOpen = wins.some(w => w.id === 'files')
+
+  function fileMenuItems(): MenuItem[] {
+    return [
+      { label: 'New Finder Window', shortcut: '⌘N', action: () => { setActiveMenu(null); openApp('files') } },
+      { label: 'New Console Window', action: () => { setActiveMenu(null); openApp('console') } },
+      null,
+      { label: 'Restart Server…', action: () => { setActiveMenu(null); setShowRestartConfirm(true) } },
+      { label: 'Thread Dump', action: triggerThreadDump },
+      null,
+      { label: 'Exit Fun Mode', action: () => { setActiveMenu(null); update({ fun: false }) }, danger: true },
+    ]
+  }
+
+  function viewMenuItems(): MenuItem[] {
+    const items: MenuItem[] = []
+    if (finderWinOpen) {
+      items.push({ label: 'as Icons', checked: finderViewMode === 'icons', action: () => { setActiveMenu(null); setFinderViewMode('icons') } })
+      items.push({ label: 'as List', checked: finderViewMode === 'list', action: () => { setActiveMenu(null); setFinderViewMode('list') } })
+      items.push(null)
+    }
+    items.push({
+      label: activeWin?.max ? 'Exit Full Screen' : 'Enter Full Screen',
+      shortcut: '⌘⇧F',
+      disabled: !activeWin,
+      action: () => { setActiveMenu(null); if (activeId) maxWin(activeId) },
+    })
+    return items
+  }
+
+  function windowMenuItems(): MenuItem[] {
+    const items: MenuItem[] = [
+      {
+        label: 'Minimize',
+        shortcut: '⌘M',
+        disabled: !activeWin,
+        action: () => { setActiveMenu(null); if (activeId) minWin(activeId) },
+      },
+      {
+        label: 'Minimize All',
+        disabled: openWins.length === 0,
+        action: () => { setActiveMenu(null); minimizeAll() },
+      },
+      null,
+      {
+        label: 'Bring All to Front',
+        disabled: openWins.length === 0,
+        action: () => { setActiveMenu(null); bringAllToFront() },
+      },
+      {
+        label: 'Close All',
+        disabled: wins.length === 0,
+        action: () => { setActiveMenu(null); closeAll() },
+        danger: true,
+      },
+    ]
+    if (wins.length > 0) {
+      items.push(null)
+      wins.forEach(w => {
+        const app = APPS.find(a => a.id === w.id)!
+        items.push({
+          label: app.label,
+          checked: w.id === activeId && !w.min,
+          disabled: false,
+          action: () => { setActiveMenu(null); openApp(w.id) },
+        })
+      })
+    }
+    return items
+  }
+
+  function helpMenuItems(): MenuItem[] {
+    return [
+      { label: 'About Teletype', action: () => { setActiveMenu(null); setShowAbout(true) } },
+      null,
+      { label: 'Keyboard Shortcuts', shortcut: '⌘K', action: () => { setActiveMenu(null); setPaletteOpen(true) } },
+      null,
+      {
+        label: 'GitHub',
+        action: () => { setActiveMenu(null); window.open('https://github.com/Earth1283/Teletype', '_blank') },
+      },
+    ]
+  }
+
+  const MENU_DEFS: { name: string; items: () => MenuItem[] }[] = [
+    { name: 'File',   items: fileMenuItems },
+    { name: 'View',   items: viewMenuItems },
+    { name: 'Window', items: windowMenuItems },
+    { name: 'Help',   items: helpMenuItems },
+  ]
 
   const dateStr = clock.toLocaleDateString([], { weekday: 'short', month: 'short', day: 'numeric' })
   const timeStr = clock.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
 
   return (
     <div className="mac-desktop" onContextMenu={desktopCtx}>
-      {/* Menu bar */}
+      {/* ── Menu bar ────────────────────────────────────────────────────── */}
       <div className="mac-menubar" onContextMenu={e => e.stopPropagation()}>
         <span className="mac-menubar-apple">
           <svg width="13" height="16" viewBox="0 0 814 1000" fill="currentColor">
             <path d="M788.1 340.9c-5.8 4.5-108.2 62.2-108.2 190.5 0 148.4 130.3 200.9 134.2 202.2-.6 3.2-20.7 71.9-68.7 141.9-42.8 61.6-87.5 123.1-155.5 123.1s-85.5-39.5-164-39.5c-76 0-103.7 40.8-165.9 40.8s-105-57.8-155.5-127.4C46 790.7 0 663 0 541.8c0-207.5 135.4-317.3 269-317.3 70.1 0 128.4 46.4 172.5 46.4 42.8 0 109.2-49.3 188.4-49.3 30.3 0 130.2 2.6 198.3 99.2zm-234-181.5c31.1-36.9 53.1-88.1 53.1-139.3 0-7.1-.6-14.3-1.9-20.1-50.6 1.9-110.8 33.7-147.1 75.8-28.5 32.4-55.1 83.6-55.1 135.5 0 7.8 1.3 15.6 1.9 18.1 3.2.6 8.4 1.3 13.6 1.3 45.4 0 102.5-30.4 135.5-71.3z"/>
           </svg>
         </span>
-        <span className="mac-menubar-appname">Teletype</span>
-        <span className="mac-menubar-item">File</span>
-        <span className="mac-menubar-item">View</span>
-        <span className="mac-menubar-item">Window</span>
+        <span className="mac-menubar-appname">
+          {activeId ? (APPS.find(a => a.id === activeId)?.label ?? 'Teletype') : 'Teletype'}
+        </span>
+
+        <div ref={menuBarRef} style={{ display: 'flex', alignItems: 'center' }}>
+          {MENU_DEFS.map(({ name, items }) => (
+            <div key={name} className="mac-menu-trigger">
+              <button
+                className={`mac-menu-btn${activeMenu === name ? ' open' : ''}`}
+                onMouseDown={e => { e.stopPropagation(); toggleMenu(name) }}
+                onMouseEnter={() => { if (activeMenu && activeMenu !== name) setActiveMenu(name) }}
+              >
+                {name}
+              </button>
+              {activeMenu === name && <MenuDropdown items={items()} />}
+            </div>
+          ))}
+        </div>
+
         <div className="mac-menubar-right">
           <button className="mac-menubar-spotlight" onClick={() => setPaletteOpen(true)} title="Spotlight (⌘K)">
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
@@ -375,7 +601,7 @@ export default function MacOSDesktop() {
         </div>
       </div>
 
-      {/* Desktop area */}
+      {/* ── Desktop area ─────────────────────────────────────────────────── */}
       <div className="mac-desktop-area" onClick={() => setActiveId(null)}>
         {wins.length === 0 && (
           <div className="mac-desktop-hint">Double-click an icon in the dock to open an app</div>
@@ -393,22 +619,63 @@ export default function MacOSDesktop() {
             onMax={maxWin}
             onNavigate={(t) => openApp(t as Tab)}
             onTitleCtx={winTitleCtx}
+            finderViewMode={finderViewMode}
+            threadDumpText={threadDumpText}
           />
         ))}
       </div>
 
-      {/* Dock */}
-      <MacDock apps={APPS} wins={wins} activeId={activeId} onOpen={openApp} onCtx={dockCtx} />
+      {/* ── Dock ──────────────────────────────────────────────────────────── */}
+      <MacDock apps={DOCK_APPS} wins={wins} activeId={activeId} onOpen={openApp} onCtx={dockCtx} />
 
-      {/* Context menu */}
+      {/* ── Context menu ──────────────────────────────────────────────────── */}
       {ctxMenu && <CtxMenu menu={ctxMenu} onClose={() => setCtxMenu(null)} />}
 
-      {/* Spotlight */}
+      {/* ── Spotlight ─────────────────────────────────────────────────────── */}
       <CommandPalette
         open={paletteOpen && settings.palette.enabled}
         onClose={() => setPaletteOpen(false)}
         onNavigate={(t) => { setPaletteOpen(false); openApp(t as Tab) }}
       />
+
+      {/* ── About Teletype ────────────────────────────────────────────────── */}
+      {showAbout && (
+        <div className="mac-system-overlay" onClick={() => setShowAbout(false)}>
+          <div className="mac-system-card" onClick={e => e.stopPropagation()}>
+            <div className="mac-about-app-icon">
+              <svg width="48" height="48" viewBox="0 0 100 100" fill="none">
+                <polyline points="22,37 41,50 22,63" stroke="white" strokeWidth="9" strokeLinecap="round" strokeLinejoin="round" fill="none"/>
+                <line x1="49" y1="63" x2="76" y2="63" stroke="white" strokeWidth="9" strokeLinecap="round"/>
+              </svg>
+            </div>
+            <div className="mac-about-name">Teletype</div>
+            <div className="mac-about-subtitle">Minecraft Server Management<br/>Open-source · Fun mode active</div>
+            <div style={{ marginTop: 12 }}>
+              <button className="pill-btn" style={{ minWidth: 100 }} onClick={() => setShowAbout(false)}>OK</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── Restart confirm ───────────────────────────────────────────────── */}
+      {showRestartConfirm && (
+        <div className="mac-system-overlay" onClick={() => setShowRestartConfirm(false)}>
+          <div className="mac-system-card" onClick={e => e.stopPropagation()}>
+            <div className="mac-system-title">Restart Minecraft Server?</div>
+            <div className="mac-system-body">All connected players will be disconnected. The server will attempt to restart automatically.</div>
+            <div className="mac-system-footer">
+              <button className="pill-btn" onClick={() => setShowRestartConfirm(false)}>Cancel</button>
+              <button
+                className="pill-btn"
+                style={{ background: 'rgba(255,59,48,0.15)', borderColor: 'rgba(255,59,48,0.4)', color: '#FF3B30' }}
+                onClick={doRestart}
+              >
+                Restart
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }
@@ -426,9 +693,11 @@ interface MacWindowProps {
   onMax: (id: Tab) => void
   onNavigate: (t: string) => void
   onTitleCtx: (e: React.MouseEvent, id: Tab) => void
+  finderViewMode: 'icons' | 'list'
+  threadDumpText: string
 }
 
-function MacWindow({ win, isActive, onFocus, onStartDrag, onStartResize, onClose, onMin, onMax, onNavigate, onTitleCtx }: MacWindowProps) {
+function MacWindow({ win, isActive, onFocus, onStartDrag, onStartResize, onClose, onMin, onMax, onNavigate, onTitleCtx, finderViewMode, threadDumpText }: MacWindowProps) {
   const app = APPS.find(a => a.id === win.id)!
   const posStyle = win.max
     ? { zIndex: win.z }
@@ -454,7 +723,7 @@ function MacWindow({ win, isActive, onFocus, onStartDrag, onStartResize, onClose
         <span className="mac-titlebar-title">{app.label}</span>
       </div>
       <div className="mac-window-content">
-        <PageContent id={win.id} onNavigate={onNavigate} />
+        <PageContent id={win.id} onNavigate={onNavigate} finderViewMode={finderViewMode} threadDumpText={threadDumpText} />
       </div>
       {!win.max && (
         <div className="mac-resize-handle" onMouseDown={e => onStartResize(e, win.id)} />
@@ -463,17 +732,23 @@ function MacWindow({ win, isActive, onFocus, onStartDrag, onStartResize, onClose
   )
 }
 
-function PageContent({ id, onNavigate }: { id: Tab; onNavigate: (t: string) => void }) {
+function PageContent({ id, onNavigate, finderViewMode, threadDumpText }: {
+  id: Tab
+  onNavigate: (t: string) => void
+  finderViewMode: 'icons' | 'list'
+  threadDumpText: string
+}) {
   switch (id) {
-    case 'glance':   return <GlancePage />
-    case 'console':  return <Console />
-    case 'players':  return <PlayerList />
-    case 'stats':    return <ServerStats onNavigate={onNavigate} />
-    case 'files':    return <FileManager />
-    case 'actions':  return <ActionsPage />
-    case 'audit':    return <AuditPage />
-    case 'network':  return <NetworkPage />
-    case 'settings': return <SettingsPage />
+    case 'glance':      return <GlancePage />
+    case 'console':     return <Console />
+    case 'players':     return <PlayerList />
+    case 'stats':       return <ServerStats onNavigate={onNavigate} />
+    case 'files':       return <FileManager viewMode={finderViewMode} />
+    case 'actions':     return <ActionsPage />
+    case 'audit':       return <AuditPage />
+    case 'network':     return <NetworkPage />
+    case 'settings':    return <SettingsPage />
+    case 'thread-dump': return <div className="thread-dump-view">{threadDumpText || 'No thread dump loaded.'}</div>
   }
 }
 

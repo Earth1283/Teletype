@@ -13,6 +13,7 @@ import io.github.Earth1283.teletype.web.routing.fileRoutes
 import io.github.Earth1283.teletype.web.routing.glanceRoutes
 import io.github.Earth1283.teletype.web.routing.networkRoutes
 import io.github.Earth1283.teletype.web.routing.statsRoutes
+import io.github.Earth1283.teletype.web.routing.systemRoutes
 import io.ktor.http.ContentType
 import io.ktor.http.HttpHeaders
 import io.ktor.http.HttpMethod
@@ -204,6 +205,7 @@ class WebServer(private val plugin: Teletype) {
                             route("/actions") { actionRoutes(plugin) }
                             route("/stats")   { statsRoutes(plugin) }
                             route("/network") { networkRoutes(plugin) }
+                            route("/system")  { systemRoutes(plugin) }
                             auditRoutes(plugin)
                         }
                     }

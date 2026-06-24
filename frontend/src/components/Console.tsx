@@ -1,4 +1,4 @@
-import { useRef, useState, useCallback, useMemo } from 'react'
+import { useRef, useState, useCallback, useMemo, useEffect } from 'react'
 import { Virtuoso, type VirtuosoHandle } from 'react-virtuoso'
 import AnsiConvert from 'ansi-to-html'
 import { useQuery } from '@tanstack/react-query'
@@ -41,7 +41,9 @@ export default function Console() {
   const [searchOpen, setSearchOpen] = useState(false)
   const [searchQuery, setSearchQuery] = useState('')
   const [fuzzyLevel, setFuzzyLevel] = useState(0)
+  const [clearedAt, setClearedAt] = useState(0)
   const [ctx, setCtx] = useState<CtxState | null>(null)
+  const ctxRef = useRef<HTMLDivElement>(null)
   const [runSnippet, setRunSnippet] = useState<Snippet | null>(null)
   const [completions, setCompletions] = useState<string[]>([])
   const [completionIdx, setCompletionIdx] = useState(0)
@@ -52,10 +54,11 @@ export default function Console() {
 
   const clearCompletions = () => { setCompletions([]); setCompletionIdx(0) }
 
-  const displayedLines = useMemo(
-    () => lines.length > displayLines ? lines.slice(lines.length - displayLines) : lines,
-    [lines, displayLines]
-  )
+  const displayedLines = useMemo(() => {
+    const base = lines.length > displayLines ? lines.slice(lines.length - displayLines) : lines
+    const clearIdx = Math.max(0, clearedAt - (lines.length - base.length))
+    return base.slice(clearIdx)
+  }, [lines, displayLines, clearedAt])
 
   const filteredLines = useMemo(
     () => searchOpen && searchQuery
@@ -138,6 +141,15 @@ export default function Console() {
 
   const closeCtx = () => setCtx(null)
 
+  useEffect(() => {
+    if (!ctx) return
+    const handler = (e: MouseEvent) => {
+      if (ctxRef.current && !ctxRef.current.contains(e.target as Node)) setCtx(null)
+    }
+    document.addEventListener('mousedown', handler)
+    return () => document.removeEventListener('mousedown', handler)
+  }, [ctx])
+
   const handleQAClick = (s: Snippet) => {
     closeCtx()
     if (s.vars.length > 0) {
@@ -188,6 +200,14 @@ export default function Console() {
           style={{ flexShrink: 0 }}
         >
           <IconSearch size={13} />
+        </button>
+        <button
+          className="icon-btn"
+          onClick={() => setClearedAt(lines.length)}
+          title="Clear console"
+          style={{ flexShrink: 0 }}
+        >
+          <IconX size={13} />
         </button>
         <div className="conn-badge">
           <span className={`dot ${connected ? 'on' : 'off'}`} />
@@ -249,25 +269,23 @@ export default function Console() {
       </div>
 
       {ctx && (
-        <>
-          <div className="ctx-backdrop" onClick={closeCtx} />
-          <div className="ctx-menu" style={{ left: ctx.x, top: ctx.y }}>
-            <button className="ctx-item" onClick={() => { navigator.clipboard.writeText(ctx.line); closeCtx() }}>
-              📋 Copy line
-            </button>
-            {quickActions.length > 0 && (
-              <>
-                <div className="ctx-divider" />
-                <div className="ctx-section-label">Quick Actions</div>
-                {quickActions.map(s => (
-                  <button key={s.id} className="ctx-item ctx-qa" onClick={() => handleQAClick(s)}>
-                    ⚡ {s.name}
-                  </button>
-                ))}
-              </>
-            )}
-          </div>
-        </>
+        <div ref={ctxRef} className="mac-ctx" style={{ left: ctx.x, top: ctx.y }}>
+          <button className="mac-ctx-item" onClick={() => { navigator.clipboard.writeText(ctx.line); closeCtx() }}>
+            <span className="mac-ctx-label">Copy Line</span>
+            <span className="mac-ctx-key">⌘C</span>
+          </button>
+          {quickActions.length > 0 && (
+            <>
+              <div className="mac-ctx-sep" />
+              <div className="mac-ctx-header">Quick Actions</div>
+              {quickActions.map(s => (
+                <button key={s.id} className="mac-ctx-item" onClick={() => handleQAClick(s)}>
+                  <span className="mac-ctx-label">{s.name}</span>
+                </button>
+              ))}
+            </>
+          )}
+        </div>
       )}
 
       {runSnippet && <RunModal snippet={runSnippet} onClose={() => setRunSnippet(null)} />}

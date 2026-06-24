@@ -18,16 +18,18 @@ export default function ActionsPage() {
   return (
     <div className="actions-page">
       <div className="actions-subnav">
-        <button className={`subnav-btn${sub === 'snippets' ? ' active' : ''}`}
-          onClick={() => setSub('snippets')}>
-          Snippets
-          {snippets.length > 0 && <span className="nav-badge">{snippets.length}</span>}
-        </button>
-        <button className={`subnav-btn${sub === 'schedule' ? ' active' : ''}`}
-          onClick={() => setSub('schedule')}>
-          Schedule
-          {activeScheduled > 0 && <span className="nav-badge">{activeScheduled}</span>}
-        </button>
+        <div className="mac-seg-ctrl">
+          <button className={`mac-seg-btn${sub === 'snippets' ? ' active' : ''}`}
+            onClick={() => setSub('snippets')}>
+            Snippets
+            {snippets.length > 0 && <span className="mac-seg-badge">{snippets.length}</span>}
+          </button>
+          <button className={`mac-seg-btn${sub === 'schedule' ? ' active' : ''}`}
+            onClick={() => setSub('schedule')}>
+            Schedule
+            {activeScheduled > 0 && <span className="mac-seg-badge">{activeScheduled}</span>}
+          </button>
+        </div>
       </div>
 
       <div className="actions-content">

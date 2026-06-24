@@ -134,7 +134,7 @@ function MainApp() {
         {tab === 'console'  && <Console />}
         {tab === 'players'  && <PlayerList />}
         {tab === 'stats'    && <ServerStats onNavigate={t => setTab(t as Tab)} />}
-        {tab === 'files'    && <FileManager />}
+        {tab === 'files'    && <FileManager viewMode="list" />}
         {tab === 'actions'  && <ActionsPage />}
         {tab === 'audit'    && <AuditPage />}
         {tab === 'network'  && <NetworkPage />}

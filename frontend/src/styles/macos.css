@@ -443,6 +443,17 @@
   margin: 4px 6px;
 }
 
+.mac-ctx-header {
+  padding: 4px 12px 2px;
+  font-family: -apple-system, var(--sans), sans-serif;
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+  color: rgba(180, 180, 200, 0.4);
+  pointer-events: none;
+}
+
 /* ── Fun mode card (in settings) ──────────────────────────────────────────── */
 
 .fun-card {
@@ -477,6 +488,556 @@
   color: var(--ghost);
   margin-top: 3px;
   line-height: 1.5;
+}
+
+/* ── Menu bar dropdowns ───────────────────────────────────────────────────── */
+
+.mac-menu-trigger {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+}
+
+.mac-menu-btn {
+  font-family: -apple-system, var(--sans), sans-serif;
+  font-size: 13px;
+  color: rgba(220, 220, 230, 0.7);
+  background: none;
+  border: none;
+  cursor: default;
+  padding: 3px 8px;
+  border-radius: 5px;
+  height: 22px;
+  display: flex;
+  align-items: center;
+  transition: background 80ms, color 80ms;
+}
+
+.mac-menu-btn:hover,
+.mac-menu-btn.open {
+  background: rgba(255, 255, 255, 0.09);
+  color: var(--ash);
+}
+
+.mac-menu-dropdown {
+  position: absolute;
+  top: calc(100% + 5px);
+  left: 0;
+  min-width: 220px;
+  background: rgba(24, 24, 34, 0.96);
+  backdrop-filter: blur(40px) saturate(1.8);
+  -webkit-backdrop-filter: blur(40px) saturate(1.8);
+  border: 0.5px solid rgba(255, 255, 255, 0.13);
+  border-radius: 10px;
+  box-shadow:
+    0 0 0 0.5px rgba(0,0,0,0.55),
+    0 16px 52px rgba(0, 0, 0, 0.62),
+    0 4px 12px rgba(0, 0, 0, 0.35);
+  padding: 4px;
+  z-index: 99999;
+  animation: mac-ctx-in 110ms cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.mac-menu-item {
+  display: flex;
+  align-items: center;
+  width: 100%;
+  padding: 5px 10px;
+  font-family: -apple-system, var(--sans), sans-serif;
+  font-size: 13px;
+  color: var(--ash);
+  background: none;
+  border: none;
+  border-radius: 7px;
+  cursor: default;
+  text-align: left;
+  gap: 8px;
+  transition: background 50ms, color 50ms;
+  min-height: 24px;
+}
+
+.mac-menu-item:not(:disabled):hover {
+  background: #0A84FF;
+  color: #fff;
+}
+
+.mac-menu-item:disabled { opacity: 0.36; }
+
+.mac-menu-item.danger:not(:disabled):hover { background: #FF3B30; color: #fff; }
+
+.mac-menu-item-check {
+  width: 14px;
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 12px;
+}
+
+.mac-menu-item-label { flex: 1; }
+
+.mac-menu-item-shortcut {
+  font-size: 11.5px;
+  opacity: 0.55;
+  white-space: nowrap;
+  letter-spacing: 0.02em;
+}
+
+.mac-menu-item:not(:disabled):hover .mac-menu-item-shortcut { opacity: 0.8; }
+
+.mac-menu-sep {
+  height: 1px;
+  background: rgba(255, 255, 255, 0.075);
+  margin: 4px 6px;
+}
+
+/* ── About / system modals ────────────────────────────────────────────────── */
+
+.mac-system-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.42);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  z-index: 99990;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  animation: mac-ctx-in 160ms cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.mac-system-card {
+  background: rgba(24, 24, 36, 0.97);
+  backdrop-filter: blur(44px);
+  border: 0.5px solid rgba(255, 255, 255, 0.13);
+  border-radius: 16px;
+  padding: 28px 32px 22px;
+  box-shadow: 0 0 0 0.5px rgba(0,0,0,0.5), 0 28px 80px rgba(0,0,0,0.72);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  min-width: 290px;
+  max-width: 370px;
+  text-align: center;
+}
+
+.mac-about-app-icon {
+  width: 80px;
+  height: 80px;
+  border-radius: 22.5%;
+  background: linear-gradient(145deg, #f59e0b 0%, #b45309 100%);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 6px 24px rgba(245,158,11,0.32), inset 0 0.5px 0 rgba(255,255,255,0.22);
+  margin-bottom: 4px;
+}
+
+.mac-about-name {
+  font-family: -apple-system, var(--sans), sans-serif;
+  font-size: 20px;
+  font-weight: 600;
+  color: var(--ash);
+  letter-spacing: -0.025em;
+  margin-top: 2px;
+}
+
+.mac-about-subtitle {
+  font-family: -apple-system, var(--sans), sans-serif;
+  font-size: 12.5px;
+  color: var(--mist);
+  line-height: 1.5;
+  margin-bottom: 6px;
+}
+
+.mac-system-title {
+  font-family: -apple-system, var(--sans), sans-serif;
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--ash);
+  letter-spacing: -0.01em;
+}
+
+.mac-system-body {
+  font-family: -apple-system, var(--sans), sans-serif;
+  font-size: 12.5px;
+  color: var(--mist);
+  line-height: 1.5;
+  margin-bottom: 4px;
+}
+
+.mac-system-footer {
+  display: flex;
+  gap: 8px;
+  justify-content: center;
+  margin-top: 8px;
+  width: 100%;
+}
+
+/* ── Segmented control ────────────────────────────────────────────────────── */
+
+.mac-seg-ctrl {
+  display: inline-flex;
+  background: rgba(255, 255, 255, 0.05);
+  border: 0.5px solid rgba(255, 255, 255, 0.09);
+  border-radius: 8px;
+  padding: 2px;
+  gap: 1px;
+}
+
+.mac-seg-btn {
+  font-family: -apple-system, var(--sans), sans-serif;
+  font-size: 12.5px;
+  font-weight: 500;
+  color: rgba(220, 220, 235, 0.5);
+  background: none;
+  border: none;
+  border-radius: 6px;
+  padding: 4px 14px;
+  cursor: default;
+  transition: background 70ms, color 70ms, box-shadow 70ms;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  white-space: nowrap;
+}
+
+.mac-seg-btn.active {
+  background: rgba(255, 255, 255, 0.13);
+  color: rgba(220, 220, 235, 0.94);
+  box-shadow: 0 1px 3px rgba(0,0,0,0.28), inset 0 0.5px 0 rgba(255,255,255,0.1);
+}
+
+.mac-seg-btn:not(.active):hover {
+  background: rgba(255, 255, 255, 0.05);
+  color: rgba(220, 220, 235, 0.78);
+}
+
+.mac-seg-badge {
+  font-size: 10px;
+  font-weight: 600;
+  background: rgba(255, 255, 255, 0.08);
+  border-radius: 8px;
+  padding: 1px 6px;
+  color: rgba(220, 220, 235, 0.5);
+}
+
+.mac-seg-btn.active .mac-seg-badge {
+  background: rgba(255, 255, 255, 0.16);
+  color: rgba(220, 220, 235, 0.88);
+}
+
+/* ── Master / detail layout (Players) ────────────────────────────────────── */
+
+.mac-master-detail {
+  display: flex;
+  height: 100%;
+  overflow: hidden;
+}
+
+.mac-master-list {
+  width: 210px;
+  flex-shrink: 0;
+  border-right: 0.5px solid rgba(255, 255, 255, 0.07);
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  background: rgba(255, 255, 255, 0.012);
+  scrollbar-width: thin;
+  padding: 6px 0;
+}
+
+.mac-master-header {
+  padding: 8px 14px 4px;
+  font-family: -apple-system, var(--sans), sans-serif;
+  font-size: 10.5px;
+  font-weight: 600;
+  color: rgba(180, 180, 200, 0.45);
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.mac-master-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 7px 10px;
+  cursor: default;
+  transition: background 60ms;
+  border-radius: 6px;
+  margin: 1px 5px;
+  border: 1.5px solid transparent;
+}
+
+.mac-master-row:hover { background: rgba(255, 255, 255, 0.05); }
+
+.mac-master-row.active {
+  background: rgba(10, 132, 255, 0.18);
+  border-color: rgba(10, 132, 255, 0.32);
+}
+
+.mac-master-avatar {
+  width: 32px;
+  height: 32px;
+  border-radius: 8px;
+  background: rgba(245, 158, 11, 0.12);
+  border: 1px solid rgba(245, 158, 11, 0.22);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: -apple-system, var(--sans), sans-serif;
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--amber);
+  flex-shrink: 0;
+  user-select: none;
+}
+
+.mac-master-row.active .mac-master-avatar {
+  background: rgba(10, 132, 255, 0.18);
+  border-color: rgba(10, 132, 255, 0.38);
+  color: #5AC8FA;
+}
+
+.mac-master-info { flex: 1; min-width: 0; }
+
+.mac-master-name {
+  font-family: -apple-system, var(--sans), sans-serif;
+  font-size: 13px;
+  color: rgba(220, 220, 235, 0.85);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.mac-master-row.active .mac-master-name { color: #fff; font-weight: 500; }
+
+.mac-master-world {
+  font-family: var(--mono);
+  font-size: 10px;
+  color: rgba(180, 180, 200, 0.42);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  margin-top: 1px;
+}
+
+.mac-detail-pane {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  overflow-y: auto;
+  padding: 36px 32px;
+  align-items: center;
+  scrollbar-width: thin;
+}
+
+.mac-detail-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  width: 100%;
+  height: 100%;
+}
+
+.mac-detail-empty-icon {
+  opacity: 0.15;
+  margin-bottom: 4px;
+}
+
+.mac-detail-empty-text {
+  font-family: -apple-system, var(--sans), sans-serif;
+  font-size: 13px;
+  color: rgba(180, 180, 200, 0.3);
+}
+
+.mac-player-detail {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 18px;
+  max-width: 320px;
+  width: 100%;
+}
+
+.mac-player-big-avatar {
+  width: 80px;
+  height: 80px;
+  border-radius: 22%;
+  background: rgba(245, 158, 11, 0.1);
+  border: 1.5px solid rgba(245, 158, 11, 0.22);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: -apple-system, var(--sans), sans-serif;
+  font-size: 34px;
+  font-weight: 700;
+  color: var(--amber);
+  box-shadow: 0 4px 20px rgba(0,0,0,0.35), inset 0 0.5px 0 rgba(255,255,255,0.08);
+  user-select: none;
+}
+
+.mac-player-detail-name {
+  font-family: -apple-system, var(--sans), sans-serif;
+  font-size: 22px;
+  font-weight: 600;
+  color: rgba(220, 220, 235, 0.92);
+  letter-spacing: -0.02em;
+  text-align: center;
+  margin-top: -6px;
+}
+
+.mac-player-meta-card {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+  width: 100%;
+  background: rgba(255, 255, 255, 0.028);
+  border: 0.5px solid rgba(255, 255, 255, 0.08);
+  border-radius: 12px;
+  overflow: hidden;
+}
+
+.mac-player-meta-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 16px;
+  font-family: -apple-system, var(--sans), sans-serif;
+  border-bottom: 0.5px solid rgba(255, 255, 255, 0.055);
+}
+
+.mac-player-meta-row:last-child { border-bottom: none; }
+
+.mac-player-meta-label {
+  font-size: 12px;
+  color: rgba(180, 180, 200, 0.52);
+}
+
+.mac-player-meta-value {
+  font-size: 12.5px;
+  color: rgba(220, 220, 235, 0.88);
+  font-weight: 500;
+}
+
+.mac-health-bar {
+  display: flex;
+  gap: 2px;
+  align-items: center;
+}
+
+.mac-health-pip {
+  width: 7px;
+  height: 7px;
+  border-radius: 1.5px;
+}
+
+.mac-player-detail-actions {
+  display: flex;
+  gap: 8px;
+  width: 100%;
+}
+
+.mac-player-action-btn {
+  flex: 1;
+  font-family: -apple-system, var(--sans), sans-serif;
+  font-size: 13px;
+  font-weight: 500;
+  padding: 9px 16px;
+  border-radius: 9px;
+  cursor: default;
+  transition: background 70ms;
+  border: 0.5px solid rgba(255, 255, 255, 0.1);
+  background: rgba(255, 255, 255, 0.065);
+  color: rgba(220, 220, 235, 0.88);
+  text-align: center;
+}
+
+.mac-player-action-btn:hover { background: rgba(255, 255, 255, 0.1); }
+
+.mac-player-action-btn.danger {
+  background: rgba(255, 59, 48, 0.08);
+  border-color: rgba(255, 59, 48, 0.22);
+  color: #FF453A;
+}
+
+.mac-player-action-btn.danger:hover { background: rgba(255, 59, 48, 0.15); }
+
+/* ── macOS table ──────────────────────────────────────────────────────────── */
+
+.mac-tbl-wrap {
+  flex: 1;
+  overflow-y: auto;
+  border: 0.5px solid rgba(255, 255, 255, 0.07);
+  border-radius: 10px;
+  overflow: hidden;
+}
+
+.mac-tbl {
+  width: 100%;
+  border-collapse: collapse;
+  font-family: -apple-system, var(--sans), sans-serif;
+  font-size: 12.5px;
+}
+
+.mac-tbl th {
+  position: sticky;
+  top: 0;
+  background: rgba(20, 20, 32, 0.97);
+  backdrop-filter: blur(20px);
+  padding: 8px 14px;
+  text-align: left;
+  font-size: 10.5px;
+  font-weight: 600;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+  color: rgba(180, 180, 200, 0.52);
+  border-bottom: 0.5px solid rgba(255, 255, 255, 0.07);
+  white-space: nowrap;
+}
+
+.mac-tbl td {
+  padding: 8px 14px;
+  border-bottom: 0.5px solid rgba(255, 255, 255, 0.042);
+  color: rgba(220, 220, 235, 0.85);
+  vertical-align: middle;
+}
+
+.mac-tbl tbody tr:last-child td { border-bottom: none; }
+.mac-tbl tbody tr:hover td { background: rgba(255, 255, 255, 0.022); }
+.mac-tbl tbody tr.ctx-active td { background: rgba(10, 132, 255, 0.1); }
+
+/* ── Empty state ──────────────────────────────────────────────────────────── */
+
+.mac-empty-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  height: 100%;
+  padding: 40px;
+  text-align: center;
+}
+
+.mac-empty-title {
+  font-family: -apple-system, var(--sans), sans-serif;
+  font-size: 14px;
+  font-weight: 500;
+  color: rgba(180, 180, 200, 0.45);
+}
+
+.mac-empty-sub {
+  font-family: -apple-system, var(--sans), sans-serif;
+  font-size: 12px;
+  color: rgba(180, 180, 200, 0.28);
 }
 
 /* ── Reduced motion ───────────────────────────────────────────────────────── */

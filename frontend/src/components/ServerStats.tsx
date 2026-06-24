@@ -565,9 +565,9 @@ export default function ServerStats({ onNavigate }: Props) {
     <div className="section-root">
       <div className="section-header">
         <span className="section-title">Server Stats</span>
-        <div className="stats-range-sel">
+        <div className="mac-seg-ctrl">
           {RANGES.map(r => (
-            <button key={r} className={`stats-range-btn${range === r ? ' active' : ''}`}
+            <button key={r} className={`mac-seg-btn${range === r ? ' active' : ''}`}
               onClick={() => changeRange(r)}>{r}</button>
           ))}
         </div>

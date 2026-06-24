@@ -698,11 +698,11 @@ export default function GlancePage() {
         </div>
 
         {/* Window selector */}
-        <div className="glance-window-bar">
+        <div className="mac-seg-ctrl" style={{ alignSelf: 'center' }}>
           {WINDOWS.map(w => (
             <button
               key={w.v}
-              className={`glance-window-btn${windowMin === w.v ? ' active' : ''}`}
+              className={`mac-seg-btn${windowMin === w.v ? ' active' : ''}`}
               onClick={() => setWindowMin(w.v)}
             >
               {w.label}

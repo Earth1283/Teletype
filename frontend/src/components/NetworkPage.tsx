@@ -253,6 +253,7 @@ function RouteModal({
 
 export default function NetworkPage() {
   const qc = useQueryClient()
+  const [section, setSection] = useState<'routes' | 'forwards'>('routes')
   const [modal, setModal] = useState<'add' | RouteMapping | null>(null)
   const [deletingId, setDeletingId] = useState<string | null>(null)
   const [fwdModal, setFwdModal] = useState<'add' | PortForward | null>(null)
@@ -334,15 +335,17 @@ export default function NetworkPage() {
   const maxForwards = status?.maxPortForwards ?? 20
   const atFwdLimit = forwards.length >= maxForwards
 
+  const statusLabel = muxOn
+    ? netOn ? `routing :${status?.muxPort}` : 'routing disabled'
+    : 'multiplexer off'
+
   return (
-    <div className="net-page">
+    <div className="net-page" style={{ display: 'flex', flexDirection: 'column', height: '100%', overflow: 'hidden' }}>
       <div className="net-header">
         <span className="net-title">Network &amp; Routing</span>
         <span className={`net-status-pill ${muxOn && netOn ? 'on' : 'off'}`}>
           <span className="net-status-dot" />
-          {muxOn
-            ? netOn ? `routing :${status?.muxPort}` : 'routing disabled'
-            : 'multiplexer off'}
+          {statusLabel}
         </span>
       </div>
 
@@ -358,239 +361,202 @@ export default function NetworkPage() {
       {muxOn && !netOn && (
         <div className="net-banner net-banner-warn">
           <IconNetwork size={14} />
-          Routing disabled in config — set <code style={{ fontFamily: 'var(--mono)', margin: '0 4px' }}>
+          Routing disabled — set <code style={{ fontFamily: 'var(--mono)', margin: '0 4px' }}>
             network.enabled: true
           </code> in config.yml and run <code style={{ fontFamily: 'var(--mono)', margin: '0 4px' }}>/tty reload</code>.
-          Routes below are saved but inactive.
         </div>
       )}
 
       {muxOn && netOn && (
         <div className="net-banner">
           <IconNetwork size={14} />
-          HTTP on <code style={{ fontFamily: 'var(--mono)', margin: '0 4px' }}>:{status?.muxPort}</code>
-          routes by longest prefix match. Unmatched → Teletype. WebSocket upgrades proxy transparently.
-          Default rate limit: <code style={{ fontFamily: 'var(--mono)', margin: '0 4px' }}>{defaultRateLimit}/min</code> per IP.
+          HTTP on <code style={{ fontFamily: 'var(--mono)', margin: '0 4px' }}>:{status?.muxPort}</code> · longest-prefix routing · default rate limit{' '}
+          <code style={{ fontFamily: 'var(--mono)', margin: '0 4px' }}>{defaultRateLimit}/min</code> per IP
         </div>
       )}
 
-      <div className="net-toolbar">
-        <span style={{ fontSize: '12px', color: 'var(--mist)' }}>
-          {routes.length} / {maxRoutes} routes
-        </span>
-        <span style={{ flex: 1 }} />
-        <button
-          className="btn-primary btn-sm"
-          disabled={atLimit}
-          title={atLimit ? `Route limit (${maxRoutes}) reached` : undefined}
-          onClick={() => setModal('add')}
-        >
-          + Add Route
-        </button>
-      </div>
-
-      <div className="net-table-wrap">
-        {routes.length === 0 ? (
-          <div className="net-empty">
-            <IconNetwork size={28} />
-            <span>No routes configured</span>
-            <span style={{ color: 'var(--ghost)' }}>Add a route to proxy paths to internal services</span>
+      <div style={{ display: 'flex', flex: 1, overflow: 'hidden' }}>
+        {/* Sidebar */}
+        <div className="mac-master-list" style={{ width: 180 }}>
+          <div className="mac-master-header">Network</div>
+          <div
+            className={`mac-master-row${section === 'routes' ? ' active' : ''}`}
+            onClick={() => setSection('routes')}
+          >
+            <div className="mac-master-info">
+              <div className="mac-master-name">HTTP Routes</div>
+              <div className="mac-master-world">{routes.length} / {maxRoutes} routes</div>
+            </div>
           </div>
-        ) : (
-          <table className="net-table">
-            <thead>
-              <tr>
-                <th>Prefix</th>
-                <th></th>
-                <th>Target Port</th>
-                <th>Label</th>
-                <th>Rate Limit</th>
-                <th>Enabled</th>
-                <th></th>
-              </tr>
-            </thead>
-            <tbody>
-              {routes.map(route => (
-                <tr key={route.id}>
-                  <td><span className="net-prefix">{route.prefix}</span></td>
-                  <td><span className="net-arrow">→</span></td>
-                  <td><span className="net-port">:{route.targetPort}</span></td>
-                  <td><span className="net-label">{route.label || '—'}</span></td>
-                  <td><span className="net-rl">{route.rateLimitPerMinute}/min</span></td>
-                  <td>
-                    <label className="net-toggle">
-                      <input
-                        type="checkbox"
-                        checked={route.enabled}
-                        onChange={() => toggleMut.mutate(route)}
-                      />
-                    </label>
-                  </td>
-                  <td>
-                    <div className="net-actions">
-                      <button
-                        className="btn-ghost btn-xs"
-                        title="Edit"
-                        onClick={() => setModal(route)}
-                      >
-                        <IconPencil size={12} />
-                      </button>
-                      {deletingId === route.id ? (
-                        <>
-                          <button
-                            className="btn-ghost btn-xs"
-                            style={{ color: 'var(--red)' }}
-                            onClick={() => deleteMut.mutate(route.id)}
-                          >
-                            Confirm
-                          </button>
-                          <button
-                            className="btn-ghost btn-xs"
-                            onClick={() => setDeletingId(null)}
-                          >
-                            <IconX size={10} />
-                          </button>
-                        </>
-                      ) : (
-                        <button
-                          className="btn-ghost btn-xs"
-                          title="Delete"
-                          onClick={() => setDeletingId(route.id)}
-                        >
-                          <IconTrash size={12} />
-                        </button>
-                      )}
-                    </div>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        )}
-      </div>
-
-      <div className="net-section-title">Port Forwards</div>
-
-      <div className="net-toolbar">
-        <span style={{ fontSize: '12px', color: 'var(--mist)' }}>
-          {forwards.length} / {maxForwards} forwards
-        </span>
-        <span style={{ flex: 1 }} />
-        <button
-          className="btn-primary btn-sm"
-          disabled={atFwdLimit || !netOn}
-          title={atFwdLimit ? `Forward limit (${maxForwards}) reached` : !netOn ? 'Network disabled' : undefined}
-          onClick={() => setFwdModal('add')}
-        >
-          + Add Forward
-        </button>
-      </div>
-
-      <div className="net-table-wrap">
-        {forwards.length === 0 ? (
-          <div className="net-empty">
-            <IconNetwork size={28} />
-            <span>No port forwards configured</span>
-            <span style={{ color: 'var(--ghost)' }}>Forward external ports to internal services over raw TCP</span>
+          <div
+            className={`mac-master-row${section === 'forwards' ? ' active' : ''}`}
+            onClick={() => setSection('forwards')}
+          >
+            <div className="mac-master-info">
+              <div className="mac-master-name">Port Forwards</div>
+              <div className="mac-master-world">{forwards.length} / {maxForwards} forwards</div>
+            </div>
           </div>
-        ) : (
-          <table className="net-table">
-            <thead>
-              <tr>
-                <th>External Port</th>
-                <th></th>
-                <th>Target Port</th>
-                <th>Label</th>
-                <th>Enabled</th>
-                <th></th>
-              </tr>
-            </thead>
-            <tbody>
-              {forwards.map(fwd => (
-                <tr key={fwd.id}>
-                  <td><span className="net-port">:{fwd.externalPort}</span></td>
-                  <td><span className="net-arrow">→</span></td>
-                  <td><span className="net-port">:{fwd.targetPort}</span></td>
-                  <td><span className="net-label">{fwd.label || '—'}</span></td>
-                  <td>
-                    <label className="net-toggle">
-                      <input
-                        type="checkbox"
-                        checked={fwd.enabled}
-                        onChange={() => toggleFwdMut.mutate(fwd)}
-                      />
-                    </label>
-                  </td>
-                  <td>
-                    <div className="net-actions">
-                      <button
-                        className="btn-ghost btn-xs"
-                        title="Edit"
-                        onClick={() => setFwdModal(fwd)}
-                      >
-                        <IconPencil size={12} />
-                      </button>
-                      {deletingFwdId === fwd.id ? (
-                        <>
-                          <button
-                            className="btn-ghost btn-xs"
-                            style={{ color: 'var(--red)' }}
-                            onClick={() => deleteFwdMut.mutate(fwd.id)}
-                          >
-                            Confirm
-                          </button>
-                          <button
-                            className="btn-ghost btn-xs"
-                            onClick={() => setDeletingFwdId(null)}
-                          >
-                            <IconX size={10} />
-                          </button>
-                        </>
-                      ) : (
-                        <button
-                          className="btn-ghost btn-xs"
-                          title="Delete"
-                          onClick={() => setDeletingFwdId(fwd.id)}
-                        >
-                          <IconTrash size={12} />
-                        </button>
-                      )}
-                    </div>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        )}
+        </div>
+
+        {/* Content */}
+        <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+          {section === 'routes' && (
+            <>
+              <div className="net-toolbar">
+                <span style={{ fontSize: '12px', color: 'var(--mist)' }}>
+                  {routes.length} / {maxRoutes} HTTP routes
+                </span>
+                <span style={{ flex: 1 }} />
+                <button
+                  className="btn-primary btn-sm"
+                  disabled={atLimit}
+                  title={atLimit ? `Route limit (${maxRoutes}) reached` : undefined}
+                  onClick={() => setModal('add')}
+                >
+                  + Add Route
+                </button>
+              </div>
+
+              <div className="net-table-wrap" style={{ flex: 1 }}>
+                {routes.length === 0 ? (
+                  <div className="net-empty">
+                    <IconNetwork size={28} />
+                    <span>No routes configured</span>
+                    <span style={{ color: 'var(--ghost)' }}>Proxy paths to internal services</span>
+                  </div>
+                ) : (
+                  <table className="net-table">
+                    <thead>
+                      <tr>
+                        <th>Prefix</th><th></th><th>Target Port</th>
+                        <th>Label</th><th>Rate Limit</th><th>Enabled</th><th></th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {routes.map(route => (
+                        <tr key={route.id}>
+                          <td><span className="net-prefix">{route.prefix}</span></td>
+                          <td><span className="net-arrow">→</span></td>
+                          <td><span className="net-port">:{route.targetPort}</span></td>
+                          <td><span className="net-label">{route.label || '—'}</span></td>
+                          <td><span className="net-rl">{route.rateLimitPerMinute}/min</span></td>
+                          <td>
+                            <label className="net-toggle">
+                              <input type="checkbox" checked={route.enabled} onChange={() => toggleMut.mutate(route)} />
+                            </label>
+                          </td>
+                          <td>
+                            <div className="net-actions">
+                              <button className="btn-ghost btn-xs" title="Edit" onClick={() => setModal(route)}>
+                                <IconPencil size={12} />
+                              </button>
+                              {deletingId === route.id ? (
+                                <>
+                                  <button className="btn-ghost btn-xs" style={{ color: 'var(--red)' }} onClick={() => deleteMut.mutate(route.id)}>Confirm</button>
+                                  <button className="btn-ghost btn-xs" onClick={() => setDeletingId(null)}><IconX size={10} /></button>
+                                </>
+                              ) : (
+                                <button className="btn-ghost btn-xs" title="Delete" onClick={() => setDeletingId(route.id)}>
+                                  <IconTrash size={12} />
+                                </button>
+                              )}
+                            </div>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                )}
+              </div>
+            </>
+          )}
+
+          {section === 'forwards' && (
+            <>
+              <div className="net-toolbar">
+                <span style={{ fontSize: '12px', color: 'var(--mist)' }}>
+                  {forwards.length} / {maxForwards} port forwards
+                </span>
+                <span style={{ flex: 1 }} />
+                <button
+                  className="btn-primary btn-sm"
+                  disabled={atFwdLimit || !netOn}
+                  title={atFwdLimit ? `Forward limit (${maxForwards}) reached` : !netOn ? 'Network disabled' : undefined}
+                  onClick={() => setFwdModal('add')}
+                >
+                  + Add Forward
+                </button>
+              </div>
+
+              <div className="net-table-wrap" style={{ flex: 1 }}>
+                {forwards.length === 0 ? (
+                  <div className="net-empty">
+                    <IconNetwork size={28} />
+                    <span>No port forwards configured</span>
+                    <span style={{ color: 'var(--ghost)' }}>Forward external ports to internal services over raw TCP</span>
+                  </div>
+                ) : (
+                  <table className="net-table">
+                    <thead>
+                      <tr>
+                        <th>External Port</th><th></th><th>Target Port</th>
+                        <th>Label</th><th>Enabled</th><th></th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {forwards.map(fwd => (
+                        <tr key={fwd.id}>
+                          <td><span className="net-port">:{fwd.externalPort}</span></td>
+                          <td><span className="net-arrow">→</span></td>
+                          <td><span className="net-port">:{fwd.targetPort}</span></td>
+                          <td><span className="net-label">{fwd.label || '—'}</span></td>
+                          <td>
+                            <label className="net-toggle">
+                              <input type="checkbox" checked={fwd.enabled} onChange={() => toggleFwdMut.mutate(fwd)} />
+                            </label>
+                          </td>
+                          <td>
+                            <div className="net-actions">
+                              <button className="btn-ghost btn-xs" title="Edit" onClick={() => setFwdModal(fwd)}>
+                                <IconPencil size={12} />
+                              </button>
+                              {deletingFwdId === fwd.id ? (
+                                <>
+                                  <button className="btn-ghost btn-xs" style={{ color: 'var(--red)' }} onClick={() => deleteFwdMut.mutate(fwd.id)}>Confirm</button>
+                                  <button className="btn-ghost btn-xs" onClick={() => setDeletingFwdId(null)}><IconX size={10} /></button>
+                                </>
+                              ) : (
+                                <button className="btn-ghost btn-xs" title="Delete" onClick={() => setDeletingFwdId(fwd.id)}>
+                                  <IconTrash size={12} />
+                                </button>
+                              )}
+                            </div>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                )}
+              </div>
+            </>
+          )}
+        </div>
       </div>
 
       {modal === 'add' && (
-        <RouteModal
-          defaultRateLimit={defaultRateLimit}
-          onSave={r => createMut.mutate(r)}
-          onClose={() => setModal(null)}
-        />
+        <RouteModal defaultRateLimit={defaultRateLimit} onSave={r => createMut.mutate(r)} onClose={() => setModal(null)} />
       )}
       {modal && modal !== 'add' && (
-        <RouteModal
-          initial={modal as RouteMapping}
-          defaultRateLimit={defaultRateLimit}
-          onSave={r => updateMut.mutate({ ...r, id: (modal as RouteMapping).id })}
-          onClose={() => setModal(null)}
-        />
+        <RouteModal initial={modal as RouteMapping} defaultRateLimit={defaultRateLimit}
+          onSave={r => updateMut.mutate({ ...r, id: (modal as RouteMapping).id })} onClose={() => setModal(null)} />
       )}
       {fwdModal === 'add' && (
-        <ForwardModal
-          onSave={f => createFwdMut.mutate(f)}
-          onClose={() => setFwdModal(null)}
-        />
+        <ForwardModal onSave={f => createFwdMut.mutate(f)} onClose={() => setFwdModal(null)} />
       )}
       {fwdModal && fwdModal !== 'add' && (
-        <ForwardModal
-          initial={fwdModal as PortForward}
-          onSave={f => updateFwdMut.mutate({ ...f, id: (fwdModal as PortForward).id })}
-          onClose={() => setFwdModal(null)}
-        />
+        <ForwardModal initial={fwdModal as PortForward}
+          onSave={f => updateFwdMut.mutate({ ...f, id: (fwdModal as PortForward).id })} onClose={() => setFwdModal(null)} />
       )}
     </div>
   )
