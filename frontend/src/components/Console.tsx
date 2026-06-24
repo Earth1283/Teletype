@@ -1,9 +1,10 @@
-import { useRef, useState, useCallback, useMemo, useEffect } from 'react'
+import { useRef, useState, useCallback, useMemo } from 'react'
 import { Virtuoso, type VirtuosoHandle } from 'react-virtuoso'
 import AnsiConvert from 'ansi-to-html'
 import { useQuery } from '@tanstack/react-query'
 import { useLogs } from '../LogContext'
 import { useSettings } from '../SettingsContext'
+import { useContextMenu, type ContextMenuItem } from '../ContextMenu'
 import { api } from '../api/client'
 import type { Snippet } from './actions/actionTypes'
 import RunModal from './actions/RunModal'
@@ -20,8 +21,6 @@ function lineClass(raw: string): LogLevel {
   if (upper.includes('[DEBUG]') || upper.includes('[TRACE]')) return 'debug'
   return 'info'
 }
-
-interface CtxState { x: number; y: number; line: string }
 
 function matchLine(line: string, q: string, fuzzyLevel: number): boolean {
   if (!q) return true
@@ -42,8 +41,6 @@ export default function Console() {
   const [searchQuery, setSearchQuery] = useState('')
   const [fuzzyLevel, setFuzzyLevel] = useState(0)
   const [clearedAt, setClearedAt] = useState(0)
-  const [ctx, setCtx] = useState<CtxState | null>(null)
-  const ctxRef = useRef<HTMLDivElement>(null)
   const [runSnippet, setRunSnippet] = useState<Snippet | null>(null)
   const [completions, setCompletions] = useState<string[]>([])
   const [completionIdx, setCompletionIdx] = useState(0)
@@ -51,6 +48,7 @@ export default function Console() {
   const atBottom = useRef(true)
   const inputRef = useRef<HTMLInputElement>(null)
   const completionListRef = useRef<HTMLDivElement>(null)
+  const { openContextMenu } = useContextMenu()
 
   const clearCompletions = () => { setCompletions([]); setCompletionIdx(0) }
 
@@ -133,25 +131,23 @@ export default function Console() {
   }, [input, completions, completionIdx, send, tabComplete])
 
   const openCtx = (e: React.MouseEvent, line: string) => {
-    e.preventDefault()
-    const x = Math.min(e.clientX, window.innerWidth - 220)
-    const y = Math.min(e.clientY, window.innerHeight - 200)
-    setCtx({ x, y, line })
+    const items: ContextMenuItem[] = [
+      {
+        label: 'Copy Line',
+        shortcut: '⌘C',
+        action: () => navigator.clipboard.writeText(line),
+      },
+    ]
+    if (quickActions.length > 0) {
+      items.push({ type: 'separator' }, { type: 'header', label: 'Quick Actions' })
+      quickActions.forEach(s => {
+        items.push({ label: s.name, action: () => handleQAClick(s) })
+      })
+    }
+    openContextMenu(e, items, { kind: 'logLine', line })
   }
 
-  const closeCtx = () => setCtx(null)
-
-  useEffect(() => {
-    if (!ctx) return
-    const handler = (e: MouseEvent) => {
-      if (ctxRef.current && !ctxRef.current.contains(e.target as Node)) setCtx(null)
-    }
-    document.addEventListener('mousedown', handler)
-    return () => document.removeEventListener('mousedown', handler)
-  }, [ctx])
-
   const handleQAClick = (s: Snippet) => {
-    closeCtx()
     if (s.vars.length > 0) {
       setRunSnippet(s)
     } else {
@@ -267,26 +263,6 @@ export default function Console() {
         />
         <button className="console-send-btn" onClick={send}>Send</button>
       </div>
-
-      {ctx && (
-        <div ref={ctxRef} className="mac-ctx" style={{ left: ctx.x, top: ctx.y }}>
-          <button className="mac-ctx-item" onClick={() => { navigator.clipboard.writeText(ctx.line); closeCtx() }}>
-            <span className="mac-ctx-label">Copy Line</span>
-            <span className="mac-ctx-key">⌘C</span>
-          </button>
-          {quickActions.length > 0 && (
-            <>
-              <div className="mac-ctx-sep" />
-              <div className="mac-ctx-header">Quick Actions</div>
-              {quickActions.map(s => (
-                <button key={s.id} className="mac-ctx-item" onClick={() => handleQAClick(s)}>
-                  <span className="mac-ctx-label">{s.name}</span>
-                </button>
-              ))}
-            </>
-          )}
-        </div>
-      )}
 
       {runSnippet && <RunModal snippet={runSnippet} onClose={() => setRunSnippet(null)} />}
     </div>

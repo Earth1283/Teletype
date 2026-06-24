@@ -1,6 +1,7 @@
-import { useState, useRef } from 'react'
+import { useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { api } from '../api/client'
+import { useContextMenu } from '../ContextMenu'
 
 interface AuditEntry {
   id: number
@@ -37,14 +38,11 @@ function fmtTs(ts: number): string {
   return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`
 }
 
-interface Ctx { x: number; y: number; entry: AuditEntry }
-
 export default function AuditPage() {
   const [actorFilter, setActorFilter]   = useState('')
   const [actionFilter, setActionFilter] = useState('')
   const [sinceInput, setSinceInput]     = useState('')
-  const [ctx, setCtx] = useState<Ctx | null>(null)
-  const ctxRef = useRef<HTMLDivElement>(null)
+  const { openContextMenu } = useContextMenu()
 
   const since = sinceInput ? new Date(sinceInput).getTime() || undefined : undefined
 
@@ -76,10 +74,19 @@ export default function AuditPage() {
   const reset = () => { setActorFilter(''); setActionFilter(''); setSinceInput('') }
 
   const openCtx = (e: React.MouseEvent, entry: AuditEntry) => {
-    e.preventDefault()
-    const x = Math.min(e.clientX, window.innerWidth - 200)
-    const y = Math.min(e.clientY, window.innerHeight - 120)
-    setCtx({ x, y, entry })
+    openContextMenu(e, [
+      { label: 'Copy Detail', action: () => navigator.clipboard.writeText(entry.detail) },
+      {
+        label: 'Copy Row',
+        action: () => {
+          const line = [fmtTs(entry.ts), entry.actor, entry.ip, entry.action, entry.detail].join('\t')
+          navigator.clipboard.writeText(line)
+        },
+      },
+      { type: 'separator' },
+      { label: 'Filter by Actor', action: () => setActorFilter(entry.actor) },
+      { label: 'Filter by Action', action: () => setActionFilter(entry.action) },
+    ], { kind: 'auditEntry', id: entry.id })
   }
 
   return (
@@ -154,28 +161,6 @@ export default function AuditPage() {
         </table>
       </div>
 
-      {ctx && (
-        <div ref={ctxRef} className="mac-ctx" style={{ left: ctx.x, top: ctx.y }}
-          onMouseLeave={() => setCtx(null)}>
-          <button className="mac-ctx-item" onClick={() => { navigator.clipboard.writeText(ctx.entry.detail); setCtx(null) }}>
-            <span className="mac-ctx-label">Copy Detail</span>
-          </button>
-          <button className="mac-ctx-item" onClick={() => {
-            const line = [fmtTs(ctx.entry.ts), ctx.entry.actor, ctx.entry.ip, ctx.entry.action, ctx.entry.detail].join('\t')
-            navigator.clipboard.writeText(line)
-            setCtx(null)
-          }}>
-            <span className="mac-ctx-label">Copy Row</span>
-          </button>
-          <div className="mac-ctx-sep" />
-          <button className="mac-ctx-item" onClick={() => { setActorFilter(ctx.entry.actor); setCtx(null) }}>
-            <span className="mac-ctx-label">Filter by Actor</span>
-          </button>
-          <button className="mac-ctx-item" onClick={() => { setActionFilter(ctx.entry.action); setCtx(null) }}>
-            <span className="mac-ctx-label">Filter by Action</span>
-          </button>
-        </div>
-      )}
     </div>
   )
 }

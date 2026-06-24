@@ -2,6 +2,7 @@ import { useRef } from 'react'
 import { useSettings } from '../SettingsContext'
 import { IconEyeOff, IconSliders, IconTerminal, IconCommand, IconCode, IconPalette } from '../Icons'
 import { THEMES, getTheme } from '../themes'
+import { CONTEXT_WHEEL_ACTIONS } from '../contextWheelActions'
 
 // ── Primitive controls ────────────────────────────────────────────────────────
 
@@ -88,6 +89,7 @@ export default function SettingsPage() {
   const setConsole = (patch: Partial<typeof settings.console>) => update({ console: patch })
   const setEditor  = (patch: Partial<typeof settings.editor>) => update({ editor: patch })
   const setStats   = (patch: Partial<typeof settings.stats>)  => update({ stats: patch })
+  const setContextWheel = (patch: Partial<typeof settings.contextWheel>) => update({ contextWheel: patch })
 
   const refFunMode    = useRef<HTMLDivElement>(null)
   const refTheme      = useRef<HTMLDivElement>(null)
@@ -96,6 +98,7 @@ export default function SettingsPage() {
   const refConsole    = useRef<HTMLDivElement>(null)
   const refStats      = useRef<HTMLDivElement>(null)
   const refPalette    = useRef<HTMLDivElement>(null)
+  const refWheel      = useRef<HTMLDivElement>(null)
   const refEditor     = useRef<HTMLDivElement>(null)
   const refReset      = useRef<HTMLDivElement>(null)
 
@@ -117,6 +120,7 @@ export default function SettingsPage() {
         <NavItem label="Stats"         icon="📈" onClick={() => scrollTo(refStats)} />
         <div className="s-sidebar-sep" />
         <NavItem label="Palette"       icon="⌘" onClick={() => scrollTo(refPalette)} />
+        <NavItem label="Context Wheel" icon="◉" onClick={() => scrollTo(refWheel)} />
         <NavItem label="Editor"        icon="📝" onClick={() => scrollTo(refEditor)} />
         <div className="s-sidebar-sep" />
         <NavItem label="Reset"         icon="↺" onClick={() => scrollTo(refReset)} />
@@ -326,6 +330,38 @@ export default function SettingsPage() {
           <Row label="Enabled" sub="Open with ⌘K (or Ctrl+K). Type run <cmd> to send console commands.">
             <Toggle value={settings.palette.enabled} onChange={v => update({ palette: { enabled: v } })} />
           </Row>
+        </Section>
+
+        {/* ── Context wheel ────────────────────────────────────────── */}
+        <Section title="Context Wheel" icon={<IconCommand size={13} />} sectionRef={refWheel}>
+          <Row label="Release to select" sub="Hold Alt + right mouse, push into a sector, release to run it">
+            <Toggle
+              value={settings.contextWheel.releaseToSelect}
+              onChange={v => setContextWheel({ releaseToSelect: v })}
+            />
+          </Row>
+          <div className="s-divider" />
+          <div className="s-subsection-label">Global panel actions</div>
+          {CONTEXT_WHEEL_ACTIONS.map(action => {
+            const enabled = settings.contextWheel.actions.includes(action.id)
+            return (
+              <Row key={action.id} label={action.label}>
+                <Toggle
+                  value={enabled}
+                  onChange={v => {
+                    const selected = new Set(settings.contextWheel.actions)
+                    if (v) selected.add(action.id)
+                    else selected.delete(action.id)
+                    setContextWheel({
+                      actions: CONTEXT_WHEEL_ACTIONS
+                        .filter(a => selected.has(a.id))
+                        .map(a => a.id),
+                    })
+                  }}
+                />
+              </Row>
+            )
+          })}
         </Section>
 
         {/* ── Editor ────────────────────────────────────────────────── */}

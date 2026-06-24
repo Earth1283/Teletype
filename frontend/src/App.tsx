@@ -1,7 +1,9 @@
-import { useEffect, useState } from 'react'
-import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
-import { TOKEN_KEY } from './api/client'
+import { useEffect, useMemo, useState } from 'react'
+import { QueryClient, QueryClientProvider, useQuery } from '@tanstack/react-query'
+import { api, TOKEN_KEY } from './api/client'
 import { LogProvider } from './LogContext'
+import { useContextMenu, type ContextMenuItem } from './ContextMenu'
+import { ContextMenuProvider } from './ContextMenuProvider'
 import { SettingsProvider, useSettings } from './SettingsContext'
 import { DEFAULT_THEME_ID } from './themes'
 import AuthSetup from './components/AuthSetup'
@@ -16,6 +18,8 @@ import AuditPage from './components/AuditPage'
 import NetworkPage from './components/NetworkPage'
 import CommandPalette from './CommandPalette'
 import MacOSDesktop from './components/MacOSDesktop'
+import type { Snippet } from './components/actions/actionTypes'
+import { CONTEXT_WHEEL_ACTIONS } from './contextWheelActions'
 import {
   TeletypeLogo, IconTerminal, IconUsers, IconCpu, IconFolder,
   IconLogOut, IconActivity, IconZap, IconSettings, IconList, IconNetwork,
@@ -46,6 +50,61 @@ const TABS: { id: Tab; label: string; Icon: React.FC<{ size?: number }> }[] = [
   { id: 'settings', label: 'Settings', Icon: IconSettings  },
 ]
 
+function PanelContextActions({ tab, onNavigate, onOpenPalette }: {
+  tab: Tab
+  onNavigate: (tab: Tab) => void
+  onOpenPalette: () => void
+}) {
+  const { setFallbackContextMenu } = useContextMenu()
+  const { settings } = useSettings()
+  const { data: snippets = [] } = useQuery<Snippet[]>({
+    queryKey: ['snippets'],
+    queryFn: () => api.get('/actions/snippets').then(r => r.data),
+    staleTime: 60_000,
+  })
+
+  const items = useMemo<ContextMenuItem[]>(() => {
+    const selected = settings.contextWheel.actions.length > 0
+      ? settings.contextWheel.actions
+      : CONTEXT_WHEEL_ACTIONS.map(a => a.id)
+    const quickActions = snippets.filter(s => s.categoryId === 'quick-actions')
+
+    const next = selected.flatMap<ContextMenuItem>(id => {
+      if (id === 'palette') {
+        return [{ label: 'Command Palette', shortcut: '⌘K', action: onOpenPalette }]
+      }
+      if (id === 'quick-actions') {
+        return quickActions.map(snippet => ({
+          label: snippet.name,
+          action: () => {
+            if (snippet.vars.length > 0) {
+              onNavigate('actions')
+            } else {
+              api.post(`/actions/execute/${snippet.id}`, { vars: {} }).catch(() => {})
+            }
+          },
+        }))
+      }
+      const tabDef = TABS.find(t => t.id === id)
+      if (!tabDef) return []
+      return [{
+        label: `Open ${tabDef.label}`,
+        disabled: tab === tabDef.id,
+        action: () => onNavigate(tabDef.id),
+      }]
+    })
+
+    return next
+  }, [onNavigate, onOpenPalette, settings.contextWheel.actions, snippets, tab])
+
+  useEffect(() => {
+    setFallbackContextMenu(items)
+    return () => setFallbackContextMenu([])
+  }, [items, setFallbackContextMenu])
+
+  return null
+}
+
 function MainApp() {
   const [tab, setTab] = useState<Tab>('glance')
   const [paletteOpen, setPaletteOpen] = useState(false)
@@ -67,6 +126,11 @@ function MainApp() {
 
   return (
     <div className="shell">
+      <PanelContextActions
+        tab={tab}
+        onNavigate={setTab}
+        onOpenPalette={() => setPaletteOpen(true)}
+      />
       <header className="mobile-header">
         <TeletypeLogo size={18} />
         <span className="mobile-header-title">Teletype</span>
@@ -172,7 +236,9 @@ export default function App() {
       <SettingsProvider>
         <ThemeApplier />
         <LogProvider>
-          {authed ? <MainApp /> : <AuthSetup onAuth={() => setAuthed(true)} />}
+          <ContextMenuProvider>
+            {authed ? <MainApp /> : <AuthSetup onAuth={() => setAuthed(true)} />}
+          </ContextMenuProvider>
         </LogProvider>
       </SettingsProvider>
     </QueryClientProvider>

@@ -3,6 +3,7 @@ import { useQuery, useQueryClient } from '@tanstack/react-query'
 import Editor, { useMonaco } from '@monaco-editor/react'
 import { api, TOKEN_KEY } from '../api/client'
 import { useSettings } from '../SettingsContext'
+import { useContextMenu, type ContextMenuItem } from '../ContextMenu'
 import { getTheme } from '../themes'
 import {
   IconFolder, IconFile, IconUpload, IconDownload,
@@ -17,8 +18,6 @@ interface FileEntry {
 interface SidebarFav {
   id: string; label: string; path: string
 }
-
-interface FileCtxMenu { x: number; y: number; entry: FileEntry }
 
 const DEFAULT_FAVS: SidebarFav[] = [
   { id: 'root',    label: 'Server Root', path: '' },
@@ -213,10 +212,10 @@ export default function FileManager({ viewMode }: FileManagerProps) {
   const [searchScope, setSearchScope] = useState<'local' | 'global'>('local')
   const [fuzzyLevel, setFuzzyLevel] = useState(0)
   const [favs, setFavs] = useState<SidebarFav[]>(loadFavs)
-  const [fileCtx, setFileCtx] = useState<FileCtxMenu | null>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
   const qc = useQueryClient()
   const { settings } = useSettings()
+  const { openContextMenu } = useContextMenu()
   const monacoInst = useMonaco()
 
   const effectiveView = editing ? 'list' : viewMode
@@ -389,19 +388,55 @@ export default function FileManager({ viewMode }: FileManagerProps) {
   // ── Right-click context menu ─────────────────────────────────────────────
 
   function openFileCtx(e: React.MouseEvent, entry: FileEntry) {
-    e.preventDefault()
-    e.stopPropagation()
-    const x = Math.min(e.clientX, window.innerWidth - 220)
-    const y = Math.min(e.clientY, window.innerHeight - 200)
-    setFileCtx({ x, y, entry })
+    const items: ContextMenuItem[] = [
+      { label: 'Open', action: () => handleIconActivate(entry) },
+    ]
+    if (!entry.isDirectory) {
+      items.push({ label: 'Download', action: () => downloadFile(entry) })
+    }
+    items.push(
+      { label: 'Copy Path', action: () => navigator.clipboard.writeText(entry.path) },
+      { type: 'separator' },
+    )
+    if (entry.isDirectory) {
+      items.push({
+        label: 'Add to Favorites',
+        disabled: favs.some(f => f.path === entry.path),
+        action: () => addFav(entry.name, entry.path),
+      })
+    }
+    items.push(
+      { label: 'Rename', action: () => openModal({ type: 'rename', entry }, entry.name) },
+      { type: 'separator' },
+      { label: 'Delete', danger: true, action: () => deleteEntry(entry) },
+    )
+    openContextMenu(e, items, { kind: 'file', path: entry.path, isDirectory: entry.isDirectory })
   }
 
-  useEffect(() => {
-    if (!fileCtx) return
-    const h = () => setFileCtx(null)
-    const t = setTimeout(() => document.addEventListener('mousedown', h), 30)
-    return () => { clearTimeout(t); document.removeEventListener('mousedown', h) }
-  }, [fileCtx])
+  function openFolderCtx(e: React.MouseEvent) {
+    openContextMenu(e, [
+      { label: 'New Folder', action: () => openModal({ type: 'mkdir' }) },
+      { label: 'Upload Files...', action: () => fileInputRef.current?.click() },
+      { label: 'Fetch from URL...', action: () => { setFetchUrl(''); setFetchName(''); setModal({ type: 'fetch' }) } },
+      { type: 'separator' },
+      {
+        label: 'Add Current Folder to Favorites',
+        disabled: favs.some(f => f.path === cwd),
+        action: () => addFav(cwd.split('/').filter(Boolean).pop() || 'Server Root', cwd),
+      },
+      { label: 'Copy Folder Path', disabled: !cwd, action: () => navigator.clipboard.writeText(cwd) },
+    ], { kind: 'folderBackground', path: cwd })
+  }
+
+  function openFavoriteCtx(e: React.MouseEvent, fav: SidebarFav) {
+    const isDefault = DEFAULT_FAVS.some(d => d.id === fav.id)
+    openContextMenu(e, [
+      { label: 'Open Favorite', action: () => navigate(fav.path) },
+      { label: 'Copy Path', disabled: !fav.path, action: () => navigator.clipboard.writeText(fav.path) },
+      { type: 'separator' },
+      { label: 'Remove from Favorites', disabled: isDefault, danger: true, action: () => removeFav(fav.id) },
+    ], { kind: 'favorite', id: fav.id, path: fav.path })
+  }
 
   // ── Icon grid double-click ────────────────────────────────────────────────
 
@@ -550,10 +585,7 @@ export default function FileManager({ viewMode }: FileManagerProps) {
                 className={`finder-sidebar-item${cwd === fav.path ? ' active' : ''}`}
                 onClick={() => navigate(fav.path)}
                 onContextMenu={e => {
-                  e.preventDefault()
-                  if (!DEFAULT_FAVS.find(d => d.id === fav.id)) {
-                    removeFav(fav.id)
-                  }
+                  openFavoriteCtx(e, fav)
                 }}
                 title={fav.path || 'Server Root'}
               >
@@ -576,7 +608,7 @@ export default function FileManager({ viewMode }: FileManagerProps) {
         )}
 
         {/* File area */}
-        <div className="finder-main">
+        <div className="finder-main" onContextMenu={openFolderCtx}>
 
           {/* Loading / error */}
           {isLoading && <div className="dim" style={{ padding: 12 }}>Loading…</div>}
@@ -592,6 +624,7 @@ export default function FileManager({ viewMode }: FileManagerProps) {
               {searchResults.map(entry => (
                 <div key={entry.path} className="fm-row"
                   onClick={() => setSelected(entry.path)}
+                  onContextMenu={e => openFileCtx(e, entry)}
                   onDoubleClick={() => {
                     if (entry.isDirectory) { navigate(entry.path); setSearchOpen(false); setSearchQuery('') }
                     else { navigate(entry.path.split('/').slice(0, -1).join('/')); openFile(entry); setSearchOpen(false); setSearchQuery('') }
@@ -723,36 +756,6 @@ export default function FileManager({ viewMode }: FileManagerProps) {
           </div>
         )}
       </div>
-
-      {/* ── Right-click context menu ────────────────────────────────────── */}
-      {fileCtx && (
-        <div className="mac-ctx" style={{ left: fileCtx.x, top: fileCtx.y }} onMouseDown={e => e.stopPropagation()}>
-          <button className="mac-ctx-item" onClick={() => { handleIconActivate(fileCtx.entry); setFileCtx(null) }}>
-            <span className="mac-ctx-label">Open</span>
-          </button>
-          {!fileCtx.entry.isDirectory && (
-            <button className="mac-ctx-item" onClick={() => { downloadFile(fileCtx.entry); setFileCtx(null) }}>
-              <span className="mac-ctx-label">Download</span>
-            </button>
-          )}
-          <div className="mac-ctx-sep" />
-          {fileCtx.entry.isDirectory && (
-            <button className="mac-ctx-item" onClick={() => {
-              addFav(fileCtx.entry.name, fileCtx.entry.path)
-              setFileCtx(null)
-            }}>
-              <span className="mac-ctx-label">Add to Favorites</span>
-            </button>
-          )}
-          <button className="mac-ctx-item" onClick={() => { openModal({ type: 'rename', entry: fileCtx.entry }, fileCtx.entry.name); setFileCtx(null) }}>
-            <span className="mac-ctx-label">Rename</span>
-          </button>
-          <div className="mac-ctx-sep" />
-          <button className="mac-ctx-item danger" onClick={() => { deleteEntry(fileCtx.entry); setFileCtx(null) }}>
-            <span className="mac-ctx-label">Delete</span>
-          </button>
-        </div>
-      )}
 
       {/* ── Rename modal ─────────────────────────────────────────────────── */}
       {modal?.type === 'rename' && (

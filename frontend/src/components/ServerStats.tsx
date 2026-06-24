@@ -42,6 +42,12 @@ type Range = '1h' | '6h' | '24h' | '7d'
 const RANGE_MINUTES: Record<Range, number> = { '1h': 60, '6h': 360, '24h': 1440, '7d': 10080 }
 const RANGES: Range[] = ['1h', '6h', '24h', '7d']
 
+interface GuideContent {
+  title: string
+  intro: string
+  sections: Array<{ title: string; body: string[] }>
+}
+
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
 function tpsClass(v: number) { return v >= 19 ? 'green' : v >= 15 ? 'yellow' : 'red' }
@@ -91,6 +97,297 @@ function pearson(xs: (number | null)[], ys: (number | null)[]): number | null {
   return dx * dy < 0.0001 ? null : num / (dx * dy)
 }
 
+// ── Data guide helpers ───────────────────────────────────────────────────────
+
+function HelpIcon() {
+  return (
+    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+      <circle cx="12" cy="12" r="9" stroke="currentColor" strokeWidth="1.8" />
+      <path d="M9.75 9.15a2.45 2.45 0 0 1 4.65 1.1c0 1.7-2.4 2.05-2.4 3.85" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
+      <circle cx="12" cy="17" r="1" fill="currentColor" />
+    </svg>
+  )
+}
+
+function HelpButton({ label, onClick }: { label: string; onClick: () => void }) {
+  return (
+    <button className="stats-help-btn" title={`Explain ${label}`} aria-label={`Explain ${label}`} onClick={onClick}>
+      <HelpIcon />
+    </button>
+  )
+}
+
+function GuideModal({ guide, onClose }: { guide: GuideContent; onClose: () => void }) {
+  return (
+    <div className="stats-guide-overlay" onClick={onClose}>
+      <div className="stats-guide-card" onClick={e => e.stopPropagation()}>
+        <div className="stats-guide-head">
+          <div>
+            <div className="stats-guide-kicker">Data Guide</div>
+            <div className="stats-guide-title">{guide.title}</div>
+          </div>
+          <button className="stats-guide-close" onClick={onClose} aria-label="Close guide">×</button>
+        </div>
+        <p className="stats-guide-intro">{guide.intro}</p>
+        <div className="stats-guide-body">
+          {guide.sections.map(section => (
+            <section key={section.title} className="stats-guide-section">
+              <h3>{section.title}</h3>
+              {section.body.map((p, i) => <p key={i}>{p}</p>)}
+            </section>
+          ))}
+        </div>
+      </div>
+    </div>
+  )
+}
+
+const GUIDE_BY_ID: Record<string, GuideContent> = {
+  tps: {
+    title: 'TPS Chart',
+    intro: 'TPS is the quickest read on whether the server is keeping up with real time. Minecraft targets 20 ticks per second; lower values mean the simulation is falling behind.',
+    sections: [
+      {
+        title: 'How to read it',
+        body: [
+          'The solid TPS line shows the recent one-minute tick rate. The dashed 5-minute line is a smoother baseline that helps separate a short hiccup from a sustained slowdown.',
+          'A healthy server spends most of its time close to 20. Brief dips can be normal during world generation, backups, large teleports, or plugin work. Repeated dips or a flat line below 19 are worth investigating.',
+        ],
+      },
+      {
+        title: 'How this helps you decide',
+        body: [
+          'Compare TPS with MSPT first. Low TPS with high MSPT usually means the main thread is overloaded. Low TPS without high MSPT can point to sampling gaps, startup/shutdown behavior, or external pauses.',
+          'Use the range selector to zoom your question: 1h for recent incidents, 6h for session patterns, 24h for daily load, and 7d for recurring schedule or player-cycle problems.',
+        ],
+      },
+      {
+        title: 'Useful next checks',
+        body: [
+          'If TPS drops line up with player joins, chunk counts, or entity count growth, investigate player movement, farms, mob caps, or chunk loaders.',
+          'If TPS drops line up with CPU, memory, or disk pressure, look at host limits rather than only Minecraft configuration.',
+        ],
+      },
+    ],
+  },
+  mspt: {
+    title: 'MSPT Chart',
+    intro: 'MSPT is milliseconds per tick. Since Minecraft needs 20 ticks per second, each tick has roughly 50ms of budget.',
+    sections: [
+      {
+        title: 'How to read it',
+        body: [
+          'Values under 50ms mean the server can usually sustain 20 TPS. Values above 50ms mean ticks are taking too long and TPS may start falling.',
+          'Spikes are important even when TPS recovers. They often correspond to world saves, plugin tasks, entity bursts, redstone activity, or chunk generation.',
+        ],
+      },
+      {
+        title: 'How this helps you decide',
+        body: [
+          'MSPT is more diagnostic than TPS because it tells you how much main-thread work is happening. TPS tells you the outcome; MSPT helps explain the mechanism.',
+          'When MSPT rises but player count does not, look for world or automation causes. When MSPT rises with players, look at player distribution, chunk loading, and player-triggered plugins.',
+        ],
+      },
+      {
+        title: 'Useful next checks',
+        body: [
+          'Correlate MSPT with Entities and Loaded Chunks. High MSPT plus high entities often points to farms, pathfinding, or mob buildup. High MSPT plus high chunks points to exploration, view distance, or loaders.',
+          'Use anomaly markers on the Z-score overlay to jump to logs near the spike. Logs may show saves, warnings, plugin tasks, or lag messages.',
+        ],
+      },
+    ],
+  },
+  players: {
+    title: 'Players Chart',
+    intro: 'This chart shows online player count over time and overlays join/leave markers when player events are available.',
+    sections: [
+      {
+        title: 'How to read it',
+        body: [
+          'The line shows concurrency. Vertical markers show joins and leaves, which help explain abrupt changes or activity bursts.',
+          'A player-count increase is not inherently bad. It becomes important when it aligns with TPS drops, MSPT spikes, more chunks, more entities, or higher ping.',
+        ],
+      },
+      {
+        title: 'How this helps you decide',
+        body: [
+          'Use this chart to distinguish baseline server load from player-driven load. A problem that appears only when players are online is usually gameplay, world, network, or plugin interaction.',
+          'If performance changes after one or two players join, inspect where they are, whether they are exploring, and whether their actions activate expensive areas.',
+        ],
+      },
+      {
+        title: 'Useful next checks',
+        body: [
+          'Compare with Loaded Chunks and Entities. A small player increase with a large chunk increase often means exploration, high view distance, or teleport-heavy play.',
+          'Compare with Ping P50/P95. If player count rises and ping rises while MSPT stays healthy, the issue may be network or host saturation rather than main-thread lag.',
+        ],
+      },
+    ],
+  },
+  entities: {
+    title: 'Entities Chart',
+    intro: 'Entities include mobs, dropped items, projectiles, armor stands, minecarts, and other world objects that the server may need to tick.',
+    sections: [
+      {
+        title: 'How to read it',
+        body: [
+          'A rising entity count means the worlds are accumulating more tickable objects. Not every entity costs the same, but growth can raise tick work.',
+          'Sharp jumps can indicate farms turning on, players entering loaded areas, world events, or cleanup failures.',
+        ],
+      },
+      {
+        title: 'How this helps you decide',
+        body: [
+          'Entity count is most useful when compared with MSPT. If both rise together, entities are a likely contributor to lag.',
+          'If entities rise but MSPT stays flat, the server is handling them for now. Keep watching for thresholds or recurring buildup.',
+        ],
+      },
+      {
+        title: 'Useful next checks',
+        body: [
+          'Investigate high-density areas, farms, villages, dropped item cleanup, mob caps, and plugin-spawned entities.',
+          'Use the 24h or 7d range to find slow leaks: a gradual upward slope that never resets often points to cleanup or world-management issues.',
+        ],
+      },
+    ],
+  },
+  chunks: {
+    title: 'Loaded Chunks Chart',
+    intro: 'Loaded chunks measure how much world area is active. More chunks mean more block/entity ticking, more memory pressure, and more potential disk activity.',
+    sections: [
+      {
+        title: 'How to read it',
+        body: [
+          'The line shows total loaded chunks across worlds. A stable plateau is normal. Sudden jumps usually mean exploration, teleporting, chunk loaders, high view distance, or many spread-out players.',
+          'Loaded chunks are a multiplier for other work. The same number of players can be much more expensive if they are spread across many areas.',
+        ],
+      },
+      {
+        title: 'How this helps you decide',
+        body: [
+          'Compare chunks with MSPT and memory. Rising chunks plus rising MSPT suggests simulation work. Rising chunks plus memory pressure suggests world footprint or caching pressure.',
+          'Compare chunks with player count. If chunks rise faster than players, the server may need view-distance, simulation-distance, pre-generation, or loader policy changes.',
+        ],
+      },
+      {
+        title: 'Useful next checks',
+        body: [
+          'Review view distance, simulation distance, chunk loaders, portals, teleport commands, and whether players are exploring ungenerated terrain.',
+          'If chunk spikes line up with disk or MSPT spikes, pre-generate terrain or reduce exploration-heavy load during peak hours.',
+        ],
+      },
+    ],
+  },
+  ping: {
+    title: 'Ping Percentiles Chart',
+    intro: 'Ping P50 is median player latency. Ping P95 is the high-latency tail. Together they show whether network problems affect most players or only a few.',
+    sections: [
+      {
+        title: 'How to read it',
+        body: [
+          'P50 tells you the typical player experience. P95 tells you how bad latency gets for the slower end of connected players.',
+          'If P50 and P95 both rise, the server or network path is broadly degraded. If only P95 rises, a subset of players may have routing, distance, Wi-Fi, or regional issues.',
+        ],
+      },
+      {
+        title: 'How this helps you decide',
+        body: [
+          'Compare ping with MSPT. High ping with normal MSPT means the game loop is healthy but network or host connectivity may be poor.',
+          'High ping with high CPU, disk, or memory pressure can indicate host contention. High ping with player count jumps may indicate bandwidth or proxy limits.',
+        ],
+      },
+      {
+        title: 'Useful next checks',
+        body: [
+          'Check proxy/tunnel health, host network graphs, DDoS protection events, routing region, and whether only specific players are affected.',
+          'Ping metrics may be unavailable on non-Paper servers or older forks; absence of this chart does not mean latency is perfect.',
+        ],
+      },
+    ],
+  },
+  perfOverlay: {
+    title: 'Performance Overlay (Z-score)',
+    intro: 'The performance overlay puts several metrics onto one standardized σ scale so different units can be compared on the same chart.',
+    sections: [
+      {
+        title: 'How to read it',
+        body: [
+          'Each line shows how unusual a metric is compared with its own history in the selected range. 0σ is normal for that metric. +2σ means unusually high. -2σ means unusually low.',
+          'TPS is special: negative movement is usually bad. For MSPT, memory, and CPU, positive movement is usually the concerning direction.',
+        ],
+      },
+      {
+        title: 'How this helps you decide',
+        body: [
+          'The overlay answers “what changed at the same time?” If MSPT, CPU, and memory all move together, host or workload pressure is more likely. If only MSPT moves, main-thread work is more likely.',
+          'Anomaly markers appear when any visible series crosses the configured σ threshold. Click a marked area to inspect nearby logs.',
+        ],
+      },
+      {
+        title: 'Important caveats',
+        body: [
+          'Z-scores are relative to the selected window. A quiet one-hour window can make small changes look unusual; a noisy seven-day window can make real issues look less dramatic.',
+          'Use this as a triage tool, not proof. Confirm with raw charts, logs, and operational context.',
+        ],
+      },
+    ],
+  },
+  worldOverlay: {
+    title: 'World Overlay (Z-score)',
+    intro: 'The world overlay standardizes player count, entities, chunks, and optionally ping so you can see which world-facing workload changed together.',
+    sections: [
+      {
+        title: 'How to read it',
+        body: [
+          'Lines above 0σ are higher than usual for the selected range. Lines below 0σ are lower than usual. Crossings and simultaneous spikes are more important than isolated noise.',
+          'The overlay is useful for identifying whether lag is driven by player presence, world area, entity accumulation, or latency.',
+        ],
+      },
+      {
+        title: 'How this helps you decide',
+        body: [
+          'Players plus chunks suggests distribution or exploration. Entities plus MSPT suggests tick cost. Ping without MSPT suggests network rather than server simulation.',
+          'When multiple world metrics spike together, use timestamps to jump into logs and correlate with joins, teleports, world saves, or plugin actions.',
+        ],
+      },
+      {
+        title: 'Useful next checks',
+        body: [
+          'Use this overlay to pick which raw chart to inspect next. The overlay shows relationships; the raw charts show magnitude.',
+          'If the world overlay identifies recurring daily spikes, compare with scheduled actions, backups, restarts, or known player activity windows.',
+        ],
+      },
+    ],
+  },
+  correlation: {
+    title: 'Metric Correlations Table',
+    intro: 'The correlation table estimates how strongly pairs of metrics moved together during the selected range using Pearson r.',
+    sections: [
+      {
+        title: 'How to read it',
+        body: [
+          'Values range from -1.00 to +1.00. Positive values mean two metrics tend to rise together. Negative values mean one tends to rise while the other falls. Values near 0 mean no clear linear relationship.',
+          'As a rough rule: |r| above 0.7 is strong, 0.4 to 0.7 is moderate, and below 0.2 is usually weak or negligible.',
+        ],
+      },
+      {
+        title: 'How this helps you decide',
+        body: [
+          'Correlation helps prioritize investigations. If MSPT correlates strongly with entities, inspect entity-heavy areas. If MSPT correlates with chunks, inspect exploration or loaders. If ping correlates with players but MSPT does not, inspect network capacity.',
+          'The table is best used after you notice a symptom. Find the symptom row or column, then look for high absolute correlations that suggest likely drivers.',
+        ],
+      },
+      {
+        title: 'Important caveats',
+        body: [
+          'Correlation is not causation. Backups, peak hours, restarts, and player behavior can make unrelated metrics move together.',
+          'Small sample sizes and flat metrics can produce missing values. Change the time range if the table looks sparse or misleading.',
+        ],
+      },
+    ],
+  },
+}
+
 // ── Mini chart ─────────────────────────────────────────────────────────────────
 
 interface MiniChartProps {
@@ -98,13 +395,15 @@ interface MiniChartProps {
   dataKey: keyof Snap
   color: string
   label: string
+  guideId: keyof typeof GUIDE_BY_ID
+  onGuide: (guide: GuideContent) => void
   yDomain?: [number | 'auto', number | 'auto']
   yFmt?: (v: number) => string
   events?: PlayerEvent[]
   extraLine?: { key: keyof Snap; color: string; label: string }
 }
 
-function MiniChart({ data, dataKey, color, label, yDomain, yFmt, events, extraLine }: MiniChartProps) {
+function MiniChart({ data, dataKey, color, label, guideId, onGuide, yDomain, yFmt, events, extraLine }: MiniChartProps) {
   const fmt = yFmt ?? ((v: number) => String(v))
   const current = data[data.length - 1]
 
@@ -131,6 +430,7 @@ function MiniChart({ data, dataKey, color, label, yDomain, yFmt, events, extraLi
       <div className="glance-chart-header">
         <span className="glance-chart-title">{label}</span>
         {current && <span className="glance-chart-value" style={{ color }}>{fmt(Number(current[dataKey] ?? 0))}</span>}
+        <HelpButton label={label} onClick={() => onGuide(GUIDE_BY_ID[guideId])} />
       </div>
       <ResponsiveContainer width="100%" height={110}>
         <ComposedChart data={data} margin={{ top: 4, right: 8, bottom: 0, left: 0 }}>
@@ -181,12 +481,14 @@ interface ZOverlayProps {
   data: Snap[]
   series: ZSeries[]
   title: string
+  guideId: keyof typeof GUIDE_BY_ID
   showMarkers: boolean
   threshold: number
   onAnomalyClick: (ts: number) => void
+  onGuide: (guide: GuideContent) => void
 }
 
-function ZOverlay({ data, series, title, showMarkers, threshold, onAnomalyClick }: ZOverlayProps) {
+function ZOverlay({ data, series, title, guideId, showMarkers, threshold, onAnomalyClick, onGuide }: ZOverlayProps) {
   // Precompute Z-scores for each series
   const zData = useMemo(() => {
     const extracted = series.map(s =>
@@ -277,6 +579,7 @@ function ZOverlay({ data, series, title, showMarkers, threshold, onAnomalyClick 
             </span>
           ))}
         </div>
+        <HelpButton label={title} onClick={() => onGuide(GUIDE_BY_ID[guideId])} />
       </div>
       <ResponsiveContainer width="100%" height={140}>
         <ComposedChart data={zData} margin={{ top: 4, right: 8, bottom: 0, left: 0 }}
@@ -355,9 +658,12 @@ function rBg(r: number): string {
   return r > 0 ? `rgba(74,222,128,${opacity})` : `rgba(248,113,113,${opacity})`
 }
 
-interface CorrelationTableProps { data: Snap[] }
+interface CorrelationTableProps {
+  data: Snap[]
+  onGuide: (guide: GuideContent) => void
+}
 
-function CorrelationTable({ data }: CorrelationTableProps) {
+function CorrelationTable({ data, onGuide }: CorrelationTableProps) {
   const matrix = useMemo(() => {
     const cols = CORR_METRICS.map(m =>
       data.map(s => m.extract ? m.extract(s) : (s[m.key] as number | null | undefined) ?? null)
@@ -389,6 +695,7 @@ function CorrelationTable({ data }: CorrelationTableProps) {
       <div className="glance-chart-header" style={{ paddingBottom: 8 }}>
         <span className="glance-chart-title">Metric Correlations (Pearson r)</span>
         <span className="corr-hint">|r| &gt; 0.7 strong · 0.4–0.7 moderate · &lt;0.2 negligible</span>
+        <HelpButton label="Metric Correlations" onClick={() => onGuide(GUIDE_BY_ID.correlation)} />
       </div>
       <div className="corr-table-scroll">
         <table className="corr-table">
@@ -475,6 +782,7 @@ export default function ServerStats({ onNavigate }: Props) {
   const ss = settings.stats
   const [range, setRange] = useState<Range>(ss.defaultRange)
   const [logPanelTs, setLogPanelTs] = useState<number | null>(null)
+  const [guide, setGuide] = useState<GuideContent | null>(null)
 
   const { data, isLoading } = useQuery<Status>({
     queryKey: ['status'],
@@ -675,27 +983,33 @@ export default function ServerStats({ onNavigate }: Props) {
           {/* ── Individual charts ──────────────────────────────────── */}
           {ss.showChartTps && (
             <MiniChart data={history} dataKey="tps1" color="var(--green)" label="TPS"
+              guideId="tps" onGuide={setGuide}
               yDomain={[0, 20]} yFmt={v => v.toFixed(1)}
               extraLine={{ key: 'tps5', color: 'var(--green)', label: '5m' }} />
           )}
           {ss.showChartMspt && (
             <MiniChart data={history} dataKey="tickTimeMs" color="var(--amber)" label="MSPT"
+              guideId="mspt" onGuide={setGuide}
               yDomain={[0, 'auto']} yFmt={v => `${Math.round(v)}ms`} />
           )}
           {ss.showChartPlayers && (
             <MiniChart data={history} dataKey="playerCount" color="var(--amber)" label="Players"
+              guideId="players" onGuide={setGuide}
               yDomain={[0, 'auto']} yFmt={v => String(Math.round(v))} events={eventsRaw} />
           )}
           {ss.showChartEntities && (
             <MiniChart data={history} dataKey="entityCount" color="var(--blue)" label="Entities"
+              guideId="entities" onGuide={setGuide}
               yFmt={fmtK} />
           )}
           {ss.showChartChunks && (
             <MiniChart data={history} dataKey="loadedChunks" color="var(--mist)" label="Loaded Chunks"
+              guideId="chunks" onGuide={setGuide}
               yFmt={fmtK} />
           )}
           {ss.showChartPing && hasPingData && (
             <MiniChart data={history} dataKey="pingP50" color="var(--green)" label="Ping P50 / P95"
+              guideId="ping" onGuide={setGuide}
               yDomain={[0, 'auto']} yFmt={v => `${Math.round(v)}ms`}
               extraLine={{ key: 'pingP95', color: 'var(--yellow)', label: 'P95' }} />
           )}
@@ -704,16 +1018,20 @@ export default function ServerStats({ onNavigate }: Props) {
           {ss.showOverlayPerf && (
             <ZOverlay data={history} series={perfSeries}
               title="Performance Overlay (Z-score)"
+              guideId="perfOverlay"
               showMarkers={ss.overlayAnomalyMarkers}
               threshold={ss.overlayAnomalyThreshold}
-              onAnomalyClick={onAnomalyClick} />
+              onAnomalyClick={onAnomalyClick}
+              onGuide={setGuide} />
           )}
           {ss.showOverlayWorld && (
             <ZOverlay data={history} series={worldSeries}
               title="World Overlay (Z-score)"
+              guideId="worldOverlay"
               showMarkers={ss.overlayAnomalyMarkers}
               threshold={ss.overlayAnomalyThreshold}
-              onAnomalyClick={onAnomalyClick} />
+              onAnomalyClick={onAnomalyClick}
+              onGuide={setGuide} />
           )}
 
           {/* ── Log panel ─────────────────────────────────────────── */}
@@ -728,10 +1046,11 @@ export default function ServerStats({ onNavigate }: Props) {
 
           {/* ── Correlation table ─────────────────────────────────── */}
           {ss.showCorrelation && history.length >= 5 && (
-            <CorrelationTable data={history} />
+            <CorrelationTable data={history} onGuide={setGuide} />
           )}
         </div>
       )}
+      {guide && <GuideModal guide={guide} onClose={() => setGuide(null)} />}
     </div>
   )
 }

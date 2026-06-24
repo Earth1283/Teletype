@@ -34,6 +34,11 @@ export interface TeletypeSettings {
     enabled: boolean
   }
 
+  contextWheel: {
+    releaseToSelect: boolean
+    actions: string[]
+  }
+
   stats: {
     defaultRange: '1h' | '6h' | '24h' | '7d'
     showChartTps: boolean
@@ -88,6 +93,10 @@ export const DEFAULT_SETTINGS: TeletypeSettings = {
   },
   palette: {
     enabled: true,
+  },
+  contextWheel: {
+    releaseToSelect: true,
+    actions: ['palette', 'glance', 'console', 'files', 'actions', 'quick-actions'],
   },
 
   stats: {

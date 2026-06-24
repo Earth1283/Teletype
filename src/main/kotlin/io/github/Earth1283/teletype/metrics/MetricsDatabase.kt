@@ -124,21 +124,33 @@ class MetricsDatabase(dataFolder: File) {
 
     /**
      * Returns history for the given window in minutes, automatically selecting
-     * the appropriate resolution table:
-     *   ≤ 60 min  → metrics_1s (1-second rows)
-     *   ≤ 7 days  → metrics_1m (1-minute rows)
-     *   > 7 days  → metrics_15m (15-minute rows)
+     * the appropriate source rows:
+     *   ≤ 60 min  → recent 1-second rows
+     *   ≤ 24h     → recent 1-second rows, bucketed for transport
+     *   ≤ 7 days  → older 1-minute rows + recent 1-second rows, bucketed
+     *   > 7 days  → 15-minute rows + 1-minute rows + recent 1-second rows, bucketed
+     *
+     * Retention only creates 1-minute rows once raw samples are older than 24h,
+     * so recent multi-hour windows must not read metrics_1m exclusively.
      */
     suspend fun history(windowMinutes: Int): List<MetricSnapshot> = mutex.withLock {
         withContext(Dispatchers.IO) {
             val now  = System.currentTimeMillis()
             val from = now - windowMinutes * 60_000L
-            val table = when {
-                windowMinutes <= 60     -> "metrics_1s"
-                windowMinutes <= 10_080 -> "metrics_1m"
-                else                    -> "metrics_15m"
+            if (windowMinutes <= 60) {
+                return@withContext queryTable("metrics_1s", from, now)
             }
-            queryTable(table, from, now)
+
+            val rawCutoff = now - 24L * 3_600_000L
+            val minuteCutoff = now - 7L * 86_400_000L
+            val bucketMs = bucketSizeMs(windowMinutes)
+            val sources = buildList {
+                add(MetricSource("metrics_1s", maxOf(from, rawCutoff), now))
+                add(MetricSource("metrics_1m", maxOf(from, minuteCutoff), minOf(now, rawCutoff)))
+                add(MetricSource("metrics_15m", from, minOf(now, minuteCutoff)))
+            }.filter { it.from < it.to }
+
+            queryBucketed(sources, origin = from, bucketMs = bucketMs)
         }
     }
 
@@ -295,6 +307,90 @@ class MetricsDatabase(dataFolder: File) {
                 while (rs.next()) {
                     result += MetricSnapshot(
                         timestamp     = rs.getLong("ts"),
+                        tps1          = rs.getDouble("tps1"),
+                        tps5          = rs.getDouble("tps5"),
+                        tps15         = rs.getDouble("tps15"),
+                        tickTimeMs    = rs.getDouble("tick_ms"),
+                        memUsedMb     = rs.getLong("mem_used"),
+                        memTotalMb    = rs.getLong("mem_total"),
+                        memMaxMb      = rs.getLong("mem_max"),
+                        uptimeMs      = rs.getLong("uptime_ms"),
+                        cpuPercent    = rs.getObject("cpu_pct")?.let { rs.getDouble("cpu_pct") },
+                        sysMemUsedMb  = rs.getObject("sys_mem_used")?.let { rs.getLong("sys_mem_used") },
+                        sysMemTotalMb = rs.getObject("sys_mem_total")?.let { rs.getLong("sys_mem_total") },
+                        diskUsedGb    = rs.getObject("disk_used_gb")?.let { rs.getLong("disk_used_gb") },
+                        diskTotalGb   = rs.getObject("disk_total_gb")?.let { rs.getLong("disk_total_gb") },
+                        playerCount   = rs.getObject("player_count")?.let { rs.getInt("player_count") } ?: 0,
+                        entityCount   = rs.getObject("entity_count")?.let { rs.getInt("entity_count") } ?: 0,
+                        loadedChunks  = rs.getObject("loaded_chunks")?.let { rs.getInt("loaded_chunks") } ?: 0,
+                        pingP50       = rs.getObject("ping_p50")?.let { rs.getInt("ping_p50") },
+                        pingP95       = rs.getObject("ping_p95")?.let { rs.getInt("ping_p95") },
+                    )
+                }
+            }
+        }
+        return result
+    }
+
+    private data class MetricSource(val table: String, val from: Long, val to: Long)
+
+    private fun bucketSizeMs(windowMinutes: Int): Long {
+        val targetPoints = 600L
+        val windowMs = windowMinutes * 60_000L
+        return ((windowMs + targetPoints - 1) / targetPoints).coerceAtLeast(1_000L)
+    }
+
+    private fun queryBucketed(sources: List<MetricSource>, origin: Long, bucketMs: Long): List<MetricSnapshot> {
+        if (sources.isEmpty()) return emptyList()
+        val unionSql = sources.joinToString("\nUNION ALL\n") { source ->
+            """SELECT ts, tps1, tps5, tps15, tick_ms, mem_used, mem_total, mem_max, uptime_ms,
+                      cpu_pct, sys_mem_used, sys_mem_total, disk_used_gb, disk_total_gb,
+                      player_count, entity_count, loaded_chunks, ping_p50, ping_p95
+               FROM ${source.table}
+               WHERE ts >= ? AND ts < ?"""
+        }
+        val sql = """
+            SELECT CAST((ts - ?) / ? AS INTEGER) * ? + ? AS bucket_ts,
+                   AVG(tps1) AS tps1,
+                   AVG(tps5) AS tps5,
+                   AVG(tps15) AS tps15,
+                   AVG(tick_ms) AS tick_ms,
+                   CAST(AVG(mem_used) AS INTEGER) AS mem_used,
+                   CAST(AVG(mem_total) AS INTEGER) AS mem_total,
+                   CAST(AVG(mem_max) AS INTEGER) AS mem_max,
+                   CAST(AVG(uptime_ms) AS INTEGER) AS uptime_ms,
+                   AVG(cpu_pct) AS cpu_pct,
+                   CAST(AVG(sys_mem_used) AS INTEGER) AS sys_mem_used,
+                   CAST(AVG(sys_mem_total) AS INTEGER) AS sys_mem_total,
+                   CAST(AVG(disk_used_gb) AS INTEGER) AS disk_used_gb,
+                   CAST(AVG(disk_total_gb) AS INTEGER) AS disk_total_gb,
+                   CAST(AVG(player_count) AS INTEGER) AS player_count,
+                   CAST(AVG(entity_count) AS INTEGER) AS entity_count,
+                   CAST(AVG(loaded_chunks) AS INTEGER) AS loaded_chunks,
+                   CAST(AVG(ping_p50) AS INTEGER) AS ping_p50,
+                   CAST(AVG(ping_p95) AS INTEGER) AS ping_p95
+            FROM (
+                $unionSql
+            )
+            GROUP BY bucket_ts
+            ORDER BY bucket_ts
+        """.trimIndent()
+
+        val result = mutableListOf<MetricSnapshot>()
+        conn.prepareStatement(sql).use { ps ->
+            var idx = 1
+            ps.setLong(idx++, origin)
+            ps.setLong(idx++, bucketMs)
+            ps.setLong(idx++, bucketMs)
+            ps.setLong(idx++, origin)
+            for (source in sources) {
+                ps.setLong(idx++, source.from)
+                ps.setLong(idx++, source.to)
+            }
+            ps.executeQuery().use { rs ->
+                while (rs.next()) {
+                    result += MetricSnapshot(
+                        timestamp     = rs.getLong("bucket_ts"),
                         tps1          = rs.getDouble("tps1"),
                         tps5          = rs.getDouble("tps5"),
                         tps15         = rs.getDouble("tps15"),

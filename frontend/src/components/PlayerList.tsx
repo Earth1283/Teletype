@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { api } from '../api/client'
+import { useContextMenu } from '../ContextMenu'
 import { IconRefresh } from '../Icons'
 
 interface Player { name: string; uuid: string; world: string; health: number }
@@ -20,11 +21,22 @@ export default function PlayerList() {
     refetchInterval: 5000,
   })
   const [selected, setSelected] = useState<string | null>(null)
+  const { openContextMenu } = useContextMenu()
 
   function kick(name: string) { api.post('/execute', { command: `kick ${name}` }) }
   function ban(name: string) {
     if (confirm(`Ban ${name}? This cannot be undone from here.`))
       api.post('/execute', { command: `ban ${name}` })
+  }
+
+  function openPlayerCtx(e: React.MouseEvent, player: Player) {
+    openContextMenu(e, [
+      { label: 'Copy Player Name', action: () => navigator.clipboard.writeText(player.name) },
+      { label: 'Copy UUID', action: () => navigator.clipboard.writeText(player.uuid) },
+      { type: 'separator' },
+      { label: 'Kick Player', action: () => kick(player.name) },
+      { label: 'Ban Player', danger: true, action: () => ban(player.name) },
+    ], { kind: 'player', name: player.name, uuid: player.uuid })
   }
 
   const count = data?.length ?? 0
@@ -61,6 +73,7 @@ export default function PlayerList() {
               key={p.uuid}
               className={`mac-master-row${selected === p.uuid ? ' active' : ''}`}
               onClick={() => setSelected(p.uuid === selected ? null : p.uuid)}
+              onContextMenu={e => openPlayerCtx(e, p)}
             >
               <div className="mac-master-avatar">{p.name[0].toUpperCase()}</div>
               <div className="mac-master-info">

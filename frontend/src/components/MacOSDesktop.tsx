@@ -1,6 +1,7 @@
 import { useState, useRef, useEffect, useCallback } from 'react'
 import { TOKEN_KEY, api } from '../api/client'
 import { useSettings } from '../SettingsContext'
+import { useContextMenu, type ContextMenuItem, type ContextMenuTarget } from '../ContextMenu'
 import Console from './Console'
 import PlayerList from './PlayerList'
 import ServerStats from './ServerStats'
@@ -182,48 +183,7 @@ function MenuDropdown({ items }: { items: MenuItem[] }) {
 
 // ── Context menu ────────────────────────────────────────────────────────────
 
-type CtxItem = {
-  label: string
-  shortcut?: string
-  action?: () => void
-  disabled?: boolean
-  danger?: boolean
-} | null
-
-interface CtxMenuData { x: number; y: number; items: CtxItem[] }
-
-function CtxMenu({ menu, onClose }: { menu: CtxMenuData; onClose: () => void }) {
-  useEffect(() => {
-    let mounted = true
-    const h = () => { if (mounted) onClose() }
-    const t = setTimeout(() => document.addEventListener('mousedown', h), 30)
-    return () => { mounted = false; clearTimeout(t); document.removeEventListener('mousedown', h) }
-  }, [onClose])
-
-  useEffect(() => {
-    const h = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose() }
-    window.addEventListener('keydown', h)
-    return () => window.removeEventListener('keydown', h)
-  }, [onClose])
-
-  return (
-    <div className="mac-ctx" style={{ left: menu.x, top: menu.y }} onMouseDown={e => e.stopPropagation()}>
-      {menu.items.map((item, i) =>
-        item === null
-          ? <div key={i} className="mac-ctx-sep" />
-          : <button
-              key={i}
-              className={`mac-ctx-item${item.danger ? ' danger' : ''}`}
-              disabled={item.disabled}
-              onClick={() => { item.action?.(); onClose() }}
-            >
-              <span className="mac-ctx-label">{item.label}</span>
-              {item.shortcut && <span className="mac-ctx-key">{item.shortcut}</span>}
-            </button>
-      )}
-    </div>
-  )
-}
+type CtxItem = ContextMenuItem
 
 // ── Types ───────────────────────────────────────────────────────────────────
 
@@ -240,7 +200,6 @@ export default function MacOSDesktop() {
   const [activeId, setActiveId] = useState<Tab | null>(null)
   const [paletteOpen, setPaletteOpen] = useState(false)
   const [clock, setClock] = useState(() => new Date())
-  const [ctxMenu, setCtxMenu] = useState<CtxMenuData | null>(null)
   const [activeMenu, setActiveMenu] = useState<string | null>(null)
   const [finderViewMode, setFinderViewMode] = useState<'icons' | 'list'>('icons')
   const [threadDumpText, setThreadDumpText] = useState('')
@@ -249,6 +208,7 @@ export default function MacOSDesktop() {
   const iRef = useRef<Interaction | null>(null)
   const menuBarRef = useRef<HTMLDivElement>(null)
   const { settings, update } = useSettings()
+  const { openContextMenu } = useContextMenu()
 
   useEffect(() => {
     const t = setInterval(() => setClock(new Date()), 1000)
@@ -294,14 +254,9 @@ export default function MacOSDesktop() {
     return () => document.removeEventListener('mousedown', h)
   }, [activeMenu])
 
-  const openCtx = useCallback((e: React.MouseEvent, items: CtxItem[]) => {
-    e.preventDefault()
-    e.stopPropagation()
-    const x = Math.min(e.clientX, window.innerWidth - 210)
-    const est = items.reduce<number>((h, i) => h + (i === null ? 9 : 28), 8)
-    const y = e.clientY + est > window.innerHeight - 8 ? e.clientY - est : e.clientY
-    setCtxMenu({ x, y, items })
-  }, [])
+  const openCtx = useCallback((e: React.MouseEvent, items: CtxItem[], target?: ContextMenuTarget) => {
+    openContextMenu(e, items, target)
+  }, [openContextMenu])
 
   function toggleMenu(name: string) {
     setActiveMenu(m => m === name ? null : name)
@@ -381,16 +336,16 @@ export default function MacOSDesktop() {
       : win.min
         ? [
             { label: 'Show Window', action: () => openApp(app.id) },
-            null,
+            { type: 'separator' },
             { label: 'Close', action: () => closeWin(app.id), danger: true },
           ]
         : [
             { label: 'Bring to Front', action: () => focusWin(app.id) },
             { label: 'Minimize', shortcut: '⌘M', action: () => minWin(app.id) },
-            null,
+            { type: 'separator' },
             { label: 'Close', shortcut: '⌘W', action: () => closeWin(app.id), danger: true },
           ]
-    openCtx(e, items)
+    openCtx(e, items, { kind: 'dockApp', id: app.id })
   }
 
   function winTitleCtx(e: React.MouseEvent, id: Tab) {
@@ -399,17 +354,17 @@ export default function MacOSDesktop() {
     openCtx(e, [
       { label: 'Minimize', shortcut: '⌘M', action: () => minWin(id) },
       { label: win.max ? 'Restore' : 'Zoom', shortcut: '⌘⇧F', action: () => maxWin(id) },
-      null,
+      { type: 'separator' },
       { label: 'Close', shortcut: '⌘W', action: () => closeWin(id), danger: true },
-    ])
+    ], { kind: 'window', id })
   }
 
   function desktopCtx(e: React.MouseEvent) {
     openCtx(e, [
       { label: 'Bring All to Front', disabled: wins.filter(w => !w.min).length === 0, action: bringAllToFront },
-      null,
+      { type: 'separator' },
       { label: 'Exit Fun Mode', action: () => update({ fun: false }) },
-    ])
+    ], { kind: 'desktop' })
   }
 
   function bringAllToFront() {
@@ -628,9 +583,6 @@ export default function MacOSDesktop() {
       {/* ── Dock ──────────────────────────────────────────────────────────── */}
       <MacDock apps={DOCK_APPS} wins={wins} activeId={activeId} onOpen={openApp} onCtx={dockCtx} />
 
-      {/* ── Context menu ──────────────────────────────────────────────────── */}
-      {ctxMenu && <CtxMenu menu={ctxMenu} onClose={() => setCtxMenu(null)} />}
-
       {/* ── Spotlight ─────────────────────────────────────────────────────── */}
       <CommandPalette
         open={paletteOpen && settings.palette.enabled}
@@ -708,7 +660,7 @@ function MacWindow({ win, isActive, onFocus, onStartDrag, onStartResize, onClose
       className={`mac-window${win.min ? ' mac-win-min' : ''}${win.max ? ' mac-win-max' : ''}${isActive ? ' mac-win-active' : ''}`}
       style={posStyle}
       onMouseDown={e => { e.stopPropagation(); onFocus(win.id) }}
-      onContextMenu={e => e.stopPropagation()}
+      onContextMenu={e => { e.preventDefault(); e.stopPropagation(); onTitleCtx(e, win.id) }}
     >
       <div
         className={`mac-titlebar${win.max ? ' nodrag' : ''}`}
