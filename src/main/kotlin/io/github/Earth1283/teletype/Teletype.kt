@@ -26,6 +26,10 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.launch
+import net.kyori.adventure.text.Component
+import net.kyori.adventure.text.TextComponent
+import net.kyori.adventure.text.format.NamedTextColor
+import net.kyori.adventure.text.format.TextDecoration
 import org.bukkit.plugin.java.JavaPlugin
 
 class Teletype : JavaPlugin() {
@@ -48,38 +52,76 @@ class Teletype : JavaPlugin() {
     internal val pluginScope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
 
     override fun onEnable() {
+        startupHeader()
+        startupLine("CONFIG", "Preparing configuration files", dataFolder.absolutePath)
         saveDefaultConfig()
         ConfigUpdater.update(this, "config.yml")
         reloadConfig()
         teletypeConfig = TeletypeConfig(this)
         messages = MessageConfig(this).also { it.load() }
+        startupLine("CONFIG", "Configuration loaded", "web=${bindSummary()}, tls=${enabled(teletypeConfig.tlsEnabled)}")
+
         challengeStore = ChallengeStore(this)
         jwtService = JwtService(teletypeConfig.jwtSecret)
+        startupLine("AUTH", "JWT service initialized", "expiry=${teletypeConfig.jwtExpiryMinutes}m, require-op=${enabled(teletypeConfig.requireOp)}")
+
         consoleBroadcaster = ConsoleBroadcaster(
             pluginScope,
             teletypeConfig.consoleReplayBufferLines,
             teletypeConfig.consoleMaxLineLength
         )
+        startupLine(
+            "CONSOLE",
+            "Console stream prepared",
+            "enabled=${enabled(teletypeConfig.consoleEnabled)}, replay=${teletypeConfig.consoleReplayBufferLines}, max-line=${teletypeConfig.consoleMaxLineLength}"
+        )
+
         metricsDatabase = MetricsDatabase(dataFolder)
         metricsCollector = MetricsCollector(this, metricsDatabase, pluginScope)
         RetentionJob(this, metricsDatabase, pluginScope).start()
+        startupLine(
+            "METRICS",
+            "Metrics services initialized",
+            "sqlite=${enabled(teletypeConfig.metricsSqliteEnabled)}, retention=${enabled(teletypeConfig.retentionEnabled)}, interval=${teletypeConfig.metricsSampleIntervalTicks}t"
+        )
+
         snippetStore = SnippetStore(this).also { it.load() }
         snippetScheduler = SnippetScheduler(this, snippetStore).also { it.load(); it.startAll() }
+        startupLine(
+            "ACTIONS",
+            "Action store loaded",
+            "snippets=${snippetStore.getSnippets().size}, categories=${snippetStore.getCategories().size}, scheduled=${snippetScheduler.getActions().size}"
+        )
+
         auditLog = AuditLog(dataFolder)
         routeStore = RouteStore(dataFolder).also { it.load() }
         portForwardStore = PortForwardStore(dataFolder).also { it.load() }
         portForwardManager = PortForwardManager(this).also { it.start(portForwardStore.getForwards()) }
+        startupLine(
+            "NETWORK",
+            "Network routing loaded",
+            "routes=${routeStore.getRoutes().size}, forwards=${portForwardStore.getForwards().size}, multiplex=${enabled(teletypeConfig.multiplexGamePort)}"
+        )
+
         if (teletypeConfig.consoleEnabled) ConsoleInterceptor.install(consoleBroadcaster)
         server.pluginManager.registerEvents(PlayerEventListener(metricsDatabase, pluginScope), this)
+        startupLine("EVENTS", "Runtime hooks registered", "console-capture=${enabled(teletypeConfig.consoleEnabled)}, player-listener=on")
         webServer = WebServer(this).also { it.start() }
+        startupLine("WEB", "Embedded web server started", bindSummary())
         if (teletypeConfig.multiplexGamePort) {
             portMultiplexer = PortMultiplexer(this).also { it.install() }
+            startupLine("MUX", "Game-port multiplexer installed", "public-port=${teletypeConfig.multiplexPort}")
         }
-        getCommand("tty")?.setExecutor(TtyCommand(this))
+        getCommand("tty")?.also {
+            val ttyCommand = TtyCommand(this)
+            it.setExecutor(ttyCommand)
+            it.tabCompleter = ttyCommand
+        }
+        startupLine("COMMAND", "Registered /tty command", "aliases=/teletype, /teletypewriter")
 
         val url = if (teletypeConfig.tlsEnabled) "https://localhost:${teletypeConfig.tlsHttpsPort}"
                   else "http://localhost:${teletypeConfig.port}"
-        messages.console("startup", "version" to description.version, "url" to url)
+        messages.console("startup", "version" to pluginMeta.version, "url" to url)
     }
 
     override fun onDisable() {
@@ -107,4 +149,44 @@ class Teletype : JavaPlugin() {
             }
         }
     }
+
+    private fun startupHeader() {
+        server.consoleSender.sendMessage(
+            Component.text()
+                .append(startupPrefix())
+                .append(Component.text("Starting v${pluginMeta.version}", NamedTextColor.WHITE))
+                .build()
+        )
+    }
+
+    private fun startupLine(stage: String, message: String, detail: String? = null) {
+        val line = Component.text()
+            .append(startupPrefix())
+            .append(Component.text(stage.padEnd(7), NamedTextColor.DARK_AQUA, TextDecoration.BOLD))
+            .append(Component.text(" ", NamedTextColor.GRAY))
+            .append(Component.text(message, NamedTextColor.WHITE))
+
+        if (!detail.isNullOrBlank()) {
+            line.append(Component.text(" - ", NamedTextColor.DARK_GRAY))
+                .append(Component.text(detail, NamedTextColor.GRAY))
+        }
+
+        server.consoleSender.sendMessage(line.build())
+    }
+
+    private fun startupPrefix(): TextComponent =
+        Component.text()
+            .append(Component.text("[", NamedTextColor.DARK_GRAY))
+            .append(Component.text("Teletype", NamedTextColor.AQUA, TextDecoration.BOLD))
+            .append(Component.text("] ", NamedTextColor.DARK_GRAY))
+            .build()
+
+    private fun bindSummary(): String =
+        if (teletypeConfig.tlsEnabled) {
+            "http=:${teletypeConfig.port}, https=:${teletypeConfig.tlsHttpsPort}, redirect=${enabled(teletypeConfig.tlsHttpRedirect)}"
+        } else {
+            "http=:${teletypeConfig.port}"
+        }
+
+    private fun enabled(value: Boolean): String = if (value) "on" else "off"
 }

@@ -11,7 +11,7 @@ authors: [ Earth1283 ]
 commands:
   tty:
     description: Teletype web server control
-    usage: /tty <verify|status|start|stop>
+    usage: /tty <verify|status|start|stop|reload|doctor>
     permission: teletype.admin
     aliases: ["teletype", "teletypewriter"]
 

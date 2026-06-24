@@ -14,8 +14,8 @@ shutdown: "{prefix}<yellow>stopped"
 
 # ── /tty command ─────────────────────────────────────────────────────────────
 command:
-  usage: "{prefix}<yellow>Usage: <gray>/tty [verify|status|start|stop]"
-  unknown-subcommand: "{prefix}<red>Unknown subcommand. <dark_gray>Usage: <gray>/tty [verify|status|start|stop]"
+  usage: "{prefix}<yellow>Usage: <gray>/tty [verify|status|start|stop|reload|doctor]"
+  unknown-subcommand: "{prefix}<red>Unknown subcommand. <dark_gray>Usage: <gray>/tty [verify|status|start|stop|reload|doctor]"
   no-permission: "{prefix}<red>No permission."
 
   verify:
@@ -39,6 +39,12 @@ command:
   stop:
     not-running: "{prefix}<yellow>Web server is not running."
     success: "{prefix}<yellow>Web server stopped."
+
+  reload:
+    # {state}
+    success: "{prefix}<green>Configuration reloaded; <white>{state}<green>. <gray>Startup-only subsystem changes require a full server restart."
+    # {error}
+    failed: "{prefix}<red>Reload failed: <white>{error}"
 
 # ── TLS (console-only) ───────────────────────────────────────────────────────
 tls:
