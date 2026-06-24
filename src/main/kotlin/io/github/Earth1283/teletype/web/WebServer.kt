@@ -32,6 +32,8 @@ import io.ktor.server.netty.Netty
 import io.ktor.server.netty.NettyApplicationEngine
 import io.ktor.server.plugins.contentnegotiation.ContentNegotiation
 import io.ktor.server.plugins.cors.routing.CORS
+import io.ktor.server.plugins.forwardedheaders.ForwardedHeaders
+import io.ktor.server.plugins.forwardedheaders.XForwardedHeaders
 import io.ktor.server.plugins.httpsredirect.HttpsRedirect
 import io.ktor.server.plugins.origin
 import io.ktor.server.plugins.ratelimit.RateLimit
@@ -83,6 +85,11 @@ class WebServer(private val plugin: Teletype) {
                 }
             }
         }) {
+            if (cfg.trustProxyHeaders) {
+                install(ForwardedHeaders)
+                install(XForwardedHeaders)
+            }
+
             if (tlsEnabled && cfg.tlsHttpRedirect) {
                 install(HttpsRedirect) {
                     sslPort = httpsPort

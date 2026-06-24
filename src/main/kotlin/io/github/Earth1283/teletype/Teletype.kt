@@ -109,6 +109,20 @@ class Teletype : JavaPlugin() {
         startupLine("EVENTS", "Runtime hooks registered", "console-capture=${enabled(teletypeConfig.consoleEnabled)}, player-listener=on")
         webServer = WebServer(this).also { it.start() }
         startupLine("WEB", "Embedded web server started", bindSummary())
+        if (!teletypeConfig.tlsEnabled) {
+            startupLine(
+                "SECURITY",
+                "HTTP is not encrypted",
+                "anyone on the network path can read or alter Teletype traffic"
+            )
+        }
+        if (teletypeConfig.trustProxyHeaders) {
+            startupLine(
+                "PROXY",
+                "Trusting reverse-proxy headers",
+                "make sure direct access to the Teletype port is blocked"
+            )
+        }
         if (teletypeConfig.multiplexGamePort) {
             portMultiplexer = PortMultiplexer(this).also { it.install() }
             startupLine("MUX", "Game-port multiplexer installed", "public-port=${teletypeConfig.multiplexPort}")

@@ -205,6 +205,13 @@ class TtyCommand(private val plugin: Teletype) : CommandExecutor, TabCompleter {
             if (cfg.tlsEnabled) add(portCheck("HTTPS port", cfg.tlsHttpsPort, skipBind = plugin.webServer.isRunning))
             add(tlsCheck(cfg))
             add(
+                if (cfg.trustProxyHeaders) {
+                    DoctorCheck(Level.WARN, "Proxy headers", "trusted; direct access to :${cfg.port} must be blocked")
+                } else {
+                    DoctorCheck(Level.PASS, "Proxy headers", "not trusted")
+                }
+            )
+            add(
                 if (cfg.jwtSecret.length >= 32) {
                     DoctorCheck(Level.PASS, "Auth secret", "JWT secret is present (${cfg.jwtSecret.length} chars)")
                 } else {

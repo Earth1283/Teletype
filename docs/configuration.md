@@ -12,6 +12,7 @@ server:
   https-port: 8443             # HTTPS port (only when tls.enabled: true)
   cors-origins: []             # Parsed but currently unused — CORS always allows all origins (anyHost)
   max-websocket-connections: 8 # Max simultaneous authenticated WebSocket clients
+  trust-proxy-headers: false   # Trust HTTPS/client IP headers from a hosting panel proxy
 
   # Port multiplexer — share one port between the web panel and Minecraft game traffic
   multiplex-game-port: false   # Enable single-port mux (see docs/multiplexer.md)
@@ -62,6 +63,26 @@ Teletype generates a self-signed certificate at `plugins/Teletype/keystore.jks` 
 
 ### `mode: keystore`
 Provide a PKCS12 or JKS keystore signed by a real CA. Set `keystore-path`, `keystore-password`, and `key-password`.
+
+## Hosted Panel / Reverse Proxy HTTPS
+
+Some hosts expose plugin web ports through their own trusted HTTPS proxy. In
+that setup Teletype still listens on plain HTTP internally, but the browser sees
+a normal `https://` address from the host and does not show a certificate
+warning.
+
+If your host provides that setup, set:
+
+```yaml
+server:
+  trust-proxy-headers: true
+```
+
+This makes Teletype honor `Forwarded` and `X-Forwarded-*` headers such as
+`X-Forwarded-Proto: https`.
+
+Only enable this when direct access to Teletype's HTTP port is blocked by the
+host or firewall. If clients can connect directly, they can spoof these headers.
 
 ---
 

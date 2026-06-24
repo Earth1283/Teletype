@@ -18,6 +18,7 @@ import AuditPage from './components/AuditPage'
 import NetworkPage from './components/NetworkPage'
 import CommandPalette from './CommandPalette'
 import MacOSDesktop from './components/MacOSDesktop'
+import InsecureHttpBanner from './components/InsecureHttpBanner'
 import type { Snippet } from './components/actions/actionTypes'
 import { CONTEXT_WHEEL_ACTIONS } from './contextWheelActions'
 import {
@@ -237,6 +238,7 @@ export default function App() {
         <ThemeApplier />
         <LogProvider>
           <ContextMenuProvider>
+            <InsecureHttpBanner />
             {authed ? <MainApp /> : <AuthSetup onAuth={() => setAuthed(true)} />}
           </ContextMenuProvider>
         </LogProvider>

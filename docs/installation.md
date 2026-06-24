@@ -48,6 +48,10 @@ The shaded JAR is at `build/libs/teletype-<version>.jar`. Copy it to `plugins/`.
 
 1. **Open the panel** — navigate to `http://<server-ip>:8080` in your browser. The auth screen displays a UUID.
 
+   If your host gives you an `https://` web-panel URL for plugin ports, use that
+   URL instead. Set `server.trust-proxy-headers: true` only when the host blocks
+   direct access to Teletype's HTTP port and sends proxy headers.
+
 2. **Verify in-game or in console** — as an op, run:
    ```
    /tty verify <uuid>

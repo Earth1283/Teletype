@@ -19,6 +19,12 @@ server:
   # Cap on simultaneous authenticated WebSocket connections.
   max-websocket-connections: 8
 
+  # Trust HTTPS/client IP headers from a reverse proxy or hosting panel.
+  # Enable only when Teletype is reachable through that proxy and direct access
+  # to the Teletype port is blocked; otherwise clients can spoof these headers.
+  # Supports Forwarded and X-Forwarded-* headers, including X-Forwarded-Proto.
+  trust-proxy-headers: false
+
   # ┌─ PORT SHARING (multiplex-game-port) ────────────────────────────────────┐
   # │ Normally your server needs TWO open ports:                              │
   # │   25565 — Minecraft players connect here                                │

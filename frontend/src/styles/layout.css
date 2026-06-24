@@ -5,6 +5,32 @@
   overflow: hidden;
 }
 
+.insecure-http-banner {
+  position: fixed;
+  top: 10px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 10000;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  max-width: min(760px, calc(100vw - 24px));
+  padding: 9px 14px;
+  background: rgba(127, 29, 29, 0.96);
+  border: 1px solid rgba(248, 113, 113, 0.65);
+  border-radius: var(--r-md);
+  color: #fff7ed;
+  font-family: var(--sans);
+  font-size: 12.5px;
+  line-height: 1.35;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, .35);
+}
+
+.insecure-http-banner strong {
+  color: #ffffff;
+  white-space: nowrap;
+}
+
 /* ── Sidebar ────────────────────────────────────────────────── */
 .sidebar {
   width: 220px;

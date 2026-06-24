@@ -21,6 +21,7 @@ class TeletypeConfig(private val plugin: Teletype) {
         else config.getInt("web-port", 8080)
     val corsOrigins: List<String> get() = config.getStringList("server.cors-origins")
     val maxWebSocketConnections: Int get() = config.getInt("server.max-websocket-connections", 8)
+    val trustProxyHeaders: Boolean get() = bool("server.trust-proxy-headers", false)
     val multiplexGamePort: Boolean get() = bool("server.multiplex-game-port", false)
     val multiplexPort: Int get() = config.getInt("server.multiplex-port", 25565)
     val forwardMinecraftPlayerAddresses: Boolean get() = bool("server.forward-minecraft-player-addresses", false)
