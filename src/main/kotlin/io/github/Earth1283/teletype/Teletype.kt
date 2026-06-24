@@ -55,7 +55,11 @@ class Teletype : JavaPlugin() {
         messages = MessageConfig(this).also { it.load() }
         challengeStore = ChallengeStore(this)
         jwtService = JwtService(teletypeConfig.jwtSecret)
-        consoleBroadcaster = ConsoleBroadcaster(pluginScope)
+        consoleBroadcaster = ConsoleBroadcaster(
+            pluginScope,
+            teletypeConfig.consoleReplayBufferLines,
+            teletypeConfig.consoleMaxLineLength
+        )
         metricsDatabase = MetricsDatabase(dataFolder)
         metricsCollector = MetricsCollector(this, metricsDatabase, pluginScope)
         RetentionJob(this, metricsDatabase, pluginScope).start()
@@ -65,7 +69,7 @@ class Teletype : JavaPlugin() {
         routeStore = RouteStore(dataFolder).also { it.load() }
         portForwardStore = PortForwardStore(dataFolder).also { it.load() }
         portForwardManager = PortForwardManager(this).also { it.start(portForwardStore.getForwards()) }
-        ConsoleInterceptor.install(consoleBroadcaster)
+        if (teletypeConfig.consoleEnabled) ConsoleInterceptor.install(consoleBroadcaster)
         server.pluginManager.registerEvents(PlayerEventListener(metricsDatabase, pluginScope), this)
         webServer = WebServer(this).also { it.start() }
         if (teletypeConfig.multiplexGamePort) {

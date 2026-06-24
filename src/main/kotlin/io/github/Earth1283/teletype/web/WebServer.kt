@@ -45,11 +45,16 @@ import io.ktor.server.routing.route
 import io.ktor.server.routing.routing
 import io.ktor.server.websocket.WebSockets
 import io.ktor.server.websocket.webSocket
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 import kotlinx.serialization.json.Json
+import java.util.concurrent.ConcurrentHashMap
 import kotlin.time.Duration.Companion.minutes
 
 class WebServer(private val plugin: Teletype) {
     private var server: EmbeddedServer<NettyApplicationEngine, NettyApplicationEngine.Configuration>? = null
+    private val staticCache = ConcurrentHashMap<String, ByteArray>()
+    private val missingStatic = ConcurrentHashMap.newKeySet<String>()
 
     val isRunning: Boolean get() = server != null
 
@@ -155,26 +160,23 @@ class WebServer(private val plugin: Teletype) {
                 }
             }
 
-            // Capture plugin classloader here — environment.classLoader may differ in Paper's plugin isolation
-            val cl = plugin.javaClass.classLoader
-
             routing {
                 get("/") {
-                    val bytes = cl.getResourceAsStream("webroot/index.html")?.readBytes()
+                    val bytes = staticBytes("webroot/index.html")
                         ?: return@get call.respond(HttpStatusCode.NotFound, ErrorResponse("Not found"))
                     call.respondBytes(bytes, ContentType.Text.Html)
                 }
                 get("/favicon.svg") {
-                    val bytes = cl.getResourceAsStream("webroot/favicon.svg")?.readBytes() ?: return@get
+                    val bytes = staticBytes("webroot/favicon.svg") ?: return@get
                     call.respondBytes(bytes, ContentType.Image.SVG)
                 }
                 get("/icons.svg") {
-                    val bytes = cl.getResourceAsStream("webroot/icons.svg")?.readBytes() ?: return@get
+                    val bytes = staticBytes("webroot/icons.svg") ?: return@get
                     call.respondBytes(bytes, ContentType.Image.SVG)
                 }
                 get("/assets/{file...}") {
                     val file = call.parameters.getAll("file")?.joinToString("/") ?: return@get
-                    val bytes = cl.getResourceAsStream("webroot/assets/$file")?.readBytes()
+                    val bytes = staticBytes("webroot/assets/$file")
                         ?: return@get call.respond(HttpStatusCode.NotFound, ErrorResponse("Not found"))
                     call.respondBytes(bytes, when {
                         file.endsWith(".js") || file.endsWith(".mjs") -> ContentType.Application.JavaScript
@@ -187,7 +189,7 @@ class WebServer(private val plugin: Teletype) {
                 }
                 // SPA fallback — must be after all asset routes
                 get("{...}") {
-                    val bytes = cl.getResourceAsStream("webroot/index.html")?.readBytes()
+                    val bytes = staticBytes("webroot/index.html")
                         ?: return@get call.respond(HttpStatusCode.NotFound, ErrorResponse("Not found"))
                     call.respondBytes(bytes, ContentType.Text.Html)
                 }
@@ -223,5 +225,21 @@ class WebServer(private val plugin: Teletype) {
     fun stop() {
         server?.stop(1000, 5000)
         server = null
+    }
+
+    private suspend fun staticBytes(path: String): ByteArray? {
+        staticCache[path]?.let { return it }
+        if (path in missingStatic) return null
+
+        return withContext(Dispatchers.IO) {
+            staticCache[path]?.let { return@withContext it }
+            val bytes = plugin.javaClass.classLoader.getResourceAsStream(path)?.use { it.readBytes() }
+            if (bytes == null) {
+                missingStatic += path
+            } else {
+                staticCache[path] = bytes
+            }
+            bytes
+        }
     }
 }

@@ -3,6 +3,7 @@ package io.github.Earth1283.teletype.config
 import io.github.Earth1283.teletype.Teletype
 import net.kyori.adventure.text.Component
 import net.kyori.adventure.text.minimessage.MiniMessage
+import org.bukkit.Bukkit
 import org.bukkit.command.CommandSender
 import org.bukkit.configuration.file.YamlConfiguration
 import java.io.File
@@ -37,6 +38,14 @@ class MessageConfig(private val plugin: Teletype) {
 
     /** Sends a message to the console sender. */
     fun console(key: String, vararg placeholders: Pair<String, String>) {
+        if (!Bukkit.isPrimaryThread()) {
+            if (plugin.isEnabled) {
+                Bukkit.getScheduler().runTask(plugin, Runnable { console(key, *placeholders) })
+            } else {
+                plugin.logger.info(mm.stripTags((cfg.getString(key) ?: key).replace("{prefix}", "")))
+            }
+            return
+        }
         val component = get(key, *placeholders)
         if (component != Component.empty()) plugin.server.consoleSender.sendMessage(component)
     }

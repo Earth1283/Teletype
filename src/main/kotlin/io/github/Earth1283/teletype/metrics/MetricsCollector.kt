@@ -30,6 +30,7 @@ class MetricsCollector(private val plugin: Teletype, private val db: MetricsData
     private val maxSnapshots = plugin.teletypeConfig.metricsInMemoryWindowSeconds.coerceAtLeast(1)
     private val sampleIntervalTicks = plugin.teletypeConfig.metricsSampleIntervalTicks.coerceAtLeast(1L)
     private val flushIntervalMs = plugin.teletypeConfig.metricsFlushIntervalSeconds.coerceAtLeast(1L) * 1_000L
+    private val heavySampleEvery = (100L / sampleIntervalTicks).coerceAtLeast(1L).toInt()
 
     private val buffer = ArrayDeque<MetricSnapshot>(maxSnapshots + 1)
 
@@ -38,6 +39,11 @@ class MetricsCollector(private val plugin: Teletype, private val db: MetricsData
 
     @Volatile var latest: MetricSnapshot? = null
     @Volatile private var latestSystem: SystemMetricSnapshot? = null
+    private var sampleCounter = 0
+    private var cachedEntityCount = 0
+    private var cachedLoadedChunks = 0
+    private var cachedPingP50: Int? = null
+    private var cachedPingP95: Int? = null
 
     private val osMx: com.sun.management.OperatingSystemMXBean? = runCatching {
         ManagementFactory.getOperatingSystemMXBean() as com.sun.management.OperatingSystemMXBean
@@ -83,17 +89,20 @@ class MetricsCollector(private val plugin: Teletype, private val db: MetricsData
                     val system = latestSystem ?: collectJvmOnlyMetrics()
 
                     val onlinePlayers = Bukkit.getOnlinePlayers()
-                    val worlds = Bukkit.getWorlds()
-                    val entityCount = worlds.sumOf { it.entities.size }
-                    val loadedChunks = worlds.sumOf { it.loadedChunks.size }
+                    val refreshHeavyMetrics = sampleCounter++ % heavySampleEvery == 0
+                    if (refreshHeavyMetrics) {
+                        val worlds = Bukkit.getWorlds()
+                        cachedEntityCount = worlds.sumOf { it.entities.size }
+                        cachedLoadedChunks = worlds.sumOf { it.loadedChunks.size }
 
-                    val pings = if (pingMethod != null) {
-                        onlinePlayers.mapNotNull { p ->
-                            runCatching { pingMethod.invoke(p) as Int }.getOrNull()
-                        }.sorted()
-                    } else emptyList()
-                    val pingP50 = pings.getOrNull(pings.size / 2)
-                    val pingP95 = pings.getOrNull(((pings.size - 1) * 95 / 100).coerceAtLeast(0))
+                        val pings = if (pingMethod != null) {
+                            onlinePlayers.mapNotNull { p ->
+                                runCatching { pingMethod.invoke(p) as Int }.getOrNull()
+                            }.sorted()
+                        } else emptyList()
+                        cachedPingP50 = pings.getOrNull(pings.size / 2)
+                        cachedPingP95 = pings.getOrNull(((pings.size - 1) * 95 / 100).coerceAtLeast(0))
+                    }
 
                     val snap = MetricSnapshot(
                         timestamp     = System.currentTimeMillis(),
@@ -111,10 +120,10 @@ class MetricsCollector(private val plugin: Teletype, private val db: MetricsData
                         diskUsedGb    = system.diskUsedGb,
                         diskTotalGb   = system.diskTotalGb,
                         playerCount   = onlinePlayers.size,
-                        entityCount   = entityCount,
-                        loadedChunks  = loadedChunks,
-                        pingP50       = pingP50,
-                        pingP95       = pingP95,
+                        entityCount   = cachedEntityCount,
+                        loadedChunks  = cachedLoadedChunks,
+                        pingP50       = cachedPingP50,
+                        pingP95       = cachedPingP95,
                     )
 
                     latest = snap

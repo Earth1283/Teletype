@@ -2,8 +2,6 @@ package io.github.Earth1283.teletype.web.routing
 
 import io.github.Earth1283.teletype.Teletype
 import io.github.Earth1283.teletype.web.model.WsMessage
-import io.ktor.http.HttpStatusCode
-import io.ktor.server.response.respond
 import io.ktor.server.websocket.DefaultWebSocketServerSession
 import io.ktor.websocket.CloseReason
 import io.ktor.websocket.Frame
@@ -17,15 +15,29 @@ import kotlinx.serialization.builtins.serializer
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
 import org.bukkit.Bukkit
+import java.util.concurrent.atomic.AtomicInteger
 import java.util.concurrent.TimeUnit
 
 private val json = Json { encodeDefaults = true }
+private val activeConsoleSockets = AtomicInteger(0)
 
 suspend fun DefaultWebSocketServerSession.consoleWebSocket(plugin: Teletype) {
+    if (!plugin.teletypeConfig.consoleEnabled) {
+        close(CloseReason(CloseReason.Codes.VIOLATED_POLICY, "Console streaming is disabled"))
+        return
+    }
+
     // Browsers cannot send custom WS headers — accept token via query parameter
     val token = call.request.queryParameters["token"]
     if (token == null || plugin.jwtService.verify(token) == null) {
         close(CloseReason(CloseReason.Codes.VIOLATED_POLICY, "Unauthorized"))
+        return
+    }
+
+    val active = activeConsoleSockets.incrementAndGet()
+    if (active > plugin.teletypeConfig.maxWebSocketConnections) {
+        activeConsoleSockets.decrementAndGet()
+        close(CloseReason(CloseReason.Codes.TRY_AGAIN_LATER, "Too many console connections"))
         return
     }
 
@@ -70,5 +82,6 @@ suspend fun DefaultWebSocketServerSession.consoleWebSocket(plugin: Teletype) {
         }
     } finally {
         collectJob.cancel()
+        activeConsoleSockets.decrementAndGet()
     }
 }

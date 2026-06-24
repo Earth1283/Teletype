@@ -1,6 +1,7 @@
 package io.github.Earth1283.teletype.web.routing
 
 import io.github.Earth1283.teletype.Teletype
+import io.github.Earth1283.teletype.util.onServerThread
 import io.github.Earth1283.teletype.web.model.ExecuteRequest
 import io.github.Earth1283.teletype.web.model.PlayerInfo
 import io.github.Earth1283.teletype.web.model.ServerStatus
@@ -16,8 +17,8 @@ import org.bukkit.Bukkit
 
 fun Route.apiRoutes(plugin: Teletype) {
     get("/status") {
-        val server = Bukkit.getServer()
-        call.respond(
+        val status = plugin.onServerThread {
+            val server = Bukkit.getServer()
             ServerStatus(
                 name = server.name,
                 version = server.version,
@@ -27,17 +28,20 @@ fun Route.apiRoutes(plugin: Teletype) {
                 worldCount = Bukkit.getWorlds().size,
                 pluginCount = Bukkit.getPluginManager().plugins.size,
             )
-        )
+        }
+        call.respond(status)
     }
 
     get("/players") {
-        val players = Bukkit.getOnlinePlayers().map {
-            PlayerInfo(
-                name = it.name,
-                uuid = it.uniqueId.toString(),
-                world = it.world.name,
-                health = it.health
-            )
+        val players = plugin.onServerThread {
+            Bukkit.getOnlinePlayers().map {
+                PlayerInfo(
+                    name = it.name,
+                    uuid = it.uniqueId.toString(),
+                    world = it.world.name,
+                    health = it.health
+                )
+            }
         }
         call.respond(players)
     }

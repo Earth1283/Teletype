@@ -3,6 +3,11 @@ package io.github.Earth1283.teletype.actions
 import io.github.Earth1283.teletype.Teletype
 import io.github.Earth1283.teletype.web.model.ScheduledAction
 import io.github.Earth1283.teletype.web.model.Snippet
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.isActive
+import kotlinx.coroutines.launch
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
@@ -21,11 +26,14 @@ class SnippetScheduler(private val plugin: Teletype, private val store: SnippetS
     private val json = Json { prettyPrint = true; encodeDefaults = true; ignoreUnknownKeys = true }
     private val tasks = ConcurrentHashMap<String, BukkitTask>()
     private val actions = mutableListOf<ScheduledAction>()
+    private val saveLock = Any()
+    @Volatile private var pendingSnapshot: List<ScheduledAction>? = null
+    @Volatile private var saveJob: Job? = null
 
     @Synchronized fun getActions(): List<ScheduledAction> = actions.toList()
 
     @Synchronized fun load() {
-        if (!file.exists()) { save(); return }
+        if (!file.exists()) { saveNow(actions.toList()); return }
         try {
             val data = json.decodeFromString<ScheduleData>(file.readText())
             actions.clear(); actions.addAll(data.actions)
@@ -34,9 +42,45 @@ class SnippetScheduler(private val plugin: Teletype, private val store: SnippetS
         }
     }
 
-    @Synchronized fun save() {
+    private fun saveNow(snapshot: List<ScheduledAction>) {
         plugin.dataFolder.mkdirs()
-        file.writeText(json.encodeToString(ScheduleData(actions.toList())))
+        file.writeText(json.encodeToString(ScheduleData(snapshot)))
+    }
+
+    private fun saveAsync() {
+        synchronized(saveLock) {
+            pendingSnapshot = synchronized(this) { actions.toList() }
+            if (saveJob?.isActive == true) return
+
+            saveJob = plugin.pluginScope.launch(Dispatchers.IO) {
+                while (isActive) {
+                    delay(250L)
+                    val snapshot = synchronized(saveLock) {
+                        pendingSnapshot.also { pendingSnapshot = null }
+                    }
+                    if (snapshot != null) saveNow(snapshot)
+
+                    val done = synchronized(saveLock) {
+                        if (pendingSnapshot == null) {
+                            saveJob = null
+                            true
+                        } else false
+                    }
+                    if (done) return@launch
+                }
+            }
+        }
+    }
+
+    private fun flushSave() {
+        val snapshot = synchronized(saveLock) {
+            saveJob?.cancel()
+            saveJob = null
+            val latest = pendingSnapshot
+            pendingSnapshot = null
+            latest
+        } ?: synchronized(this) { actions.toList() }
+        saveNow(snapshot)
     }
 
     fun startAll() {
@@ -46,30 +90,31 @@ class SnippetScheduler(private val plugin: Teletype, private val store: SnippetS
     fun stopAll() {
         tasks.values.forEach { it.cancel() }
         tasks.clear()
+        flushSave()
     }
 
     @Synchronized fun add(action: ScheduledAction) {
-        actions += action; save()
+        actions += action; saveAsync()
         if (action.status == "active") scheduleTask(action)
     }
 
     @Synchronized fun remove(id: String): Boolean {
         if (actions.none { it.id == id }) return false
         tasks[id]?.cancel(); tasks.remove(id)
-        actions.removeIf { it.id == id }; save(); return true
+        actions.removeIf { it.id == id }; saveAsync(); return true
     }
 
     @Synchronized fun pause(id: String): Boolean {
         val idx = actions.indexOfFirst { it.id == id }
         if (idx < 0) return false
         tasks[id]?.cancel(); tasks.remove(id)
-        actions[idx] = actions[idx].copy(status = "paused"); save(); return true
+        actions[idx] = actions[idx].copy(status = "paused"); saveAsync(); return true
     }
 
     @Synchronized fun resume(id: String): Boolean {
         val idx = actions.indexOfFirst { it.id == id }
         if (idx < 0) return false
-        actions[idx] = actions[idx].copy(status = "active"); save()
+        actions[idx] = actions[idx].copy(status = "active"); saveAsync()
         scheduleTask(actions[idx]); return true
     }
 
@@ -89,7 +134,7 @@ class SnippetScheduler(private val plugin: Teletype, private val store: SnippetS
                 tasks[action.id] = Bukkit.getScheduler().runTaskLater(plugin, Runnable {
                     dispatchCommands(snippet, action.vars)
                     tasks.remove(action.id)
-                    synchronized(this) { actions.removeIf { it.id == action.id }; save() }
+                    synchronized(this) { actions.removeIf { it.id == action.id }; saveAsync() }
                 }, delayTicks)
             }
 
@@ -115,7 +160,7 @@ class SnippetScheduler(private val plugin: Teletype, private val store: SnippetS
                                     lastRunMs = System.currentTimeMillis(), lastRunOk = true
                                 )
                             }
-                            save()
+                            saveAsync()
                         }
                     }
                 }, initialTicks, periodTicks)
@@ -161,7 +206,7 @@ class SnippetScheduler(private val plugin: Teletype, private val store: SnippetS
         val idx = actions.indexOfFirst { it.id == id }
         if (idx >= 0) {
             actions[idx] = actions[idx].copy(lastRunMs = System.currentTimeMillis(), lastRunOk = ok)
-            save()
+            saveAsync()
         }
     }
 }

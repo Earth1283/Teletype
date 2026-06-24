@@ -25,16 +25,19 @@ import io.ktor.server.routing.get
 import io.ktor.server.routing.patch
 import io.ktor.server.routing.post
 import io.ktor.server.routing.put
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 import java.io.File
 
 private const val MAX_TEXT_SIZE = 2 * 1024 * 1024L // 2 MB
 
 fun Route.fileRoutes(plugin: Teletype) {
-    val root = plugin.teletypeConfig.filesRoot
+    val root = plugin.teletypeConfig.filesRoot.canonicalFile
+    val rootPath = root.path
 
     fun resolve(path: String): File? {
         val resolved = File(root, path).canonicalFile
-        return if (resolved.path.startsWith(root.canonicalPath)) resolved else null
+        return if (resolved.path == rootPath || resolved.path.startsWith(rootPath + File.separator)) resolved else null
     }
 
     get("/list") {
@@ -44,16 +47,18 @@ fun Route.fileRoutes(plugin: Teletype) {
         if (!dir.exists() || !dir.isDirectory)
             return@get call.respond(HttpStatusCode.NotFound, ErrorResponse("Directory not found"))
 
-        val entries = dir.listFiles()?.map {
-            FileEntry(
-                name = it.name,
-                path = it.relativeTo(root).path,
-                isDirectory = it.isDirectory,
-                size = if (it.isFile) it.length() else 0L,
-                lastModified = it.lastModified()
-            )
-        }?.sortedWith(compareByDescending<FileEntry> { it.isDirectory }.thenBy { it.name })
-            ?: emptyList()
+        val entries = withContext(Dispatchers.IO) {
+            dir.listFiles()?.map {
+                FileEntry(
+                    name = it.name,
+                    path = it.relativeTo(root).path,
+                    isDirectory = it.isDirectory,
+                    size = if (it.isFile) it.length() else 0L,
+                    lastModified = it.lastModified()
+                )
+            }?.sortedWith(compareByDescending<FileEntry> { it.isDirectory }.thenBy { it.name })
+                ?: emptyList()
+        }
 
         call.respond(entries)
     }
@@ -66,10 +71,13 @@ fun Route.fileRoutes(plugin: Teletype) {
             return@get call.respond(HttpStatusCode.NotFound, ErrorResponse("File not found"))
         if (file.length() > MAX_TEXT_SIZE)
             return@get call.respond(HttpStatusCode.PayloadTooLarge, ErrorResponse("File too large for editor (max 2 MB)"))
-        if (isBinary(file))
+        val content = withContext(Dispatchers.IO) {
+            if (isBinary(file)) null else file.readText()
+        }
+        if (content == null)
             return@get call.respond(HttpStatusCode.UnsupportedMediaType, ErrorResponse("Binary file cannot be opened in editor"))
 
-        call.respondText(file.readText(), ContentType.Text.Plain)
+        call.respondText(content, ContentType.Text.Plain)
     }
 
     put("/write") {
@@ -80,8 +88,10 @@ fun Route.fileRoutes(plugin: Teletype) {
             return@put call.respond(HttpStatusCode.BadRequest, ErrorResponse("Path is a directory"))
 
         val content = call.receive<String>()
-        file.parentFile?.mkdirs()
-        file.writeText(content)
+        withContext(Dispatchers.IO) {
+            file.parentFile?.mkdirs()
+            file.writeText(content)
+        }
         call.respond(StatusResponse("saved"))
         auditAsync(plugin, "file_write", path)
     }
@@ -113,7 +123,9 @@ fun Route.fileRoutes(plugin: Teletype) {
             if (part is PartData.FileItem) {
                 val filename = part.originalFileName?.let { File(it).name } ?: "upload"
                 val dest = File(dir, filename)
-                part.provider().toInputStream().use { input -> dest.outputStream().use { input.copyTo(it) } }
+                withContext(Dispatchers.IO) {
+                    part.provider().toInputStream().use { input -> dest.outputStream().use { input.copyTo(it) } }
+                }
                 count++
             }
             part.dispose()
@@ -129,7 +141,9 @@ fun Route.fileRoutes(plugin: Teletype) {
         if (!file.exists())
             return@delete call.respond(HttpStatusCode.NotFound, ErrorResponse("Not found"))
 
-        val deleted = if (file.isDirectory) file.deleteRecursively() else file.delete()
+        val deleted = withContext(Dispatchers.IO) {
+            if (file.isDirectory) file.deleteRecursively() else file.delete()
+        }
         if (deleted) {
             call.respond(StatusResponse("deleted"))
             auditAsync(plugin, "file_delete", path)
@@ -143,7 +157,7 @@ fun Route.fileRoutes(plugin: Teletype) {
         if (dir.exists())
             return@post call.respond(HttpStatusCode.Conflict, ErrorResponse("Already exists"))
 
-        if (dir.mkdirs()) call.respond(StatusResponse("created"))
+        if (withContext(Dispatchers.IO) { dir.mkdirs() }) call.respond(StatusResponse("created"))
         else call.respond(HttpStatusCode.InternalServerError, ErrorResponse("Failed to create directory"))
     }
 
@@ -159,8 +173,11 @@ fun Route.fileRoutes(plugin: Teletype) {
         if (to.exists())
             return@patch call.respond(HttpStatusCode.Conflict, ErrorResponse("Destination already exists"))
 
-        to.parentFile?.mkdirs()
-        if (from.renameTo(to)) {
+        val moved = withContext(Dispatchers.IO) {
+            to.parentFile?.mkdirs()
+            from.renameTo(to)
+        }
+        if (moved) {
             call.respond(StatusResponse("moved"))
             auditAsync(plugin, "file_rename", "${req.from} → ${req.to}")
         } else call.respond(HttpStatusCode.InternalServerError, ErrorResponse("Rename failed"))
@@ -176,20 +193,22 @@ fun Route.fileRoutes(plugin: Teletype) {
 
         val searchRoot = if (scope == "global") root else (resolve(path) ?: root)
 
-        val results = searchRoot.walkTopDown()
-            .filter { it != searchRoot }
-            .filter { fileMatchesQuery(it.name, q, fuzzyLevel) }
-            .take(200)
-            .map { file ->
-                FileEntry(
-                    name = file.name,
-                    path = file.relativeTo(root).path,
-                    isDirectory = file.isDirectory,
-                    size = if (file.isFile) file.length() else 0L,
-                    lastModified = file.lastModified()
-                )
-            }
-            .toList()
+        val results = withContext(Dispatchers.IO) {
+            searchRoot.walkTopDown()
+                .filter { it != searchRoot }
+                .filter { fileMatchesQuery(it.name, q, fuzzyLevel) }
+                .take(200)
+                .map { file ->
+                    FileEntry(
+                        name = file.name,
+                        path = file.relativeTo(root).path,
+                        isDirectory = file.isDirectory,
+                        size = if (file.isFile) file.length() else 0L,
+                        lastModified = file.lastModified()
+                    )
+                }
+                .toList()
+        }
 
         call.respond(results)
     }
@@ -209,7 +228,7 @@ fun Route.fileRoutes(plugin: Teletype) {
             ?: "download"
         val dest = File(dir, derivedName)
 
-        kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+        withContext(Dispatchers.IO) {
             url.openStream().use { input -> dest.outputStream().use { input.copyTo(it) } }
         }
 
