@@ -1,6 +1,7 @@
 package io.github.Earth1283.teletype.actions
 
 import io.github.Earth1283.teletype.Teletype
+import io.github.Earth1283.teletype.util.TeletypeCommandOrigin
 import io.github.Earth1283.teletype.web.model.ScheduledAction
 import io.github.Earth1283.teletype.web.model.Snippet
 import kotlinx.coroutines.Dispatchers
@@ -198,7 +199,9 @@ class SnippetScheduler(private val plugin: Teletype, private val store: SnippetS
         val sender = Bukkit.getConsoleSender()
         snippet.cmds.forEach { cmd ->
             val filled = vars.entries.fold(cmd) { acc, (k, v) -> acc.replace("{$k}", v) }
-            Bukkit.dispatchCommand(sender, filled.removePrefix("/"))
+            TeletypeCommandOrigin.run {
+                Bukkit.dispatchCommand(sender, filled.removePrefix("/"))
+            }
         }
     }
 

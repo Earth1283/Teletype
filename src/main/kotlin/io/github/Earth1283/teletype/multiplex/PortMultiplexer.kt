@@ -5,6 +5,8 @@ import java.io.ByteArrayOutputStream
 import java.io.File
 import java.io.InputStream
 import java.io.OutputStream
+import java.net.Inet4Address
+import java.net.Inet6Address
 import java.net.ServerSocket
 import java.net.Socket
 import java.util.Properties
@@ -21,6 +23,7 @@ class PortMultiplexer(private val plugin: Teletype) {
         val publicPort = plugin.teletypeConfig.multiplexPort
         val gamePort   = plugin.server.port
         val ktorPort   = plugin.teletypeConfig.port
+        val forwardPlayerAddresses = plugin.teletypeConfig.forwardMinecraftPlayerAddresses
 
         if (publicPort == gamePort) {
             val internalPort = gamePort + 1
@@ -33,13 +36,13 @@ class PortMultiplexer(private val plugin: Teletype) {
         }
 
         try {
-            startListening(publicPort, ktorPort, gamePort)
+            startListening(publicPort, ktorPort, gamePort, forwardPlayerAddresses)
         } catch (e: Exception) {
             plugin.logger.severe("[Teletype] Multiplexer failed to bind :$publicPort — ${e.message}")
         }
     }
 
-    private fun startListening(publicPort: Int, ktorPort: Int, gamePort: Int) {
+    private fun startListening(publicPort: Int, ktorPort: Int, gamePort: Int, forwardPlayerAddresses: Boolean) {
         val ss = ServerSocket(publicPort)
         serverSocket = ss
         val pool = Executors.newCachedThreadPool { r ->
@@ -49,12 +52,13 @@ class PortMultiplexer(private val plugin: Teletype) {
 
         pool.submit {
             plugin.logger.info(
-                "[Teletype] Port multiplexer on :$publicPort — HTTP → :$ktorPort, Minecraft → :$gamePort"
+                "[Teletype] Port multiplexer on :$publicPort — HTTP → :$ktorPort, " +
+                    "Minecraft → :$gamePort, player IP forwarding=${if (forwardPlayerAddresses) "on" else "off"}"
             )
             while (!ss.isClosed) {
                 try {
                     val client = ss.accept()
-                    pool.submit { handleConnection(client, ktorPort, gamePort) }
+                    pool.submit { handleConnection(client, ktorPort, gamePort, forwardPlayerAddresses) }
                 } catch (e: Exception) {
                     if (!ss.isClosed) plugin.logger.warning("[Teletype] Multiplexer accept error: ${e.message}")
                 }
@@ -70,14 +74,15 @@ class PortMultiplexer(private val plugin: Teletype) {
         executor = null
     }
 
-    private fun handleConnection(client: Socket, ktorPort: Int, gamePort: Int) {
+    private fun handleConnection(client: Socket, ktorPort: Int, gamePort: Int, forwardPlayerAddresses: Boolean) {
         client.use {
             val header = ByteArray(4)
             val n = readExact(client.getInputStream(), header)
             if (n < 4) return
 
             if (!isHttp(header)) {
-                proxyTo(client, gamePort, header, n)
+                val proxyHeader = if (forwardPlayerAddresses) proxyProtocolHeader(client) else null
+                proxyTo(client, gamePort, header, n, proxyHeader)
                 return
             }
 
@@ -110,10 +115,17 @@ class PortMultiplexer(private val plugin: Teletype) {
         }
     }
 
-    private fun proxyTo(client: Socket, targetPort: Int, prefixBytes: ByteArray, prefixLen: Int) {
+    private fun proxyTo(
+        client: Socket,
+        targetPort: Int,
+        prefixBytes: ByteArray,
+        prefixLen: Int,
+        prefaceBytes: ByteArray? = null,
+    ) {
         try {
             Socket("127.0.0.1", targetPort).use { backend ->
                 val backendOut = backend.getOutputStream()
+                if (prefaceBytes != null) backendOut.write(prefaceBytes)
                 backendOut.write(prefixBytes, 0, prefixLen)
                 backendOut.flush()
                 val pool = executor ?: return
@@ -129,6 +141,26 @@ class PortMultiplexer(private val plugin: Teletype) {
             }
         } catch (_: Exception) {}
     }
+
+    private fun proxyProtocolHeader(client: Socket): ByteArray {
+        val source = client.inetAddress
+        val destination = client.localAddress
+        val family = when {
+            source is Inet4Address && destination is Inet4Address -> "TCP4"
+            source is Inet6Address && destination is Inet6Address -> "TCP6"
+            else -> "UNKNOWN"
+        }
+
+        val line = if (family == "UNKNOWN") {
+            "PROXY UNKNOWN\r\n"
+        } else {
+            "PROXY $family ${cleanAddress(source.hostAddress)} ${cleanAddress(destination.hostAddress)} " +
+                "${client.port} ${client.localPort}\r\n"
+        }
+        return line.toByteArray(Charsets.US_ASCII)
+    }
+
+    private fun cleanAddress(value: String): String = value.substringBefore('%')
 
     private fun readUntilCRLF(input: InputStream, maxBytes: Int): ByteArray {
         val buf = ByteArrayOutputStream()

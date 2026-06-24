@@ -23,6 +23,7 @@ class TeletypeConfig(private val plugin: Teletype) {
     val maxWebSocketConnections: Int get() = config.getInt("server.max-websocket-connections", 8)
     val multiplexGamePort: Boolean get() = bool("server.multiplex-game-port", false)
     val multiplexPort: Int get() = config.getInt("server.multiplex-port", 25565)
+    val forwardMinecraftPlayerAddresses: Boolean get() = bool("server.forward-minecraft-player-addresses", false)
 
     // ── TLS ───────────────────────────────────────────────────────────────────
     val tlsEnabled: Boolean get() = bool("server.tls.enabled", false)
@@ -61,6 +62,9 @@ class TeletypeConfig(private val plugin: Teletype) {
 
     val challengeTtlSeconds: Long get() = config.getLong("auth.challenge-ttl-seconds", 300)
     val requireOp: Boolean get() = bool("auth.require-op", true)
+    val disallowTeletypeVerify: Boolean get() = bool("auth.disallow-teletype-verify", true)
+    val disallowPlayerVerify: Boolean get() = bool("auth.disallow-player-verify", true)
+    val allowPlayerVerifyMatchingIp: Boolean get() = bool("auth.allow-player-verify-matching-ip", true)
 
     // ── Console ───────────────────────────────────────────────────────────────
     val consoleEnabled: Boolean get() = bool("console.enabled", true)

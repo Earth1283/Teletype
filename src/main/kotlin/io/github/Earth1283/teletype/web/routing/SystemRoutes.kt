@@ -1,6 +1,7 @@
 package io.github.Earth1283.teletype.web.routing
 
 import io.github.Earth1283.teletype.Teletype
+import io.github.Earth1283.teletype.util.TeletypeCommandOrigin
 import io.github.Earth1283.teletype.web.model.StatusResponse
 import io.ktor.http.ContentType
 import io.ktor.server.response.respond
@@ -13,7 +14,9 @@ import org.bukkit.Bukkit
 fun Route.systemRoutes(plugin: Teletype) {
     post("/restart") {
         Bukkit.getScheduler().runTask(plugin, Runnable {
-            Bukkit.dispatchCommand(Bukkit.getConsoleSender(), "restart")
+            TeletypeCommandOrigin.run {
+                Bukkit.dispatchCommand(Bukkit.getConsoleSender(), "restart")
+            }
         })
         call.respond(StatusResponse("restarting"))
         auditAsync(plugin, "server_restart", "triggered via Teletype UI")

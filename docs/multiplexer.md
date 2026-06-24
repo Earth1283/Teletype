@@ -43,9 +43,31 @@ Set in `config.yml`:
 server:
   multiplex-game-port: true   # enable the multiplexer
   multiplex-port: 25565       # port the multiplexer binds to
+  forward-minecraft-player-addresses: false
 ```
 
 When `multiplex-game-port: true`, Teletype starts the multiplexer thread pool on the configured port and runs Ktor on an internal port. The Minecraft server runs on `multiplex-port + 1` internally.
+
+### Forwarding Minecraft Player IPs
+
+By default, the internal Minecraft listener sees muxed players as `127.0.0.1` because Teletype opens a local backend socket to the game server. To preserve the real client address, enable:
+
+```yaml
+server:
+  forward-minecraft-player-addresses: true
+```
+
+When enabled, Teletype prepends an HAProxy PROXY protocol v1 header to **Minecraft-bound** connections before replaying the buffered handshake bytes. Paper must also be configured to accept PROXY protocol on the internal Minecraft listener:
+
+```yaml
+# config/paper-global.yml
+proxies:
+  proxy-protocol: true
+```
+
+If Paper is not configured for it, players will fail to join because the backend will treat the `PROXY ...` line as invalid Minecraft protocol.
+
+This only affects Minecraft connections routed by the multiplexer. HTTP/Ktor traffic is not given a PROXY preface.
 
 ### The First-Start Shuffle
 
@@ -94,7 +116,7 @@ CONNECT is included because some WebSocket upgrade handshakes travel through CON
 
 **Minecraft Bedrock:** The multiplexer is TCP-only. Bedrock uses UDP. If you need Bedrock support, Geyser handles that on a separate port and the multiplexer ignores it.
 
-**HAProxy/CDN in front:** If you run HAProxy PROXY protocol, the first bytes are `PROXY TCP4 ...`, which starts with `P` — but `PROX` is not in the allowed prefix list, so it would route to Minecraft. Don't put HAProxy PROXY protocol in front of the multiplexer. If you need it, terminate HAProxy before the mux or configure Ktor directly.
+**HAProxy/CDN in front:** If you run HAProxy PROXY protocol in front of Teletype, the first bytes are `PROXY TCP4 ...`, which starts with `P` — but `PROX` is not in the allowed prefix list, so it would route to Minecraft. Don't put inbound HAProxy PROXY protocol in front of the multiplexer. Teletype's `forward-minecraft-player-addresses` setting is different: it emits PROXY protocol from Teletype to the internal Minecraft listener after the mux has already classified the connection.
 
 **Performance:** For a small web panel used by one or two admins, the relay overhead is negligible. For Minecraft game traffic, every packet passes through two extra `InputStream.read()` calls and two threads per connection. This is fine at typical player counts. If you're running 500+ players and are worried about latency, you are almost certainly not running the web panel on a shared game port — disable the multiplexer and open the firewall.
 
@@ -112,6 +134,7 @@ Set `multiplex-game-port: false` (the default). Teletype binds its HTTP server t
 |--------|---------|---------|
 | `server.multiplex-game-port` | `false` | Enable single-port mux |
 | `server.multiplex-port` | `25565` | Port the mux binds to |
+| `server.forward-minecraft-player-addresses` | `false` | Send HAProxy PROXY protocol v1 to Minecraft backend so Paper can see real player IPs |
 
 The game server runs on `multiplex-port + 1` when the mux is active. Ktor runs on an internal port chosen at startup. Clients see one port. The servers see two.
 

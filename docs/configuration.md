@@ -16,6 +16,7 @@ server:
   # Port multiplexer — share one port between the web panel and Minecraft game traffic
   multiplex-game-port: false   # Enable single-port mux (see docs/multiplexer.md)
   multiplex-port: 25565        # Port the mux binds to when enabled
+  forward-minecraft-player-addresses: false # Send HAProxy PROXY protocol to Minecraft backend
 ```
 
 `cors-origins` example for a specific origin:
@@ -33,6 +34,8 @@ When `multiplex-game-port: true`, Teletype binds to `multiplex-port` and routes 
 The routing decision is made by peeking the first 4 bytes. If they match an HTTP method prefix, the connection goes to Ktor. Otherwise it goes to Minecraft. No firewall rule changes needed.
 
 **First-time setup:** If Minecraft already owns `multiplex-port` when the multiplexer starts, Teletype patches `server.properties` (`server-port=N` → `server-port=N+1`) and prints a warning. Two restarts are required. To avoid this, set `server-port` in `server.properties` to `multiplex-port + 1` before enabling the mux.
+
+**Player IP forwarding:** Enable `forward-minecraft-player-addresses` only after Paper is configured to accept HAProxy PROXY protocol on the internal Minecraft listener. In `config/paper-global.yml`, set `proxies.proxy-protocol: true`. Without that backend setting, Minecraft will reject the prefixed connection.
 
 See [Port Multiplexer](multiplexer.md) for full details and limitations.
 

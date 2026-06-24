@@ -1,6 +1,7 @@
 package io.github.Earth1283.teletype.web.routing
 
 import io.github.Earth1283.teletype.Teletype
+import io.github.Earth1283.teletype.util.TeletypeCommandOrigin
 import io.github.Earth1283.teletype.util.onServerThread
 import io.github.Earth1283.teletype.web.model.ExecuteRequest
 import io.github.Earth1283.teletype.web.model.PlayerInfo
@@ -50,7 +51,9 @@ fun Route.apiRoutes(plugin: Teletype) {
         post("/execute") {
             val body = call.receive<ExecuteRequest>()
             Bukkit.getScheduler().runTask(plugin, Runnable {
-                Bukkit.dispatchCommand(Bukkit.getConsoleSender(), body.command)
+                TeletypeCommandOrigin.run {
+                    Bukkit.dispatchCommand(Bukkit.getConsoleSender(), body.command)
+                }
             })
             call.respond(StatusResponse("dispatched"))
             auditAsync(plugin, "execute_command", body.command)

@@ -4,6 +4,7 @@ import io.github.Earth1283.teletype.Teletype
 import io.github.Earth1283.teletype.auth.JwtService
 import io.github.Earth1283.teletype.config.ConfigUpdater
 import io.github.Earth1283.teletype.config.TeletypeConfig
+import io.github.Earth1283.teletype.util.TeletypeCommandOrigin
 import net.kyori.adventure.text.Component
 import net.kyori.adventure.text.TextComponent
 import net.kyori.adventure.text.format.NamedTextColor
@@ -13,6 +14,7 @@ import org.bukkit.command.CommandExecutor
 import org.bukkit.command.CommandSender
 import org.bukkit.command.ConsoleCommandSender
 import org.bukkit.command.TabCompleter
+import org.bukkit.entity.Player
 import java.io.File
 import java.net.InetSocketAddress
 import java.net.ServerSocket
@@ -44,12 +46,43 @@ class TtyCommand(private val plugin: Teletype) : CommandExecutor, TabCompleter {
             plugin.messages.send(sender, "command.verify.no-permission")
             return
         }
+        if (plugin.teletypeConfig.disallowTeletypeVerify && TeletypeCommandOrigin.isActive) {
+            plugin.messages.send(sender, "command.verify.teletype-denied")
+            return
+        }
         if (args.size < 2) {
             plugin.messages.send(sender, "command.verify.usage")
             return
         }
         val uuid = runCatching { UUID.fromString(args[1]) }.getOrNull()
             ?: run { plugin.messages.send(sender, "command.verify.invalid-uuid"); return }
+
+        val challenge = plugin.challengeStore.getPending(uuid)
+            ?: run { plugin.messages.send(sender, "command.verify.not-found"); return }
+
+        if (sender is Player && plugin.teletypeConfig.disallowPlayerVerify) {
+            val playerIp = normalizeIp(sender.address?.address?.hostAddress)
+            val challengeIp = normalizeIp(challenge.remoteAddress)
+            val matchingIpAllowed = plugin.teletypeConfig.allowPlayerVerifyMatchingIp &&
+                playerIp != null &&
+                challengeIp != null &&
+                playerIp == challengeIp
+
+            if (!matchingIpAllowed) {
+                val messageKey = if (plugin.teletypeConfig.allowPlayerVerifyMatchingIp) {
+                    "command.verify.player-ip-mismatch"
+                } else {
+                    "command.verify.player-denied"
+                }
+                plugin.messages.send(
+                    sender,
+                    messageKey,
+                    "player_ip" to (playerIp ?: "unknown"),
+                    "http_ip" to (challengeIp ?: "unknown")
+                )
+                return
+            }
+        }
 
         val jwt = plugin.jwtService.issueToken(expiryHours = plugin.teletypeConfig.jwtExpiryHours)
         if (plugin.challengeStore.verify(uuid, jwt)) {
@@ -74,8 +107,14 @@ class TtyCommand(private val plugin: Teletype) : CommandExecutor, TabCompleter {
         if (plugin.webServer.isRunning) {
             plugin.messages.send(sender, "command.start.already-running"); return
         }
-        plugin.webServer.start()
-        plugin.messages.send(sender, "command.start.success")
+        plugin.messages.send(sender, "command.start.progress")
+        runCatching {
+            plugin.webServer.start()
+        }.onSuccess {
+            plugin.messages.send(sender, "command.start.success")
+        }.onFailure { e ->
+            plugin.messages.send(sender, "command.start.failed", "error" to (e.message ?: "unknown"))
+        }
     }
 
     private fun handleStop(sender: CommandSender) {
@@ -85,8 +124,14 @@ class TtyCommand(private val plugin: Teletype) : CommandExecutor, TabCompleter {
         if (!plugin.webServer.isRunning) {
             plugin.messages.send(sender, "command.stop.not-running"); return
         }
-        plugin.webServer.stop()
-        plugin.messages.send(sender, "command.stop.success")
+        plugin.messages.send(sender, "command.stop.progress")
+        runCatching {
+            plugin.webServer.stop()
+        }.onSuccess {
+            plugin.messages.send(sender, "command.stop.success")
+        }.onFailure { e ->
+            plugin.messages.send(sender, "command.stop.failed", "error" to (e.message ?: "unknown"))
+        }
     }
 
     private fun handleReload(sender: CommandSender) {
@@ -95,6 +140,7 @@ class TtyCommand(private val plugin: Teletype) : CommandExecutor, TabCompleter {
         }
 
         val wasRunning = plugin.webServer.isRunning
+        plugin.messages.send(sender, "command.reload.progress")
         runCatching {
             if (wasRunning) plugin.webServer.stop()
             ConfigUpdater.update(plugin, "config.yml")
@@ -165,11 +211,38 @@ class TtyCommand(private val plugin: Teletype) : CommandExecutor, TabCompleter {
                     DoctorCheck(Level.FAIL, "Auth secret", "JWT secret is too short or missing")
                 }
             )
+            add(
+                if (cfg.disallowTeletypeVerify) {
+                    DoctorCheck(Level.PASS, "Verify guard", "Teletype-originated /tty verify is blocked")
+                } else {
+                    DoctorCheck(Level.WARN, "Verify guard", "Teletype-originated /tty verify is allowed")
+                }
+            )
+            add(
+                when {
+                    !cfg.disallowPlayerVerify ->
+                        DoctorCheck(Level.WARN, "Player verify", "operators can verify challenges in-game")
+                    cfg.allowPlayerVerifyMatchingIp ->
+                        DoctorCheck(Level.PASS, "Player verify", "blocked unless player IP matches challenge HTTP IP")
+                    else ->
+                        DoctorCheck(Level.PASS, "Player verify", "blocked for all players")
+                }
+            )
             add(fileCheck("Metrics DB", metricsDb, expectDirectory = false, requireWrite = true, missingLevel = if (cfg.metricsSqliteEnabled) Level.WARN else Level.PASS))
             add(fileCheck("Audit DB", auditDb, expectDirectory = false, requireWrite = true))
             add(fileCheck("Files root", cfg.filesRoot, expectDirectory = true, requireWrite = false, missingLevel = if (cfg.filesEnabled) Level.FAIL else Level.WARN))
             add(DoctorCheck(Level.PASS, "Actions", "${plugin.snippetStore.getSnippets().size} snippets, ${plugin.snippetScheduler.getActions().size} scheduled"))
             add(DoctorCheck(Level.PASS, "Network", "${plugin.routeStore.getRoutes().size} routes, ${plugin.portForwardStore.getForwards().size} forwards, multiplex=${if (cfg.multiplexGamePort) "on" else "off"}"))
+            add(
+                when {
+                    !cfg.multiplexGamePort ->
+                        DoctorCheck(Level.PASS, "Player IP forwarding", "multiplexer is disabled")
+                    cfg.forwardMinecraftPlayerAddresses ->
+                        DoctorCheck(Level.WARN, "Player IP forwarding", "enabled; Paper proxy-protocol must be enabled on the internal game listener")
+                    else ->
+                        DoctorCheck(Level.WARN, "Player IP forwarding", "disabled; Minecraft will see multiplexer connections as 127.0.0.1")
+                }
+            )
         }
     }
 
@@ -236,6 +309,14 @@ class TtyCommand(private val plugin: Teletype) : CommandExecutor, TabCompleter {
             .append(Component.text("Teletype", NamedTextColor.AQUA, TextDecoration.BOLD))
             .append(Component.text(" » ", NamedTextColor.DARK_GRAY))
             .build()
+
+    private fun normalizeIp(value: String?): String? {
+        val trimmed = value?.trim()?.takeIf { it.isNotBlank() } ?: return null
+        return trimmed
+            .removePrefix("/")
+            .removePrefix("::ffff:")
+            .substringBefore('%')
+    }
 
     override fun onTabComplete(
         sender: CommandSender, command: Command, alias: String, args: Array<String>

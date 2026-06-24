@@ -20,6 +20,10 @@ command:
 
   verify:
     no-permission: "{prefix}<red>Only operators or console can verify challenges."
+    teletype-denied: "{prefix}<red>For security, <white>/tty verify</white><red> cannot be run from Teletype. Use the real server console or an operator in-game."
+    player-denied: "{prefix}<red>For security, players cannot run <white>/tty verify</white><red>. Use the real server console."
+    # {player_ip} {http_ip}
+    player-ip-mismatch: "{prefix}<red>For security, player verify requires matching IPs. <gray>Player: <white>{player_ip}</white> <dark_gray>|</dark_gray> HTTP: <white>{http_ip}</white>"
     usage: "{prefix}<red>Usage: <gray>/tty verify [uuid]"
     invalid-uuid: "{prefix}<red>Invalid UUID format."
     # (no placeholders)
@@ -34,13 +38,20 @@ command:
 
   start:
     already-running: "{prefix}<yellow>Web server is already running."
+    progress: "{prefix}<gray>Starting web server..."
     success: "{prefix}<green>Web server started."
+    # {error}
+    failed: "{prefix}<red>Failed to start web server: <white>{error}"
 
   stop:
     not-running: "{prefix}<yellow>Web server is not running."
+    progress: "{prefix}<gray>Stopping web server..."
     success: "{prefix}<yellow>Web server stopped."
+    # {error}
+    failed: "{prefix}<red>Failed to stop web server: <white>{error}"
 
   reload:
+    progress: "{prefix}<gray>Reloading configuration..."
     # {state}
     success: "{prefix}<green>Configuration reloaded; <white>{state}<green>. <gray>Startup-only subsystem changes require a full server restart."
     # {error}

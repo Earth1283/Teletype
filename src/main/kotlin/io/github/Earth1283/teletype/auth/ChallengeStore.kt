@@ -24,10 +24,11 @@ class ChallengeStore(plugin: Teletype) {
         }.runTaskTimerAsynchronously(plugin, 600L, 600L)
     }
 
-    fun createChallenge(): PendingChallenge {
+    fun createChallenge(remoteAddress: String): PendingChallenge {
         val challenge = PendingChallenge(
             uuid = UUID.randomUUID(),
             createdAt = Instant.now(),
+            remoteAddress = remoteAddress,
             deferred = CompletableDeferred()
         )
         store[challenge.uuid] = challenge

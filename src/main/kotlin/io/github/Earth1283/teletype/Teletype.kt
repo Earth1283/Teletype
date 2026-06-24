@@ -100,7 +100,8 @@ class Teletype : JavaPlugin() {
         startupLine(
             "NETWORK",
             "Network routing loaded",
-            "routes=${routeStore.getRoutes().size}, forwards=${portForwardStore.getForwards().size}, multiplex=${enabled(teletypeConfig.multiplexGamePort)}"
+            "routes=${routeStore.getRoutes().size}, forwards=${portForwardStore.getForwards().size}, " +
+                "multiplex=${enabled(teletypeConfig.multiplexGamePort)}, player-ip-forwarding=${enabled(teletypeConfig.forwardMinecraftPlayerAddresses)}"
         )
 
         if (teletypeConfig.consoleEnabled) ConsoleInterceptor.install(consoleBroadcaster)

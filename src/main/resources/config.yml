@@ -48,6 +48,17 @@ server:
   # (Only used when multiplex-game-port is true.)
   multiplex-port: 25565
 
+  # Forward real Minecraft client IPs through the Teletype multiplexer using
+  # HAProxy PROXY protocol v1.
+  #
+  # BEFORE setting this to true, edit Paper's config/paper-global.yml:
+  #   proxies:
+  #     proxy-protocol: true
+  #
+  # If Paper's proxy-protocol support is not enabled first, players will fail
+  # to join because Paper will read the PROXY header as invalid Minecraft data.
+  forward-minecraft-player-addresses: false
+
   tls:
     # Enable HTTPS. A self-signed certificate is generated automatically on first
     # start (stored in plugins/Teletype/keystore.jks). Browsers will show a
@@ -108,6 +119,19 @@ auth:
   # Require the verifying player to be an operator (/op).
   # Set false to allow any player with console access to authenticate.
   require-op: true
+
+  # Security guard: block `tty verify ...` when the command was dispatched by
+  # Teletype itself, such as from the web console, /api/execute, or snippets.
+  # Leave enabled to prevent a browser session from approving its own login.
+  disallow-teletype-verify: true
+
+  # Security guard: block players from running `tty verify ...`, even when they
+  # are operators. The real server console is still allowed.
+  disallow-player-verify: true
+
+  # If player verification is blocked, allow it only when the player's Minecraft
+  # connection IP matches the HTTP connection that created the challenge.
+  allow-player-verify-matching-ip: true
 
 # ── Console interceptor ───────────────────────────────────────────────────────
 console:

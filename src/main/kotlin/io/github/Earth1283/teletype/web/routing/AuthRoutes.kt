@@ -5,6 +5,7 @@ import io.github.Earth1283.teletype.web.model.ChallengeResponse
 import io.github.Earth1283.teletype.web.model.ErrorResponse
 import io.github.Earth1283.teletype.web.model.PollResponse
 import io.ktor.http.HttpStatusCode
+import io.ktor.server.plugins.origin
 import io.ktor.server.response.respond
 import io.ktor.server.routing.Route
 import io.ktor.server.routing.get
@@ -14,7 +15,7 @@ import java.util.UUID
 
 fun Route.authRoutes(plugin: Teletype) {
     post("/challenge") {
-        val challenge = plugin.challengeStore.createChallenge()
+        val challenge = plugin.challengeStore.createChallenge(call.request.origin.remoteAddress)
         call.respond(
             ChallengeResponse(
                 uuid = challenge.uuid.toString(),

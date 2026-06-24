@@ -7,5 +7,6 @@ import java.util.UUID
 data class PendingChallenge(
     val uuid: UUID,
     val createdAt: Instant,
+    val remoteAddress: String,
     val deferred: CompletableDeferred<String>
 )

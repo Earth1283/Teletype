@@ -1,6 +1,7 @@
 package io.github.Earth1283.teletype.web.routing
 
 import io.github.Earth1283.teletype.Teletype
+import io.github.Earth1283.teletype.util.TeletypeCommandOrigin
 import io.github.Earth1283.teletype.web.model.WsMessage
 import io.ktor.server.websocket.DefaultWebSocketServerSession
 import io.ktor.websocket.CloseReason
@@ -57,7 +58,9 @@ suspend fun DefaultWebSocketServerSession.consoleWebSocket(plugin: Teletype) {
                 when {
                     msg.type == "command" && msg.payload.isNotBlank() -> {
                         Bukkit.getScheduler().runTask(plugin, Runnable {
-                            Bukkit.dispatchCommand(Bukkit.getConsoleSender(), msg.payload)
+                            TeletypeCommandOrigin.run {
+                                Bukkit.dispatchCommand(Bukkit.getConsoleSender(), msg.payload)
+                            }
                         })
                     }
                     msg.type == "tab_complete" && msg.payload.isNotBlank() -> {
