@@ -68,6 +68,19 @@ function fmtTimeFull(ts: number) {
   return `${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`
 }
 function fmtK(v: number) { return v >= 1000 ? `${(v / 1000).toFixed(1)}k` : String(Math.round(v)) }
+function fmtPct(v: number) { return `${Math.round(v * 100)}%` }
+function finiteNumbers(values: Array<number | null | undefined>): number[] {
+  return values.filter((v): v is number => typeof v === 'number' && isFinite(v))
+}
+function avg(values: number[]): number | null {
+  return values.length ? values.reduce((a, b) => a + b, 0) / values.length : null
+}
+function min(values: number[]): number | null {
+  return values.length ? Math.min(...values) : null
+}
+function max(values: number[]): number | null {
+  return values.length ? Math.max(...values) : null
+}
 
 const MAX_PTS = 400
 function downsample<T extends { timestamp: number }>(data: T[]): T[] {
@@ -811,7 +824,39 @@ export default function ServerStats({ onNavigate }: Props) {
     enabled: ss.showChartPlayers,
   })
 
-  const history = useMemo(() => downsample(historyRaw), [historyRaw])
+  const historyRawWithCurrent = useMemo(() => {
+    if (!snap) return historyRaw
+    const lastTs = historyRaw[historyRaw.length - 1]?.timestamp ?? 0
+    return snap.timestamp > lastTs + 500 ? [...historyRaw, snap] : historyRaw
+  }, [historyRaw, snap])
+
+  const history = useMemo(() => downsample(historyRawWithCurrent), [historyRawWithCurrent])
+
+  const rangeSummary = useMemo(() => {
+    const rows = historyRawWithCurrent
+    const tps = finiteNumbers(rows.map(s => s.tps1))
+    const mspt = finiteNumbers(rows.map(s => s.tickTimeMs))
+    const players = finiteNumbers(rows.map(s => s.playerCount))
+    const cpu = finiteNumbers(rows.map(s => s.cpuPercent != null && s.cpuPercent >= 0 ? s.cpuPercent : null))
+    const jvmPct = finiteNumbers(rows.map(s => s.memMaxMb > 0 ? s.memUsedMb / s.memMaxMb : null))
+    const ping95 = finiteNumbers(rows.map(s => s.pingP95 != null && s.pingP95 > 0 ? s.pingP95 : null))
+    const firstTs = rows[0]?.timestamp ?? null
+    const lastTs = rows[rows.length - 1]?.timestamp ?? null
+
+    return {
+      samples: rows.length,
+      coverageMin: firstTs !== null && lastTs !== null ? Math.max(0, (lastTs - firstTs) / 60_000) : null,
+      avgTps: avg(tps),
+      minTps: min(tps),
+      avgMspt: avg(mspt),
+      maxMspt: max(mspt),
+      avgPlayers: avg(players),
+      peakPlayers: max(players),
+      avgCpu: avg(cpu),
+      peakJvmPct: max(jvmPct),
+      maxPingP95: max(ping95),
+    }
+  }, [historyRawWithCurrent])
 
   const hasPingData = useMemo(
     () => history.some(s => s.pingP50 != null && s.pingP50 > 0),
@@ -958,6 +1003,69 @@ export default function ServerStats({ onNavigate }: Props) {
             <div className="stat-label">Ping P50</div>
             <div className="stat-value green">{snap.pingP50}ms</div>
             <div className="stat-sub">median latency</div>
+          </div>
+        )}
+        {rangeSummary.samples > 0 && (
+          <div className="stat-card">
+            <div className="stat-label">Window Data</div>
+            <div className="stat-value">{rangeSummary.coverageMin != null ? `${Math.round(rangeSummary.coverageMin)}m` : '—'}</div>
+            <div className="stat-sub">{rangeSummary.samples.toLocaleString()} samples in {range}</div>
+          </div>
+        )}
+        {rangeSummary.avgTps != null && (
+          <div className="stat-card">
+            <div className="stat-label">Avg TPS</div>
+            <div className={`stat-value ${tpsClass(rangeSummary.avgTps)}`}>{rangeSummary.avgTps.toFixed(1)}</div>
+            <div className="stat-sub">selected window</div>
+          </div>
+        )}
+        {rangeSummary.minTps != null && (
+          <div className="stat-card">
+            <div className="stat-label">Lowest TPS</div>
+            <div className={`stat-value ${tpsClass(rangeSummary.minTps)}`}>{rangeSummary.minTps.toFixed(1)}</div>
+            <div className="stat-sub">selected window</div>
+          </div>
+        )}
+        {rangeSummary.avgMspt != null && (
+          <div className="stat-card">
+            <div className="stat-label">Avg MSPT</div>
+            <div className={`stat-value ${tickClass(rangeSummary.avgMspt)}`}>{Math.round(rangeSummary.avgMspt)}ms</div>
+            <div className="stat-sub">selected window</div>
+          </div>
+        )}
+        {rangeSummary.maxMspt != null && (
+          <div className="stat-card">
+            <div className="stat-label">Peak MSPT</div>
+            <div className={`stat-value ${tickClass(rangeSummary.maxMspt)}`}>{Math.round(rangeSummary.maxMspt)}ms</div>
+            <div className="stat-sub">selected window</div>
+          </div>
+        )}
+        {rangeSummary.peakPlayers != null && (
+          <div className="stat-card">
+            <div className="stat-label">Peak Players</div>
+            <div className="stat-value amber">{Math.round(rangeSummary.peakPlayers)}</div>
+            <div className="stat-sub">{rangeSummary.avgPlayers != null ? `avg ${rangeSummary.avgPlayers.toFixed(1)}` : 'selected window'}</div>
+          </div>
+        )}
+        {rangeSummary.avgCpu != null && (
+          <div className="stat-card">
+            <div className="stat-label">Avg CPU</div>
+            <div className={`stat-value ${cpuClass(rangeSummary.avgCpu)}`}>{rangeSummary.avgCpu.toFixed(1)}%</div>
+            <div className="stat-sub">selected window</div>
+          </div>
+        )}
+        {rangeSummary.peakJvmPct != null && (
+          <div className="stat-card">
+            <div className="stat-label">Peak JVM</div>
+            <div className={`stat-value ${memClass(rangeSummary.peakJvmPct)}`}>{fmtPct(rangeSummary.peakJvmPct)}</div>
+            <div className="stat-sub">heap used</div>
+          </div>
+        )}
+        {rangeSummary.maxPingP95 != null && (
+          <div className="stat-card">
+            <div className="stat-label">Worst Ping P95</div>
+            <div className="stat-value">{Math.round(rangeSummary.maxPingP95)}ms</div>
+            <div className="stat-sub">selected window</div>
           </div>
         )}
         <div className="stat-card">

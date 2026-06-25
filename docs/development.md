@@ -40,7 +40,6 @@ Teletype/
 │   │   │   └── RetentionJob.kt      # Nightly downsampling + player_events pruning
 │   │   ├── multiplex/
 │   │   │   └── PortMultiplexer.kt   # Optional single-port HTTP+Minecraft mux
-│   │   ├── standalone/           # Standalone (non-Paper) startup path
 │   │   └── web/
 │   │       ├── WebServer.kt      # Ktor engine + install blocks + route registration
 │   │       ├── TlsManager.kt     # Auto/keystore TLS setup

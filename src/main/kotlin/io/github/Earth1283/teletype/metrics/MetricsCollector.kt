@@ -194,9 +194,9 @@ class MetricsCollector(private val plugin: Teletype, private val db: MetricsData
         )
     }
 
-    /** In-memory history for windows up to 15 minutes (1-second resolution). */
+    /** In-memory history for the requested time window. */
     fun history(windowMinutes: Int): List<MetricSnapshot> {
-        val max = (windowMinutes * 60).coerceIn(1, maxSnapshots)
-        return synchronized(buffer) { buffer.takeLast(max).toList() }
+        val from = System.currentTimeMillis() - windowMinutes.coerceAtLeast(1) * 60_000L
+        return synchronized(buffer) { buffer.filter { it.timestamp >= from } }
     }
 }

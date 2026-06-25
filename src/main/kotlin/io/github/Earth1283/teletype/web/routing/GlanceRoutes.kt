@@ -1,6 +1,7 @@
 package io.github.Earth1283.teletype.web.routing
 
 import io.github.Earth1283.teletype.Teletype
+import io.github.Earth1283.teletype.web.model.MetricSnapshot
 import io.github.Earth1283.teletype.web.model.ErrorResponse
 import io.ktor.http.HttpStatusCode
 import io.ktor.server.response.respond
@@ -15,13 +16,17 @@ fun Route.glanceRoutes(plugin: Teletype) {
     }
 
     get("/history") {
-        // window is in minutes; ≤15 uses in-memory (1-second), larger windows query SQLite.
+        // window is in minutes. Larger windows use SQLite, but always merge in
+        // the live in-memory tail so partial uptime windows still chart fully.
         val window = call.request.queryParameters["window"]?.toIntOrNull()?.coerceIn(1, 525_600) ?: 5
-        val data = if (window <= 15) {
-            plugin.metricsCollector.history(window)
-        } else {
-            plugin.metricsDatabase.history(window)
-        }
+        val memory = plugin.metricsCollector.history(window)
+        val data = if (window <= 15) memory else mergeHistory(plugin.metricsDatabase.history(window), memory)
         call.respond(data)
     }
 }
+
+private fun mergeHistory(persisted: List<MetricSnapshot>, live: List<MetricSnapshot>): List<MetricSnapshot> =
+    (persisted + live)
+        .associateBy { it.timestamp }
+        .values
+        .sortedBy { it.timestamp }

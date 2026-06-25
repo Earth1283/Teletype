@@ -15,7 +15,6 @@ repositories {
 val ktorVersion = "3.1.3"
 val kotlinxSerializationVersion = "1.8.1"
 val kotlinxCoroutinesVersion = "1.10.2"
-val jlineVersion = "3.26.3"
 val logbackVersion = "1.5.18"
 
 dependencies {
@@ -45,17 +44,6 @@ dependencies {
     implementation("io.ktor:ktor-server-rate-limit-jvm:$ktorVersion")
     implementation("io.ktor:ktor-server-http-redirect-jvm:$ktorVersion")
     implementation("io.ktor:ktor-network-tls-certificates-jvm:$ktorVersion")
-
-    // Ktor Client (standalone mode)
-    implementation("io.ktor:ktor-client-core-jvm:$ktorVersion")
-    implementation("io.ktor:ktor-client-cio-jvm:$ktorVersion")
-    implementation("io.ktor:ktor-client-websockets-jvm:$ktorVersion")
-    implementation("io.ktor:ktor-client-content-negotiation-jvm:$ktorVersion")
-
-    // JLine 3 (standalone terminal)
-    implementation("org.jline:jline-terminal:$jlineVersion")
-    implementation("org.jline:jline-reader:$jlineVersion")
-    implementation("org.jline:jline-terminal-jansi:$jlineVersion")
 
     // JWT issuance (Auth0 library; Ktor's auth-jwt uses same HMAC256 algorithm for validation)
     implementation("com.auth0:java-jwt:4.5.0")
@@ -105,7 +93,6 @@ tasks {
 
         manifest {
             attributes(
-                "Main-Class" to "io.github.Earth1283.teletype.standalone.StandaloneMainKt",
                 "Multi-Release" to "true"
             )
         }
@@ -121,7 +108,6 @@ tasks {
         relocate("net.minidev.", "teletype.shaded.minidev.")
         relocate("org.slf4j.", "teletype.shaded.slf4j.")
         relocate("ch.qos.logback.", "teletype.shaded.logback.")
-        relocate("org.jline.", "teletype.shaded.jline.")
         relocate("org.jetbrains.annotations.", "teletype.shaded.jetbrains.annotations.")
         relocate("com.auth0.", "teletype.shaded.auth0.")
         relocate("com.typesafe.", "teletype.shaded.typesafe.")
