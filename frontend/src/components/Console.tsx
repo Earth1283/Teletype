@@ -1,4 +1,4 @@
-import { useRef, useState, useCallback, useMemo } from 'react'
+import { useEffect, useRef, useState, useCallback, useMemo } from 'react'
 import { Virtuoso, type VirtuosoHandle } from 'react-virtuoso'
 import AnsiConvert from 'ansi-to-html'
 import { useQuery } from '@tanstack/react-query'
@@ -44,8 +44,8 @@ export default function Console() {
   const [runSnippet, setRunSnippet] = useState<Snippet | null>(null)
   const [completions, setCompletions] = useState<string[]>([])
   const [completionIdx, setCompletionIdx] = useState(0)
+  const [isAtBottom, setIsAtBottom] = useState(true)
   const virtuosoRef = useRef<VirtuosoHandle>(null)
-  const atBottom = useRef(true)
   const inputRef = useRef<HTMLInputElement>(null)
   const completionListRef = useRef<HTMLDivElement>(null)
   const { openContextMenu } = useContextMenu()
@@ -76,6 +76,25 @@ export default function Console() {
     staleTime: 30_000,
   })
   const quickActions = allSnippets.filter(s => s.categoryId === 'quick-actions')
+
+  const scrollToBottom = useCallback((behavior: 'auto' | 'smooth' = 'auto') => {
+    const lastIndex = filteredLines.length - 1
+    if (lastIndex < 0) return
+    virtuosoRef.current?.scrollToIndex({
+      index: lastIndex,
+      align: 'end',
+      behavior,
+    })
+  }, [filteredLines.length])
+
+  useEffect(() => {
+    if (filteredLines.length === 0) {
+      setIsAtBottom(true)
+      return
+    }
+    const frame = requestAnimationFrame(() => scrollToBottom('auto'))
+    return () => cancelAnimationFrame(frame)
+  }, [filteredLines.length, scrollToBottom])
 
   const send = useCallback(() => {
     const cmd = input.trim()
@@ -205,6 +224,14 @@ export default function Console() {
         >
           <IconX size={13} />
         </button>
+        <button
+          className={`console-bottom-btn${isAtBottom ? '' : ' active'}`}
+          onClick={() => scrollToBottom('smooth')}
+          title="Scroll to bottom"
+          disabled={filteredLines.length === 0}
+        >
+          Bottom
+        </button>
         <div className="conn-badge">
           <span className={`dot ${connected ? 'on' : 'off'}`} />
           {connected ? 'connected' : 'connecting'}
@@ -216,8 +243,8 @@ export default function Console() {
         className="console-log"
         style={{ flex: 1 }}
         data={filteredLines}
-        followOutput={(isAtBottom) => isAtBottom ? 'smooth' : false}
-        atBottomStateChange={(b) => { atBottom.current = b }}
+        followOutput={() => 'auto'}
+        atBottomStateChange={setIsAtBottom}
         itemContent={(_, line) => (
           <div
             className={`log-line ${lineClass(line)}`}

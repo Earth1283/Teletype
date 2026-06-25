@@ -127,22 +127,34 @@ export const DEFAULT_SETTINGS: TeletypeSettings = {
 
 const STORAGE_KEY = 'teletype-settings-v1'
 
-type DeepPartial<T> = T extends object ? { [K in keyof T]?: DeepPartial<T[K]> } : T
+type DeepPartial<T> = T extends (infer U)[]
+  ? U[]
+  : T extends object
+    ? { [K in keyof T]?: DeepPartial<T[K]> }
+    : T
 
-function deepMerge<T extends object>(defaults: T, overrides: DeepPartial<T>): T {
-  const result = { ...defaults }
-  for (const key of Object.keys(defaults) as (keyof T)[]) {
-    const d = defaults[key]
-    const o = (overrides as any)[key]
-    if (o !== undefined) {
-      if (typeof d === 'object' && d !== null && typeof o === 'object' && o !== null) {
-        result[key] = deepMerge(d as any, o) as T[keyof T]
-      } else {
-        result[key] = o as T[keyof T]
-      }
-    }
+function isPlainObject(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null && !Array.isArray(value)
+}
+
+function deepMerge<T>(defaults: T, overrides: DeepPartial<T> | unknown): T {
+  if (Array.isArray(defaults)) {
+    return Array.isArray(overrides) ? overrides as T : defaults
   }
-  return result
+
+  if (!isPlainObject(defaults)) {
+    return overrides !== undefined && overrides !== null ? overrides as T : defaults
+  }
+
+  if (!isPlainObject(overrides)) {
+    return defaults
+  }
+
+  const result = { ...defaults } as Record<string, unknown>
+  for (const key of Object.keys(defaults)) {
+    result[key] = deepMerge(defaults[key], overrides[key])
+  }
+  return result as T
 }
 
 function load(): TeletypeSettings {

@@ -40,6 +40,7 @@ fun Route.authRoutes(plugin: Teletype) {
 
         if (jwt != null) {
             call.respond(PollResponse(status = "verified", token = jwt))
+            plugin.challengeStore.remove(uuid)
         } else {
             call.respond(HttpStatusCode.Accepted, PollResponse(status = "pending"))
         }

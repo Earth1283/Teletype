@@ -18,7 +18,12 @@ data class PlayerInfo(
     val name: String,
     val uuid: String,
     val world: String,
-    val health: Double
+    val health: Double,
+    val foodLevel: Int,
+    val level: Int,
+    val gameMode: String,
+    val ping: Int,
+    val isOp: Boolean,
 )
 
 @Serializable

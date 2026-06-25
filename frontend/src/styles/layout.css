@@ -13,9 +13,9 @@
   z-index: 10000;
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 12px;
   max-width: min(760px, calc(100vw - 24px));
-  padding: 9px 14px;
+  padding: 9px 10px 9px 14px;
   background: rgba(127, 29, 29, 0.96);
   border: 1px solid rgba(248, 113, 113, 0.65);
   border-radius: var(--r-md);
@@ -26,9 +26,48 @@
   box-shadow: 0 10px 30px rgba(0, 0, 0, .35);
 }
 
+.insecure-http-banner-copy {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
 .insecure-http-banner strong {
   color: #ffffff;
   white-space: nowrap;
+}
+
+.insecure-http-banner span {
+  min-width: 0;
+}
+
+.insecure-http-dismiss {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  padding: 0;
+  border: 0;
+  border-radius: var(--r-sm);
+  background: transparent;
+  color: #fff7ed;
+  cursor: pointer;
+  flex-shrink: 0;
+  opacity: 0.82;
+  transition: background 120ms, opacity 120ms;
+}
+
+.insecure-http-dismiss:hover,
+.insecure-http-dismiss:focus-visible {
+  background: rgba(255, 255, 255, 0.12);
+  opacity: 1;
+}
+
+.insecure-http-dismiss:focus-visible {
+  outline: 2px solid rgba(255, 247, 237, 0.75);
+  outline-offset: 2px;
 }
 
 /* ── Sidebar ────────────────────────────────────────────────── */

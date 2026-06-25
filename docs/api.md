@@ -121,7 +121,12 @@ Tab completions are fetched via `CommandMap.tabComplete()` on the Bukkit main th
     "name": "Notch",
     "uuid": "069a79f4-44e9-4726-a5be-fca90e38aaf5",
     "world": "world",
-    "health": 20.0
+    "health": 20.0,
+    "foodLevel": 20,
+    "level": 35,
+    "gameMode": "survival",
+    "ping": 42,
+    "isOp": true
   }
 ]
 ```

@@ -13,6 +13,34 @@ export default function AuthSetup({ onAuth }: Props) {
   const animFrame = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   useEffect(() => {
+    async function poll(id: string) {
+      while (polling.current) {
+        try {
+          const res = await axios.get(`/api/auth/poll/${id}`)
+          if (res.data.status === 'verified' && res.data.token) {
+            localStorage.setItem(TOKEN_KEY, res.data.token)
+            polling.current = false
+            onAuth()
+            return
+          }
+        } catch (err) {
+          if (axios.isAxiosError(err)) {
+            if (err.response?.status === 404) {
+              polling.current = false
+              setError('Verification challenge expired or was already used. Refresh to create a new challenge.')
+              return
+            }
+            if (err.response?.status === 429) {
+              setError('Too many auth requests. Waiting before trying again.')
+            } else if (!err.response) {
+              setError(authRequestError(err))
+            }
+          }
+        }
+        await new Promise((r) => setTimeout(r, 2000))
+      }
+    }
+
     axios.post('/api/auth/challenge')
       .then((res) => {
         const id: string = res.data.uuid
@@ -28,25 +56,10 @@ export default function AuthSetup({ onAuth }: Props) {
         }
         animFrame.current = setTimeout(reveal, 200)
       })
-      .catch(() => setError('Cannot reach Teletype server. Is the plugin running?'))
+      .catch((err) => setError(authRequestError(err)))
 
     return () => { polling.current = false; if (animFrame.current) clearTimeout(animFrame.current) }
-  }, [])
-
-  async function poll(id: string) {
-    while (polling.current) {
-      try {
-        const res = await axios.get(`/api/auth/poll/${id}`)
-        if (res.data.status === 'verified' && res.data.token) {
-          localStorage.setItem(TOKEN_KEY, res.data.token)
-          polling.current = false
-          onAuth()
-          return
-        }
-      } catch { /* 404 = expired, 202 = pending — keep going */ }
-      await new Promise((r) => setTimeout(r, 2000))
-    }
-  }
+  }, [onAuth])
 
   const cmd = `tty verify ${uuid ?? '...'}`
 
@@ -100,4 +113,12 @@ export default function AuthSetup({ onAuth }: Props) {
       </div>
     </div>
   )
+}
+
+function authRequestError(err: unknown) {
+  if (axios.isAxiosError(err)) {
+    if (err.response?.status === 429) return 'Too many auth requests. Wait a moment and refresh.'
+    if (err.response) return `Authentication request failed (${err.response.status}). Refresh and try again.`
+  }
+  return 'Cannot reach Teletype server. Is the plugin running?'
 }

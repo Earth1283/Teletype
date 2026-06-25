@@ -39,6 +39,30 @@
 .conn-badge .dot.on { background: var(--green); animation: pulse-dot 2.4s ease infinite; }
 .conn-badge .dot.off { background: var(--red); }
 
+.console-bottom-btn {
+  flex-shrink: 0;
+  height: 28px;
+  padding: 0 10px;
+  border: 1px solid var(--border);
+  border-radius: var(--r-sm);
+  background: transparent;
+  color: var(--mist);
+  font-family: var(--mono);
+  font-size: 11px;
+  cursor: pointer;
+  transition: background 120ms, border-color 120ms, color 120ms;
+}
+.console-bottom-btn:hover:not(:disabled),
+.console-bottom-btn.active {
+  background: var(--amber-dim);
+  border-color: var(--amber-glow);
+  color: var(--amber);
+}
+.console-bottom-btn:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+
 .console-log {
   flex: 1;
 }

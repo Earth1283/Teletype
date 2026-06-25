@@ -38,8 +38,11 @@ class ChallengeStore(plugin: Teletype) {
     fun getPending(uuid: UUID): PendingChallenge? = store[uuid]
 
     fun verify(uuid: UUID, jwt: String): Boolean {
-        val challenge = store.remove(uuid) ?: return false
-        challenge.deferred.complete(jwt)
-        return true
+        val challenge = store[uuid] ?: return false
+        return challenge.deferred.complete(jwt)
+    }
+
+    fun remove(uuid: UUID) {
+        store.remove(uuid)
     }
 }

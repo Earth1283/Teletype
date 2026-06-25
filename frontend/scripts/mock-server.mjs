@@ -88,9 +88,9 @@ setInterval(() => {
 // ── Static datasets ───────────────────────────────────────────────────────────
 
 const PLAYERS = [
-  { name: 'Notch',     uuid: '069a79f4-44e9-4726-a5be-fca90e38aaf5', world: 'world',        health: 20   },
-  { name: 'Herobrine', uuid: 'f84c6a79-0a4e-45e0-879d-cb2bc8fa39e2', world: 'world_nether',  health: 14.5 },
-  { name: 'jeb_',      uuid: '853c80ef-3c37-49fd-aa49-938b674adae6', world: 'world',          health: 20   },
+  { name: 'Notch',     uuid: '069a79f4-44e9-4726-a5be-fca90e38aaf5', world: 'world',        health: 20,   foodLevel: 20, level: 35, gameMode: 'survival', ping: 42, isOp: true  },
+  { name: 'Herobrine', uuid: 'f84c6a79-0a4e-45e0-879d-cb2bc8fa39e2', world: 'world_nether',  health: 14.5, foodLevel: 17, level: 12, gameMode: 'survival', ping: 88, isOp: false },
+  { name: 'jeb_',      uuid: '853c80ef-3c37-49fd-aa49-938b674adae6', world: 'world',        health: 20,   foodLevel: 20, level: 24, gameMode: 'creative', ping: 31, isOp: true  },
 ]
 
 const CATEGORIES = [

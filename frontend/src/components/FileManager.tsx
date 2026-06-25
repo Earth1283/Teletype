@@ -5,6 +5,7 @@ import { api, TOKEN_KEY } from '../api/client'
 import { useSettings } from '../SettingsContext'
 import { useContextMenu, type ContextMenuItem } from '../ContextMenu'
 import { getTheme } from '../themes'
+import PromptModal, { type PromptVariant } from './PromptModal'
 import {
   IconFolder, IconFile, IconUpload, IconDownload,
   IconFolderPlus, IconPencil, IconTrash, IconSave, IconX, IconGlobe,
@@ -22,18 +23,28 @@ interface SidebarFav {
 const DEFAULT_FAVS: SidebarFav[] = [
   { id: 'root',    label: 'Server Root', path: '' },
   { id: 'plugins', label: 'Plugins',     path: 'plugins' },
-  { id: 'worlds',  label: 'Worlds',      path: 'worlds' },
+  { id: 'world',   label: 'World',       path: 'world' },
   { id: 'logs',    label: 'Logs',        path: 'logs' },
   { id: 'config',  label: 'Config',      path: 'config' },
-  { id: 'mods',    label: 'Mods',        path: 'mods' },
 ]
 
 const FAVS_KEY = 'teletype_finder_favs'
+const DEFAULT_FAV_IDS = new Set(DEFAULT_FAVS.map(f => f.id))
+const LEGACY_DEFAULT_FAV_IDS = new Set(['worlds', 'mods'])
 
 function loadFavs(): SidebarFav[] {
   try {
     const raw = localStorage.getItem(FAVS_KEY)
-    if (raw) return JSON.parse(raw)
+    if (raw) {
+      const saved = JSON.parse(raw) as SidebarFav[]
+      const custom = saved.filter(f => !DEFAULT_FAV_IDS.has(f.id) && !LEGACY_DEFAULT_FAV_IDS.has(f.id))
+      const next = [
+        ...DEFAULT_FAVS,
+        ...custom.filter(f => !DEFAULT_FAVS.some(d => d.path === f.path)),
+      ]
+      saveFavs(next)
+      return next
+    }
   } catch {}
   return DEFAULT_FAVS
 }
@@ -180,7 +191,8 @@ function langFor(name: string) {
 function fmtSize(b: number) {
   if (b < 1024) return `${b} B`
   if (b < 1024 ** 2) return `${(b / 1024).toFixed(1)} KB`
-  return `${(b / 1024 ** 2).toFixed(1)} MB`
+  if (b < 1024 ** 3) return `${(b / 1024 ** 2).toFixed(1)} MB`
+  return `${(b / 1024 ** 3).toFixed(2)} GB`
 }
 
 function fmtDate(ts: number) {
@@ -189,6 +201,25 @@ function fmtDate(ts: number) {
 }
 
 type Modal = { type: 'rename'; entry: FileEntry } | { type: 'mkdir' } | { type: 'fetch' } | null
+type UploadStatus = 'queued' | 'uploading' | 'done' | 'error'
+type PromptState = {
+  title: string
+  message: React.ReactNode
+  variant?: PromptVariant
+  confirmLabel?: string
+  cancelLabel?: string
+  onConfirm?: () => void | Promise<void>
+} | null
+
+interface UploadItem {
+  id: string
+  index: number
+  name: string
+  size: number
+  loaded: number
+  status: UploadStatus
+  error?: string
+}
 
 interface FileManagerProps {
   viewMode: 'icons' | 'list'
@@ -212,7 +243,12 @@ export default function FileManager({ viewMode }: FileManagerProps) {
   const [searchScope, setSearchScope] = useState<'local' | 'global'>('local')
   const [fuzzyLevel, setFuzzyLevel] = useState(0)
   const [favs, setFavs] = useState<SidebarFav[]>(loadFavs)
+  const [uploadItems, setUploadItems] = useState<UploadItem[]>([])
+  const [uploadRunning, setUploadRunning] = useState(false)
+  const [prompt, setPrompt] = useState<PromptState>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
+  const uploadItemsRef = useRef<UploadItem[]>([])
+  const uploadFrameRef = useRef<number | null>(null)
   const qc = useQueryClient()
   const { settings } = useSettings()
   const { openContextMenu } = useContextMenu()
@@ -228,6 +264,12 @@ export default function FileManager({ viewMode }: FileManagerProps) {
     langs.typescript?.typescriptDefaults?.setDiagnosticsOptions({ noSemanticValidation: !on, noSyntaxValidation: !on })
     langs.typescript?.javascriptDefaults?.setDiagnosticsOptions({ noSemanticValidation: !on, noSyntaxValidation: !on })
   }, [monacoInst, settings.editor.validate])
+
+  useEffect(() => {
+    return () => {
+      if (uploadFrameRef.current != null) cancelAnimationFrame(uploadFrameRef.current)
+    }
+  }, [])
 
   const qKey = ['files', cwd]
   const { data: entries = [], isLoading, error } = useQuery<FileEntry[]>({
@@ -274,6 +316,33 @@ export default function FileManager({ viewMode }: FileManagerProps) {
 
   function invalidate() { qc.invalidateQueries({ queryKey: qKey }) }
 
+  function showPrompt(title: string, message: React.ReactNode, variant: PromptVariant = 'info') {
+    setPrompt({ title, message, variant })
+  }
+
+  function setUploadSnapshot(items: UploadItem[]) {
+    uploadItemsRef.current = items
+    setUploadItems(items)
+  }
+
+  function patchUploadItem(id: string, patch: Partial<UploadItem>, defer = false) {
+    uploadItemsRef.current = uploadItemsRef.current.map(item => item.id === id ? { ...item, ...patch } : item)
+    if (!defer) {
+      if (uploadFrameRef.current != null) {
+        cancelAnimationFrame(uploadFrameRef.current)
+        uploadFrameRef.current = null
+      }
+      setUploadItems(uploadItemsRef.current)
+      return
+    }
+    if (uploadFrameRef.current == null) {
+      uploadFrameRef.current = requestAnimationFrame(() => {
+        uploadFrameRef.current = null
+        setUploadItems(uploadItemsRef.current)
+      })
+    }
+  }
+
   async function openFile(entry: FileEntry) {
     try {
       const res = await api.get('/files/read', { params: { path: entry.path } })
@@ -281,7 +350,7 @@ export default function FileManager({ viewMode }: FileManagerProps) {
       setEditorContent(res.data)
     } catch (e: any) {
       if (e.response?.status === 415) downloadFile(entry)
-      else alert(e.response?.data?.error ?? 'Cannot open file')
+      else showPrompt('Cannot open file', e.response?.data?.error ?? 'The selected file could not be opened.', 'error')
     }
   }
 
@@ -308,14 +377,28 @@ export default function FileManager({ viewMode }: FileManagerProps) {
         params: { path: editing.path },
         headers: { 'Content-Type': 'text/plain' },
       })
-    } catch (e: any) { alert(e.response?.data?.error ?? 'Save failed') }
+      showPrompt('File saved', `Saved ${editing.path}`)
+    } catch (e: any) { showPrompt('Save failed', e.response?.data?.error ?? 'The file could not be saved.', 'error') }
     finally { setSaving(false) }
   }
 
   async function deleteEntry(entry: FileEntry) {
-    if (!confirm(`Delete "${entry.name}"?`)) return
-    await api.delete('/files', { params: { path: entry.path } })
-    invalidate()
+    setPrompt({
+      title: 'Delete item?',
+      message: `Delete "${entry.name}"? This cannot be undone from Teletype.`,
+      variant: 'danger',
+      confirmLabel: 'Delete',
+      cancelLabel: 'Cancel',
+      onConfirm: async () => {
+        try {
+          await api.delete('/files', { params: { path: entry.path } })
+          invalidate()
+        } catch (e: any) {
+          showPrompt('Delete failed', e.response?.data?.error ?? 'The item could not be deleted.', 'error')
+          throw e
+        }
+      },
+    })
   }
 
   async function doRename() {
@@ -325,7 +408,7 @@ export default function FileManager({ viewMode }: FileManagerProps) {
     try {
       await api.patch('/files/rename', { from: modal.entry.path, to })
       setModal(null); invalidate()
-    } catch (e: any) { alert(e.response?.data?.error ?? 'Rename failed') }
+    } catch (e: any) { showPrompt('Rename failed', e.response?.data?.error ?? 'The item could not be renamed.', 'error') }
   }
 
   async function doMkdir() {
@@ -334,7 +417,7 @@ export default function FileManager({ viewMode }: FileManagerProps) {
     try {
       await api.post('/files/mkdir', null, { params: { path } })
       setModal(null); invalidate()
-    } catch (e: any) { alert(e.response?.data?.error ?? 'Failed') }
+    } catch (e: any) { showPrompt('Folder not created', e.response?.data?.error ?? 'The folder could not be created.', 'error') }
   }
 
   async function doFetch() {
@@ -347,21 +430,59 @@ export default function FileManager({ viewMode }: FileManagerProps) {
         fileName: fetchName.trim() || undefined,
       })
       setModal(null); setFetchUrl(''); setFetchName(''); invalidate()
-    } catch (e: any) { alert(e.response?.data?.error ?? 'Fetch failed') }
+    } catch (e: any) { showPrompt('Download failed', e.response?.data?.error ?? 'The file could not be fetched.', 'error') }
     finally { setFetchLoading(false) }
   }
 
   async function upload(files: FileList | null) {
     if (!files || files.length === 0) return
-    const fd = new FormData()
-    for (const f of Array.from(files)) fd.append('file', f)
-    try {
-      await api.post('/files/upload', fd, {
-        params: { path: cwd },
-        headers: { 'Content-Type': 'multipart/form-data' },
-      })
-      invalidate()
-    } catch (e: any) { alert(e.response?.data?.error ?? 'Upload failed') }
+    const selectedFiles = Array.from(files)
+    const items = selectedFiles.map((file, index) => ({
+      id: `${Date.now()}-${index}-${file.name}`,
+      index,
+      name: file.name,
+      size: file.size,
+      loaded: 0,
+      status: 'queued' as UploadStatus,
+    }))
+    const uploadPath = cwd
+    setPrompt(null)
+    setUploadSnapshot(items)
+    setUploadRunning(true)
+    if (fileInputRef.current) fileInputRef.current.value = ''
+
+    async function uploadOne(file: File, item: UploadItem) {
+      const fd = new FormData()
+      fd.append('file', file)
+      patchUploadItem(item.id, { status: 'uploading', loaded: 0 })
+      try {
+        await api.post('/files/upload', fd, {
+          params: { path: uploadPath },
+          onUploadProgress: (event) => {
+            patchUploadItem(item.id, { loaded: event.loaded }, true)
+          },
+        })
+        patchUploadItem(item.id, { status: 'done', loaded: file.size })
+      } catch (e: any) {
+        patchUploadItem(item.id, {
+          status: 'error',
+          loaded: 0,
+          error: e.response?.data?.error ?? 'Upload failed',
+        })
+      }
+    }
+
+    let next = 0
+    const workerCount = Math.min(4, selectedFiles.length)
+    await Promise.all(Array.from({ length: workerCount }, async () => {
+      while (next < selectedFiles.length) {
+        const index = next++
+        await uploadOne(selectedFiles[index], items[index])
+      }
+    }))
+
+    setUploadRunning(false)
+    invalidate()
   }
 
   const onDrop = useCallback((e: React.DragEvent) => {
@@ -464,6 +585,18 @@ export default function FileManager({ viewMode }: FileManagerProps) {
   }
 
   const displayEntries = searchOpen && searchQuery.trim() ? searchResults : entries
+  const uploadTotal = uploadItems.reduce((sum, item) => sum + item.size, 0)
+  const uploadLoaded = uploadItems.reduce((sum, item) => sum + Math.min(item.loaded, item.size), 0)
+  const uploadPercent = uploadTotal > 0 ? Math.round((uploadLoaded / uploadTotal) * 100) : 0
+  const uploadDone = uploadItems.filter(item => item.status === 'done').length
+  const uploadFailed = uploadItems.filter(item => item.status === 'error').length
+  const uploadingNow = uploadItems.filter(item => item.status === 'uploading')
+  const activeUpload = uploadingNow[0] ?? uploadItems.find(item => item.status === 'queued') ?? null
+  const activeUploadLabel = activeUpload
+    ? `File ${activeUpload.index + 1} of ${uploadItems.length}: ${activeUpload.name}`
+    : uploadItems.length > 0
+      ? `${uploadDone} of ${uploadItems.length} files complete`
+      : ''
 
   return (
     <div className="fm-root" onDragOver={(e) => e.preventDefault()} onDrop={onDrop}>
@@ -533,6 +666,45 @@ export default function FileManager({ viewMode }: FileManagerProps) {
         </button>
         <input ref={fileInputRef} type="file" multiple hidden onChange={(e) => upload(e.target.files)} />
       </div>
+
+      {uploadItems.length > 0 && (
+        <div className="fm-upload-panel">
+          <div className="fm-upload-summary">
+            <div className="fm-upload-title">
+              {uploadRunning ? 'Uploading files' : uploadFailed ? 'Upload finished with errors' : 'Upload complete'}
+            </div>
+            <div className="fm-upload-meta">
+              {fmtSize(uploadLoaded)} / {fmtSize(uploadTotal)} transferred
+              <span> {uploadPercent}%</span>
+              <span> {uploadDone}/{uploadItems.length} files</span>
+              {uploadFailed > 0 && <span className="fm-upload-error-count"> {uploadFailed} failed</span>}
+            </div>
+            <div className="fm-upload-current">{activeUploadLabel}</div>
+          </div>
+          <div className="fm-upload-actions">
+            {!uploadRunning && (
+              <button className="btn-ghost btn-xs" onClick={() => setUploadSnapshot([])}>Dismiss</button>
+            )}
+          </div>
+          <div className="fm-upload-bar" aria-label="Upload progress">
+            <div className="fm-upload-bar-fill" style={{ width: `${uploadPercent}%` }} />
+          </div>
+          <div className="fm-upload-files">
+            {uploadItems.map(item => {
+              const pct = item.size > 0 ? Math.round((Math.min(item.loaded, item.size) / item.size) * 100) : 100
+              return (
+                <div key={item.id} className={`fm-upload-file ${item.status}`}>
+                  <span className="fm-upload-file-name">{item.name}</span>
+                  <span className="fm-upload-file-size">
+                    {item.status === 'error' ? item.error : `${fmtSize(Math.min(item.loaded, item.size))} / ${fmtSize(item.size)}`}
+                  </span>
+                  <span className="fm-upload-file-pct">{item.status === 'queued' ? 'Queued' : `${pct}%`}</span>
+                </div>
+              )
+            })}
+          </div>
+        </div>
+      )}
 
       {/* ── Inline mkdir form ──────────────────────────────────────────── */}
       {modal?.type === 'mkdir' && (
@@ -804,6 +976,17 @@ export default function FileManager({ viewMode }: FileManagerProps) {
           </div>
         </div>
       )}
+
+      <PromptModal
+        open={!!prompt}
+        title={prompt?.title ?? ''}
+        message={prompt?.message}
+        variant={prompt?.variant}
+        confirmLabel={prompt?.confirmLabel}
+        cancelLabel={prompt?.cancelLabel}
+        onConfirm={prompt?.onConfirm}
+        onClose={() => setPrompt(null)}
+      />
     </div>
   )
 }

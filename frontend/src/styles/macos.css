@@ -997,6 +997,26 @@
   user-select: none;
 }
 
+.mac-master-avatar.skin,
+.mac-player-big-avatar.skin {
+  overflow: hidden;
+  padding: 0;
+  background: rgba(255, 255, 255, 0.06);
+}
+
+.mac-master-avatar.skin img,
+.mac-player-big-avatar.skin img {
+  width: 100%;
+  height: 100%;
+  display: block;
+  object-fit: cover;
+  image-rendering: pixelated;
+}
+
+.mac-player-big-avatar.skin img {
+  object-fit: contain;
+}
+
 .mac-player-detail-name {
   font-family: -apple-system, var(--sans), sans-serif;
   font-size: 22px;

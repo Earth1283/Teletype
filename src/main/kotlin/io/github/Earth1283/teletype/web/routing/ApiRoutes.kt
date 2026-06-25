@@ -40,7 +40,12 @@ fun Route.apiRoutes(plugin: Teletype) {
                     name = it.name,
                     uuid = it.uniqueId.toString(),
                     world = it.world.name,
-                    health = it.health
+                    health = it.health,
+                    foodLevel = it.foodLevel,
+                    level = it.level,
+                    gameMode = it.gameMode.name.lowercase(),
+                    ping = it.ping,
+                    isOp = it.isOp,
                 )
             }
         }

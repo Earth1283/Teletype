@@ -110,6 +110,31 @@ function pearson(xs: (number | null)[], ys: (number | null)[]): number | null {
   return dx * dy < 0.0001 ? null : num / (dx * dy)
 }
 
+function Sparkline({ values, color = 'var(--amber)' }: { values: Array<number | null | undefined>; color?: string }) {
+  const pts = values
+    .filter((v): v is number => typeof v === 'number' && isFinite(v))
+    .slice(-72)
+  if (pts.length < 2) return null
+
+  const lo = Math.min(...pts)
+  const hi = Math.max(...pts)
+  const span = hi - lo || 1
+  const w = 120
+  const h = 28
+  const pad = 2
+  const d = pts.map((v, i) => {
+    const x = pts.length === 1 ? w / 2 : (i / (pts.length - 1)) * w
+    const y = h - pad - ((v - lo) / span) * (h - pad * 2)
+    return `${i === 0 ? 'M' : 'L'}${x.toFixed(1)},${y.toFixed(1)}`
+  }).join(' ')
+
+  return (
+    <svg className="stat-sparkline" viewBox={`0 0 ${w} ${h}`} preserveAspectRatio="none" aria-hidden="true">
+      <path d={d} fill="none" stroke={color} strokeWidth="2" vectorEffect="non-scaling-stroke" />
+    </svg>
+  )
+}
+
 // ── Data guide helpers ───────────────────────────────────────────────────────
 
 function HelpIcon() {
@@ -706,7 +731,7 @@ function CorrelationTable({ data, onGuide }: CorrelationTableProps) {
   return (
     <div className="corr-wrap">
       <div className="glance-chart-header" style={{ paddingBottom: 8 }}>
-        <span className="glance-chart-title">Metric Correlations (Pearson r)</span>
+        <span className="glance-chart-title">Pearson r Correlation Table</span>
         <span className="corr-hint">|r| &gt; 0.7 strong · 0.4–0.7 moderate · &lt;0.2 negligible</span>
         <HelpButton label="Metric Correlations" onClick={() => onGuide(GUIDE_BY_ID.correlation)} />
       </div>
@@ -935,21 +960,25 @@ export default function ServerStats({ onNavigate }: Props) {
           <div className="stat-label">Players</div>
           <div className="stat-value amber">{data.onlinePlayers}</div>
           <div className="stat-sub">of {data.maxPlayers} max</div>
+          <Sparkline values={history.map(s => s.playerCount)} color="var(--amber)" />
         </div>
         <div className="stat-card">
           <div className="stat-label">TPS · 1m</div>
           <div className={`stat-value ${tpsClass(tps1)}`}>{tps1?.toFixed(1) ?? '—'}</div>
           <div className="stat-sub">target 20.0</div>
+          <Sparkline values={history.map(s => s.tps1)} color="var(--green)" />
         </div>
         <div className="stat-card">
           <div className="stat-label">TPS · 5m</div>
           <div className={`stat-value ${tpsClass(tps5)}`}>{tps5?.toFixed(1) ?? '—'}</div>
           <div className="stat-sub">5 min avg</div>
+          <Sparkline values={history.map(s => s.tps5)} color="var(--green)" />
         </div>
         <div className="stat-card">
           <div className="stat-label">TPS · 15m</div>
           <div className={`stat-value ${tpsClass(tps15)}`}>{tps15?.toFixed(1) ?? '—'}</div>
           <div className="stat-sub">15 min avg</div>
+          <Sparkline values={history.map(s => s.tps15)} color="var(--green)" />
         </div>
         <div className="stat-card">
           <div className="stat-label">Tick Time</div>
@@ -957,17 +986,20 @@ export default function ServerStats({ onNavigate }: Props) {
             {snap ? `${Math.round(snap.tickTimeMs)}ms` : '—'}
           </div>
           <div className="stat-sub">healthy &lt;50ms</div>
+          <Sparkline values={history.map(s => s.tickTimeMs)} color="var(--amber)" />
         </div>
         <div className="stat-card">
           <div className="stat-label">JVM Memory</div>
           <div className={`stat-value ${memClass(memPct)}`}>{snap ? fmtMem(snap.memUsedMb) : '—'}</div>
           <div className="stat-sub">{snap ? `of ${fmtMem(snap.memMaxMb)} max` : ''}</div>
+          <Sparkline values={history.map(s => s.memUsedMb)} color="var(--blue)" />
         </div>
         {snap?.cpuPercent != null && snap.cpuPercent >= 0 && (
           <div className="stat-card">
             <div className="stat-label">Host CPU</div>
             <div className={`stat-value ${cpuClass(snap.cpuPercent)}`}>{snap.cpuPercent.toFixed(1)}%</div>
             <div className="stat-sub">system-wide</div>
+            <Sparkline values={history.map(s => s.cpuPercent != null && s.cpuPercent >= 0 ? s.cpuPercent : null)} color="var(--red)" />
           </div>
         )}
         {sysMemPct != null && snap?.sysMemUsedMb != null && snap?.sysMemTotalMb != null && (
@@ -975,6 +1007,7 @@ export default function ServerStats({ onNavigate }: Props) {
             <div className="stat-label">Host RAM</div>
             <div className={`stat-value ${memClass(sysMemPct)}`}>{fmtMem(snap.sysMemUsedMb)}</div>
             <div className="stat-sub">of {fmtMem(snap.sysMemTotalMb)}</div>
+            <Sparkline values={history.map(s => s.sysMemUsedMb)} color="var(--blue)" />
           </div>
         )}
         {diskPct != null && snap?.diskUsedGb != null && snap?.diskTotalGb != null && (
@@ -982,6 +1015,7 @@ export default function ServerStats({ onNavigate }: Props) {
             <div className="stat-label">Disk</div>
             <div className={`stat-value ${diskClass(diskPct)}`}>{snap.diskUsedGb} GB</div>
             <div className="stat-sub">of {snap.diskTotalGb} GB used</div>
+            <Sparkline values={history.map(s => s.diskUsedGb)} color="var(--mist)" />
           </div>
         )}
         {snap && (
@@ -989,6 +1023,7 @@ export default function ServerStats({ onNavigate }: Props) {
             <div className="stat-label">Entities</div>
             <div className="stat-value">{snap.entityCount.toLocaleString()}</div>
             <div className="stat-sub">all worlds</div>
+            <Sparkline values={history.map(s => s.entityCount)} color="var(--blue)" />
           </div>
         )}
         {snap && (
@@ -996,6 +1031,7 @@ export default function ServerStats({ onNavigate }: Props) {
             <div className="stat-label">Chunks</div>
             <div className="stat-value">{snap.loadedChunks.toLocaleString()}</div>
             <div className="stat-sub">loaded</div>
+            <Sparkline values={history.map(s => s.loadedChunks)} color="var(--mist)" />
           </div>
         )}
         {snap?.pingP50 != null && snap.pingP50 > 0 && (
@@ -1003,6 +1039,7 @@ export default function ServerStats({ onNavigate }: Props) {
             <div className="stat-label">Ping P50</div>
             <div className="stat-value green">{snap.pingP50}ms</div>
             <div className="stat-sub">median latency</div>
+            <Sparkline values={history.map(s => s.pingP50 != null && s.pingP50 > 0 ? s.pingP50 : null)} color="var(--green)" />
           </div>
         )}
         {rangeSummary.samples > 0 && (

@@ -437,6 +437,110 @@
 .finder-view-btn.active { background: var(--elevated); color: var(--ash); }
 .finder-view-btn:not(.active):hover { background: rgba(255,255,255,0.04); color: var(--ash); }
 
+/* ── Upload progress ─────────────────────────────────────────────────────── */
+
+.fm-upload-panel {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 8px 12px;
+  padding: 10px 14px;
+  border-bottom: 1px solid var(--border);
+  background: var(--elevated);
+  flex-shrink: 0;
+}
+
+.fm-upload-summary {
+  min-width: 0;
+}
+
+.fm-upload-title {
+  font-family: var(--sans);
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--ash);
+}
+
+.fm-upload-meta,
+.fm-upload-current {
+  margin-top: 3px;
+  font-family: var(--mono);
+  font-size: 11px;
+  color: var(--mist);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.fm-upload-error-count {
+  color: var(--red);
+}
+
+.fm-upload-actions {
+  display: flex;
+  align-items: flex-start;
+}
+
+.fm-upload-bar {
+  grid-column: 1 / -1;
+  height: 7px;
+  overflow: hidden;
+  border-radius: 999px;
+  background: rgba(255,255,255,0.08);
+  border: 1px solid rgba(255,255,255,0.07);
+}
+
+.fm-upload-bar-fill {
+  height: 100%;
+  border-radius: inherit;
+  background: linear-gradient(90deg, var(--amber), #fbbf24);
+  transition: width 120ms linear;
+}
+
+.fm-upload-files {
+  grid-column: 1 / -1;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  max-height: 92px;
+  overflow-y: auto;
+  scrollbar-width: thin;
+}
+
+.fm-upload-file {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(100px, auto) 52px;
+  gap: 10px;
+  align-items: center;
+  font-family: var(--mono);
+  font-size: 10.5px;
+  color: var(--mist);
+}
+
+.fm-upload-file.uploading .fm-upload-file-name {
+  color: var(--ash);
+}
+
+.fm-upload-file.done .fm-upload-file-pct {
+  color: var(--green);
+}
+
+.fm-upload-file.error .fm-upload-file-size,
+.fm-upload-file.error .fm-upload-file-pct {
+  color: var(--red);
+}
+
+.fm-upload-file-name,
+.fm-upload-file-size {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.fm-upload-file-size,
+.fm-upload-file-pct {
+  text-align: right;
+}
+
 /* ── Finder layout ───────────────────────────────────────────────────────── */
 
 .finder-body {

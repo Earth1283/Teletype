@@ -12,6 +12,7 @@ import SettingsPage from './SettingsPage'
 import AuditPage from './AuditPage'
 import NetworkPage from './NetworkPage'
 import CommandPalette from '../CommandPalette'
+import PromptModal, { type PromptVariant } from './PromptModal'
 
 type Tab = 'glance' | 'console' | 'players' | 'stats' | 'files' | 'actions' | 'audit' | 'network' | 'settings' | 'thread-dump'
 
@@ -192,6 +193,12 @@ type Interaction = {
   sx: number; sy: number; ox: number; oy: number; ow: number; oh: number
 }
 
+type PromptState = {
+  title: string
+  message: React.ReactNode
+  variant?: PromptVariant
+} | null
+
 // ── Main desktop ────────────────────────────────────────────────────────────
 
 export default function MacOSDesktop() {
@@ -205,6 +212,7 @@ export default function MacOSDesktop() {
   const [threadDumpText, setThreadDumpText] = useState('')
   const [showAbout, setShowAbout] = useState(false)
   const [showRestartConfirm, setShowRestartConfirm] = useState(false)
+  const [prompt, setPrompt] = useState<PromptState>(null)
   const iRef = useRef<Interaction | null>(null)
   const menuBarRef = useRef<HTMLDivElement>(null)
   const { settings, update } = useSettings()
@@ -402,7 +410,11 @@ export default function MacOSDesktop() {
       setThreadDumpText(text)
       openApp('thread-dump')
     } catch (e: any) {
-      alert(e.response?.data?.error ?? 'Thread dump failed')
+      setPrompt({
+        title: 'Thread dump failed',
+        message: e.response?.data?.error ?? 'The thread dump could not be generated.',
+        variant: 'error',
+      })
     }
   }
 
@@ -411,7 +423,11 @@ export default function MacOSDesktop() {
     try {
       await api.post('/system/restart')
     } catch (e: any) {
-      alert(e.response?.data?.error ?? 'Restart request failed')
+      setPrompt({
+        title: 'Restart request failed',
+        message: e.response?.data?.error ?? 'The restart command could not be dispatched.',
+        variant: 'error',
+      })
     }
   }
 
@@ -628,6 +644,14 @@ export default function MacOSDesktop() {
           </div>
         </div>
       )}
+
+      <PromptModal
+        open={!!prompt}
+        title={prompt?.title ?? ''}
+        message={prompt?.message}
+        variant={prompt?.variant}
+        onClose={() => setPrompt(null)}
+      />
     </div>
   )
 }
