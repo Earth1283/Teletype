@@ -146,7 +146,16 @@ function MainApp() {
   const { settings, update } = useSettings()
   const { connected } = useLogs()
   const activeTab = TABS.find(t => t.id === tab)
-  const isMobile = window.innerWidth <= 640
+  const [isMobile, setIsMobile] = useState(() =>
+    window.matchMedia('(hover: none) and (pointer: coarse)').matches
+  )
+
+  useEffect(() => {
+    const mq = window.matchMedia('(hover: none) and (pointer: coarse)')
+    const handler = (e: MediaQueryListEvent) => setIsMobile(e.matches)
+    mq.addEventListener('change', handler)
+    return () => mq.removeEventListener('change', handler)
+  }, [])
 
   // Poll current TPS for sparkline
   const { data: glanceCurrent } = useQuery<{ tps1: number }>({
@@ -187,8 +196,7 @@ function MainApp() {
   useEffect(() => {
     if (isMobile && settings.fun) update({ fun: false })
     if (!isMobile && settings.appleify) update({ appleify: false })
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [])
+  }, [isMobile, settings.fun, settings.appleify, update])
 
   const tapCountRef = useRef(0)
   const tapTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)

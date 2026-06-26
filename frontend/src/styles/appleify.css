@@ -28,10 +28,14 @@
   --a-fill2:       rgba(120, 120, 128, 0.16);
   --a-fill3:       rgba(120, 120, 128, 0.12);
   --a-fill4:       rgba(120, 120, 128, 0.08);
-  /* Liquid glass material */
-  --a-glass-bg:    rgba(255, 255, 255, 0.68);
-  --a-glass-edge:  rgba(255, 255, 255, 0.92);
-  --a-glass-spec:  rgba(255, 255, 255, 0.80);
+  /* Liquid glass — panels / sheets */
+  --a-glass-bg:    rgba(255, 255, 255, 0.52);
+  --a-glass-edge:  rgba(255, 255, 255, 0.82);
+  --a-glass-spec:  rgba(255, 255, 255, 0.70);
+  /* Floating pill glass — iOS light system material */
+  --a-pill-bg:     rgba(255, 255, 255, 0.80);
+  --a-pill-edge:   rgba(0,   0,   0,   0.10);
+  --a-pill-spec:   rgba(255, 255, 255, 0.90);
   --a-font:        -apple-system, BlinkMacSystemFont, 'SF Pro Display', 'SF Pro Text', system-ui, sans-serif;
   --a-mono:        'SF Mono', ui-monospace, 'Fira Code', monospace;
 
@@ -102,10 +106,14 @@
     --a-fill2:       rgba(120, 120, 128, 0.32);
     --a-fill3:       rgba(120, 120, 128, 0.24);
     --a-fill4:       rgba(120, 120, 128, 0.18);
-    /* Liquid glass — dark: more translucent, richer blur */
-    --a-glass-bg:    rgba(28, 28, 30, 0.76);
-    --a-glass-edge:  rgba(255, 255, 255, 0.14);
-    --a-glass-spec:  rgba(255, 255, 255, 0.07);
+    /* Liquid glass — panels / sheets */
+    --a-glass-bg:    rgba(28, 28, 32, 0.48);
+    --a-glass-edge:  rgba(255, 255, 255, 0.16);
+    --a-glass-spec:  rgba(255, 255, 255, 0.09);
+    /* Floating pill glass — iOS dark system material */
+    --a-pill-bg:     rgba(22,  22,  26,  0.82);
+    --a-pill-edge:   rgba(255, 255, 255, 0.14);
+    --a-pill-spec:   rgba(255, 255, 255, 0.10);
   }
 }
 
@@ -147,28 +155,33 @@
   padding: 0 6px 0 12px;
   pointer-events: all;
 
-  /* Liquid glass */
-  background: var(--a-glass-bg);
-  backdrop-filter: blur(50px) saturate(2.0) brightness(1.05);
-  -webkit-backdrop-filter: blur(50px) saturate(2.0) brightness(1.05);
-  border: 0.5px solid var(--a-glass-edge);
+  /* Translucent pill glass — blur carries the separation */
+  background: var(--a-pill-bg);
+  backdrop-filter: blur(40px) saturate(1.8) brightness(1.04);
+  -webkit-backdrop-filter: blur(40px) saturate(1.8) brightness(1.04);
+  border: 0.5px solid var(--a-pill-edge);
   box-shadow:
-    /* specular top-edge highlight — the "liquid" feel */
-    inset 0 0.5px 0 var(--a-glass-spec),
-    /* subtle inner bottom shadow for depth */
-    inset 0 -0.5px 0 rgba(0, 0, 0, 0.06),
-    /* floating shadow */
-    0 8px 32px rgba(0, 0, 0, 0.18),
-    0 2px 8px  rgba(0, 0, 0, 0.10);
+    inset 0  0.5px 0 var(--a-pill-spec),
+    inset 0 -0.5px 0 rgba(0, 0, 0, 0.05),
+    0 8px 32px rgba(0, 0, 0, 0.14),
+    0 2px 8px  rgba(0, 0, 0, 0.08);
+
+  transition: opacity 240ms ease, transform 240ms cubic-bezier(0.32, 0.72, 0, 1);
+}
+
+.apple-nav-pill.apple-pill-hidden {
+  opacity: 0;
+  transform: scale(0.88) translateY(-6px);
+  pointer-events: none;
 }
 
 @media (prefers-color-scheme: dark) {
   .apple-nav-pill {
     box-shadow:
-      inset 0 0.5px 0 var(--a-glass-spec),
-      inset 0 -0.5px 0 rgba(0, 0, 0, 0.18),
-      0 8px 40px rgba(0, 0, 0, 0.50),
-      0 2px 10px rgba(0, 0, 0, 0.30);
+      inset 0  0.5px 0 var(--a-pill-spec),
+      inset 0 -0.5px 0 rgba(0, 0, 0, 0.20),
+      0 8px 40px rgba(0, 0, 0, 0.55),
+      0 2px 10px rgba(0, 0, 0, 0.35);
   }
 }
 
@@ -252,60 +265,112 @@
 }
 
 /* ── Main content ────────────────────────────────────────────── */
-/* Accounts for: safe area + 8px gap + 46px pill + 10px gap below */
+/* top: safe area + 8px gap + 46px pill + 10px breathing room    */
+/* bot: safe area + 12px gap + 58px pill + 10px breathing room   */
 .apple-main {
   flex: 1;
   overflow: hidden;
   display: flex;
   flex-direction: column;
   padding-top: calc(env(safe-area-inset-top, 0px) + 64px);
-  padding-bottom: calc(49px + env(safe-area-inset-bottom, 0px));
+  padding-bottom: calc(env(safe-area-inset-bottom, 0px) + 80px);
 }
 
-/* ── Bottom tab bar ─────────────────────────────────────────── */
+/* ── Floating pill tab bar ───────────────────────────────────── */
 .apple-tab-bar {
   position: fixed;
-  bottom: 0;
-  left: 0;
-  right: 0;
+  bottom: calc(env(safe-area-inset-bottom, 0px) + 12px);
+  left: 16px;
+  right: 16px;
   z-index: var(--z-mobile-nav);
   display: flex;
-  align-items: flex-start;
-  padding-top: 6px;
-  padding-bottom: env(safe-area-inset-bottom, 0px);
-  min-height: calc(49px + env(safe-area-inset-bottom, 0px));
+  align-items: center;
+  height: 58px;
+  padding: 0 4px;
+  border-radius: 100px;
 
-  /* Liquid glass tab bar */
-  background: var(--a-tab-mat);
-  backdrop-filter: blur(40px) saturate(1.8);
-  -webkit-backdrop-filter: blur(40px) saturate(1.8);
-  border-top: 0.5px solid var(--a-sep);
+  /* iOS system material — opaque enough to read without content behind */
+  background: var(--a-pill-bg);
+  backdrop-filter: blur(40px) saturate(1.8) brightness(1.04);
+  -webkit-backdrop-filter: blur(40px) saturate(1.8) brightness(1.04);
+  border: 0.5px solid var(--a-pill-edge);
   box-shadow:
-    inset 0 0.5px 0 var(--a-glass-spec),
-    0 -0.5px 0 var(--a-sep-lo);
+    inset 0  0.5px 0 var(--a-pill-spec),
+    inset 0 -0.5px 0 rgba(0, 0, 0, 0.05),
+    0 8px 32px rgba(0, 0, 0, 0.14),
+    0 2px 8px  rgba(0, 0, 0, 0.08);
+
+  transition: opacity 240ms ease, transform 240ms cubic-bezier(0.32, 0.72, 0, 1);
 }
 
+.apple-tab-bar.apple-pill-hidden {
+  opacity: 0;
+  transform: scale(0.88) translateY(6px);
+  pointer-events: none;
+}
+
+@media (prefers-color-scheme: dark) {
+  .apple-tab-bar {
+    box-shadow:
+      inset 0  0.5px 0 var(--a-pill-spec),
+      inset 0 -0.5px 0 rgba(0, 0, 0, 0.20),
+      0 8px 40px rgba(0, 0, 0, 0.55),
+      0 2px 10px rgba(0, 0, 0, 0.35);
+  }
+}
+
+/* ── Tab buttons ─────────────────────────────────────────────── */
 .apple-tab-btn {
   flex: 1;
   display: flex;
   flex-direction: column;
   align-items: center;
+  justify-content: center;
   gap: 2px;
-  padding: 2px 4px 0;
+  padding: 6px 2px;
   background: transparent;
   border: none;
   color: var(--a-label3);
   cursor: pointer;
   font-family: var(--a-font);
   -webkit-tap-highlight-color: transparent;
-  transition: color 80ms;
-  min-height: 43px;
+  border-radius: 100px;
+  min-height: 50px;
   position: relative;
+  isolation: isolate;
+  /* spring release animation */
+  transition: transform 200ms cubic-bezier(0.34, 1.56, 0.64, 1), color 80ms;
 }
-.apple-tab-btn.active {
-  color: var(--a-blue);
+
+/* Active color */
+.apple-tab-btn.active { color: var(--a-blue); }
+
+/* Active glass highlight bubble */
+.apple-tab-btn.active::before {
+  content: '';
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 56px;
+  height: 38px;
+  transform: translate(-50%, -50%);
+  background: color-mix(in srgb, var(--a-blue) 12%, transparent);
+  border-radius: 100px;
+  z-index: -1;
+  animation: apple-tab-bubble 240ms cubic-bezier(0.34, 1.56, 0.64, 1);
 }
-.apple-tab-btn:active { opacity: 0.6; }
+
+/* Spring compress on press */
+.apple-tab-btn:active {
+  transform: scale(0.82);
+  transition: transform 60ms ease-out, color 80ms;
+}
+
+/* Long-press visual hold */
+.apple-tab-btn.apple-tab-pressing {
+  transform: scale(0.78);
+  transition: transform 400ms cubic-bezier(0.25, 0, 0, 1), color 80ms;
+}
 
 .apple-tab-icon {
   display: flex;
@@ -314,30 +379,95 @@
   position: relative;
 }
 
-/* Pill indicator under active icon */
-.apple-tab-btn.active .apple-tab-icon::after {
-  content: '';
-  position: absolute;
-  top: -6px;
+.apple-tab-label {
+  font-size: 9.5px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  line-height: 1;
+}
+
+/* ── Collapsed pill dots ─────────────────────────────────────── */
+
+/* Nav dot — top-right corner, shows connection state */
+.apple-nav-dot {
+  position: fixed;
+  top: calc(env(safe-area-inset-top, 0px) + 8px);
+  right: 16px;
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  z-index: var(--z-mobile-header);
+  background: var(--a-pill-bg);
+  backdrop-filter: blur(40px) saturate(1.8) brightness(1.04);
+  -webkit-backdrop-filter: blur(40px) saturate(1.8) brightness(1.04);
+  border: 0.5px solid var(--a-pill-edge);
+  box-shadow:
+    inset 0 0.5px 0 var(--a-pill-spec),
+    0 6px 20px rgba(0, 0, 0, 0.18);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+  animation: apple-dot-pop 280ms cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+.apple-nav-dot:active { transform: scale(0.88); }
+
+/* Tab dot — bottom center, shows active tab icon */
+.apple-tab-dot {
+  position: fixed;
+  bottom: calc(env(safe-area-inset-bottom, 0px) + 12px);
   left: 50%;
   transform: translateX(-50%);
-  width: 28px;
-  height: 3px;
-  border-radius: 0 0 3px 3px;
-  background: var(--a-blue);
-  animation: apple-tab-pill 160ms cubic-bezier(0.34, 1.56, 0.64, 1);
+  width: 52px;
+  height: 52px;
+  border-radius: 50%;
+  z-index: var(--z-mobile-nav);
+  background: var(--a-pill-bg);
+  backdrop-filter: blur(40px) saturate(1.8) brightness(1.04);
+  -webkit-backdrop-filter: blur(40px) saturate(1.8) brightness(1.04);
+  border: 0.5px solid var(--a-pill-edge);
+  box-shadow:
+    inset 0 0.5px 0 var(--a-pill-spec),
+    0 6px 20px rgba(0, 0, 0, 0.18);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--a-blue);
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+  animation: apple-tab-dot-pop 280ms cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+.apple-tab-dot:active { transform: translateX(-50%) scale(0.88); }
+
+/* Status dot inside nav dot */
+.apple-dot-gray {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--a-label3);
 }
 
-@keyframes apple-tab-pill {
-  from { width: 0; opacity: 0; }
-  to   { width: 28px; opacity: 1; }
+@keyframes apple-dot-pop {
+  from { transform: scale(0.3); opacity: 0; }
+  to   { transform: scale(1);   opacity: 1; }
 }
 
-.apple-tab-label {
-  font-size: 10px;
-  font-weight: 500;
-  letter-spacing: 0.01em;
-  line-height: 1;
+@keyframes apple-tab-dot-pop {
+  from { transform: translateX(-50%) scale(0.3); opacity: 0; }
+  to   { transform: translateX(-50%) scale(1);   opacity: 1; }
+}
+
+/* ── Animations ─────────────────────────────────────────────── */
+@keyframes apple-tab-bubble {
+  from {
+    transform: translate(-50%, -50%) scale(0.3);
+    opacity: 0;
+  }
+  to {
+    transform: translate(-50%, -50%) scale(1);
+    opacity: 1;
+  }
 }
 
 /* ── More sheet ──────────────────────────────────────────────── */

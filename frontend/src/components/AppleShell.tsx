@@ -1,4 +1,4 @@
-import { useState, useCallback, useEffect } from 'react'
+import { useState, useCallback, useEffect, useRef } from 'react'
 import { api, TOKEN_KEY } from '../api/client'
 import { useSettings } from '../SettingsContext'
 import { useLogs } from '../LogContext'
@@ -59,13 +59,27 @@ function ChevronRight() {
   )
 }
 
+// Short haptic pattern — works on Android; silently no-ops on iOS/desktop
+function haptic(pattern: VibratePattern = 6) {
+  if ('vibrate' in navigator) navigator.vibrate(pattern)
+}
+
 export default function AppleShell() {
-  const [tab, setTab]           = useState<Tab>('glance')
-  const [moreOpen, setMoreOpen] = useState(false)
+  const [tab, setTab]               = useState<Tab>('glance')
+  const [moreOpen, setMoreOpen]     = useState(false)
   const [paletteOpen, setPaletteOpen] = useState(false)
+  const [pressingTab, setPressingTab] = useState<Tab | null>(null)
+  const [pillsCollapsed, setPillsCollapsed] = useState(false)
   const { settings, update } = useSettings()
   const { connected } = useLogs()
   const toast = useToast()
+
+  const mainRef      = useRef<HTMLElement>(null)
+  const navPillRef   = useRef<HTMLDivElement>(null)
+  const tabBarRef    = useRef<HTMLElement>(null)
+  const lastTapRef   = useRef<{ id: Tab; time: number } | null>(null)
+  const pressTimer   = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const longFired    = useRef(false)
 
   const activeTab = TABS.find(t => t.id === tab)!
 
@@ -96,10 +110,98 @@ export default function AppleShell() {
     setMoreOpen(false)
   }, [])
 
+  // Scroll whichever element inside <main> is scrolled, back to top
+  const scrollToTop = useCallback(() => {
+    if (!mainRef.current) return
+    const els = Array.from(mainRef.current.querySelectorAll('*')) as HTMLElement[]
+    for (const el of els) {
+      if (el.scrollTop > 4) { el.scrollTo({ top: 0, behavior: 'smooth' }); return }
+    }
+  }, [])
+
+  // Pointer down: start long-press timer (480ms), track pressing state
+  const handleTabDown = useCallback((tabId: Tab) => {
+    longFired.current = false
+    setPressingTab(tabId)
+    if (pressTimer.current) clearTimeout(pressTimer.current)
+    pressTimer.current = setTimeout(() => {
+      longFired.current = true
+      setPressingTab(null)
+      haptic([8, 60, 14])       // stronger "thud" pattern for long press
+      if (tabId === tab) scrollToTop()
+    }, 480)
+  }, [tab, scrollToTop])
+
+  // Pointer up/cancel: clear timer, clear pressing state
+  const handleTabUp = useCallback(() => {
+    if (pressTimer.current) { clearTimeout(pressTimer.current); pressTimer.current = null }
+    setPressingTab(null)
+  }, [])
+
+  // Click: haptic + double-tap detection + navigate
+  const handleTabTap = useCallback((tabId: Tab) => {
+    if (longFired.current) { longFired.current = false; return } // already handled by long press
+    haptic(5)
+    const now  = Date.now()
+    const last = lastTapRef.current
+    if (last?.id === tabId && now - last.time < 360) {
+      // Double-tap: scroll to top (or close More sheet if already open)
+      lastTapRef.current = null
+      haptic([4, 30, 4])
+      if (tabId === tab) scrollToTop()
+      else navigate(tabId)
+      return
+    }
+    lastTapRef.current = { id: tabId, time: now }
+    navigate(tabId)
+  }, [tab, navigate, scrollToTop])
+
   const disable = useCallback(() => {
     update({ appleify: false })
     toast.info('Appleify deactivated')
   }, [update, toast])
+
+  const expandPills = useCallback(() => {
+    setPillsCollapsed(false)
+    haptic(6)
+  }, [])
+
+  // Swipe left/right on either pill → collapse both to dots
+  useEffect(() => {
+    if (pillsCollapsed) return
+    const THRESHOLD = 55
+
+    const addSwipe = (el: HTMLElement | null) => {
+      if (!el) return () => {}
+      let startX = 0, startY = 0, fired = false
+
+      const onStart = (e: TouchEvent) => {
+        startX = e.touches[0].clientX
+        startY = e.touches[0].clientY
+        fired = false
+      }
+      const onMove = (e: TouchEvent) => {
+        if (fired) return
+        const dx = Math.abs(e.touches[0].clientX - startX)
+        const dy = Math.abs(e.touches[0].clientY - startY)
+        if (dx > THRESHOLD && dx > dy * 1.5) {
+          fired = true
+          setPillsCollapsed(true)
+          haptic([4, 40, 4])
+        }
+      }
+      el.addEventListener('touchstart', onStart, { passive: true })
+      el.addEventListener('touchmove',  onMove,  { passive: true })
+      return () => {
+        el.removeEventListener('touchstart', onStart)
+        el.removeEventListener('touchmove',  onMove)
+      }
+    }
+
+    const c1 = addSwipe(navPillRef.current)
+    const c2 = addSwipe(tabBarRef.current)
+    return () => { c1(); c2() }
+  }, [pillsCollapsed])
 
   const signOut = () => {
     localStorage.removeItem(TOKEN_KEY)
@@ -111,7 +213,7 @@ export default function AppleShell() {
     <div className="appleify-root">
       {/* ── Floating pill navigation bar ───────────────────────── */}
       <header className="apple-nav-bar">
-        <div className="apple-nav-pill">
+        <div ref={navPillRef} className={`apple-nav-pill${pillsCollapsed ? ' apple-pill-hidden' : ''}`}>
           {/* Left — connection status */}
           <div className="apple-nav-left">
             {connected
@@ -139,8 +241,17 @@ export default function AppleShell() {
         </div>
       </header>
 
+      {/* Nav collapsed dot — tap to restore both pills */}
+      {pillsCollapsed && (
+        <button className="apple-nav-dot" onClick={expandPills} aria-label="Expand navigation">
+          {connected
+            ? <span className="apple-live-dot" style={{ width: 7, height: 7 }} />
+            : <span className="apple-dot-gray" />}
+        </button>
+      )}
+
       {/* ── Page content ───────────────────────────────────────── */}
-      <main className="apple-main">
+      <main className="apple-main" ref={mainRef}>
         <ErrorBoundary key={tab} label={`${activeTab.label} failed to render`}>
           {tab === 'glance'   && <GlancePage />}
           {tab === 'console'  && <Console />}
@@ -154,38 +265,62 @@ export default function AppleShell() {
         </ErrorBoundary>
       </main>
 
-      {/* ── iOS Tab Bar ────────────────────────────────────────── */}
-      <nav className="apple-tab-bar" aria-label="Navigation">
+      {/* ── Floating pill tab bar ──────────────────────────────── */}
+      <nav
+        ref={tabBarRef}
+        className={`apple-tab-bar${pillsCollapsed ? ' apple-pill-hidden' : ''}`}
+        aria-label="Navigation"
+      >
         {PRIMARY_TABS.map(tabId => {
-          const t = TABS.find(t => t.id === tabId)!
+          const t      = TABS.find(t => t.id === tabId)!
           const active = tab === tabId
           return (
             <button
               key={tabId}
               type="button"
-              className={`apple-tab-btn${active ? ' active' : ''}`}
-              onClick={() => navigate(tabId)}
+              className={[
+                'apple-tab-btn',
+                active          ? 'active'           : '',
+                pressingTab === tabId ? 'apple-tab-pressing' : '',
+              ].filter(Boolean).join(' ')}
+              onPointerDown={() => handleTabDown(tabId)}
+              onPointerUp={handleTabUp}
+              onPointerCancel={handleTabUp}
+              onClick={() => handleTabTap(tabId)}
               aria-label={t.label}
               aria-current={active ? 'page' : undefined}
             >
-              <div className="apple-tab-icon"><t.Icon size={24} /></div>
+              <div className="apple-tab-icon"><t.Icon size={22} /></div>
               <span className="apple-tab-label">{t.label}</span>
             </button>
           )
         })}
 
-        {/* More tab */}
+        {/* More tab — simpler: haptic + toggle, no double-tap needed */}
         <button
           type="button"
-          className={`apple-tab-btn${SECONDARY_TABS.includes(tab) ? ' active' : ''}`}
-          onClick={() => setMoreOpen(o => !o)}
+          className={[
+            'apple-tab-btn',
+            SECONDARY_TABS.includes(tab) ? 'active' : '',
+          ].filter(Boolean).join(' ')}
+          onPointerDown={() => setPressingTab('settings')}
+          onPointerUp={handleTabUp}
+          onPointerCancel={handleTabUp}
+          onClick={() => { haptic(5); setMoreOpen(o => !o) }}
           aria-label="More"
           aria-expanded={moreOpen}
         >
-          <div className="apple-tab-icon"><EllipsisCircle size={24} /></div>
+          <div className="apple-tab-icon"><EllipsisCircle size={22} /></div>
           <span className="apple-tab-label">More</span>
         </button>
       </nav>
+
+      {/* Tab collapsed dot — tap to restore both pills */}
+      {pillsCollapsed && (
+        <button className="apple-tab-dot" onClick={expandPills} aria-label="Expand tab bar">
+          <activeTab.Icon size={20} />
+        </button>
+      )}
 
       {/* ── More sheet ─────────────────────────────────────────── */}
       {moreOpen && (
