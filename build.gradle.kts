@@ -59,6 +59,9 @@ dependencies {
     // Log4j API — Paper provides it at runtime; compileOnly to attach the console appender
     compileOnly("org.apache.logging.log4j:log4j-api:2.22.0")
     compileOnly("org.apache.logging.log4j:log4j-core:2.22.0")
+
+    testImplementation(kotlin("test"))
+    testImplementation("org.junit.jupiter:junit-jupiter:5.12.2")
 }
 
 kotlin {
@@ -120,6 +123,10 @@ tasks {
     runServer {
         minecraftVersion("1.21")
         jvmArgs("-Xms2G", "-Xmx2G", "-Dcom.mojang.eula.agree=true")
+    }
+
+    test {
+        useJUnitPlatform()
     }
 
     processResources {
