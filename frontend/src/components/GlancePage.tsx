@@ -305,8 +305,8 @@ function GlanceChart({
     : null
 
   const renderDot = greyBeardMode ? false : (props: any) => {
-    const { cx, cy, payload } = props
-    if (cx == null || cy == null) return <g key="d-empty" />
+    const { cx, cy, payload, index } = props
+    if (cx == null || cy == null) return <g key={`d-empty-${index}`} />
     const v = payload[dataKey] as number
     if (stats.std < 0.01) return <g key={`d-${cx}`} />
     const z = (v - stats.mean) / stats.std
@@ -487,8 +487,7 @@ function GlanceLogViewer({ tsLogs, clickedTs, onClear, isOpen, onToggle }: {
         virtuosoRef.current?.scrollToIndex({ index: Math.max(0, idx), behavior: 'smooth', align: 'center' })
       })
     }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [clickedTs])
+  }, [clickedTs, tsLogs])
 
   return (
     <>
@@ -550,20 +549,20 @@ export default function GlancePage() {
   const { settings } = useSettings()
   const { greyBeardMode: gbm, glance: gs } = settings
 
-  const { data: histData = [] } = useQuery<Snap[]>({
+  const { data: histData = [], isError: histError, refetch: refetchHist } = useQuery<Snap[]>({
     queryKey: ['glance-history', windowMin],
     queryFn: () => api.get(`/glance/history?window=${windowMin}`).then(r => r.data),
     refetchInterval: windowMin <= 5 ? Math.max(gs.refreshIntervalMs, 2000) : 30_000,
     staleTime: 1_000,
   })
 
-  const { data: current } = useQuery<Snap>({
+  const { data: current, isError: currentError, refetch: refetchCurrent } = useQuery<Snap>({
     queryKey: ['glance-current'],
     queryFn: () => api.get('/glance/current').then(r => r.data),
     refetchInterval: gs.refreshIntervalMs,
   })
 
-  const { data: rawGcEvents = [] } = useQuery<GcEvent[]>({
+  const { data: rawGcEvents = [], isError: gcError, refetch: refetchGc } = useQuery<GcEvent[]>({
     queryKey: ['glance-gc-events', windowMin],
     queryFn: () => api.get(`/glance/gc-events?window=${windowMin}`).then(r => r.data),
     refetchInterval: windowMin <= 5 ? Math.max(gs.refreshIntervalMs, 2000) : 30_000,
@@ -618,7 +617,7 @@ export default function GlancePage() {
     tick()
     const id = setInterval(tick, 1000)
     return () => clearInterval(id)
-  }, [current?.timestamp])
+  }, [current])
 
   const status = current ? globalStatus(current) : 'nominal'
   const memP = current && current.memMaxMb > 0 ? current.memUsedMb / current.memMaxMb : 0
@@ -658,9 +657,19 @@ export default function GlancePage() {
     ? `glance-status-badge ${status}`
     : `glance-status-badge ${status} no-pulse`
 
+  const hasError = histError || currentError || gcError
+  const retryAll = () => { refetchHist(); refetchCurrent(); refetchGc() }
+
   return (
     <div className="glance-root">
       <div className="glance-left">
+
+        {hasError && (
+          <div className="glance-error-banner">
+            <span>⚠ Failed to fetch metrics</span>
+            <button className="btn-ghost btn-xs" onClick={retryAll}>Retry</button>
+          </div>
+        )}
 
         {/* Status bar */}
         <div className="glance-status-bar">

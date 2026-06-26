@@ -7,6 +7,10 @@
   0%, 100% { box-shadow: 0 0 0 2px var(--void), 0 0 0 3px rgba(74,222,128,.4); }
   50% { box-shadow: 0 0 0 2px var(--void), 0 0 0 4px rgba(74,222,128,.15); }
 }
+@keyframes pulse-dot-live {
+  0%, 100% { box-shadow: 0 0 0 2px var(--void), 0 0 0 3px color-mix(in srgb, var(--live) 40%, transparent); }
+  50% { box-shadow: 0 0 0 2px var(--void), 0 0 0 4px color-mix(in srgb, var(--live) 15%, transparent); }
+}
 @keyframes spin {
   to { transform: rotate(360deg); }
 }
@@ -22,9 +26,29 @@
   from { opacity: 0; }
   to   { opacity: 1; }
 }
+@keyframes page-in {
+  from { opacity: 0; transform: translateY(4px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
 @keyframes rail-pulse {
   0%, 100% { opacity: 1; }
   50%       { opacity: 0.4; }
+}
+@keyframes shimmer {
+  from { background-position: -200% 0; }
+  to   { background-position: 200% 0; }
+}
+@keyframes toast-in {
+  from { opacity: 0; transform: translateY(8px) scale(0.97); }
+  to   { opacity: 1; transform: translateY(0) scale(1); }
+}
+@keyframes toast-out {
+  from { opacity: 1; transform: translateY(0) scale(1); }
+  to   { opacity: 0; transform: translateY(4px) scale(0.97); }
+}
+
+.page-content {
+  animation: page-in 120ms ease-out;
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -37,4 +61,6 @@
   .nav-btn, .nav-btn svg, .glance-stat-card,
   .glance-chart-card, .player-row,
   .btn-primary, .btn-ghost { transform: none !important; }
+  .page-content { animation: none; }
+  .skeleton { animation: none; }
 }

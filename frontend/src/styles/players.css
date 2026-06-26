@@ -1,6 +1,6 @@
 /* ── Player list ────────────────────────────────────────────── */
 .section-root {
-  padding: 20px;
+  padding: 24px;
   height: 100%;
   overflow-y: auto;
 }
@@ -8,7 +8,7 @@
   display: flex;
   align-items: baseline;
   gap: 8px;
-  margin-bottom: 16px;
+  margin-bottom: 20px;
 }
 .section-title {
   font-size: 14px;
@@ -100,15 +100,15 @@
 /* ── Server stats ───────────────────────────────────────────── */
 .stats-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
-  gap: 12px;
-  margin-top: 16px;
+  grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+  gap: 16px;
+  margin-top: 20px;
 }
 .stat-card {
   background: var(--surface);
   border: 1px solid var(--border);
   border-radius: var(--r-lg);
-  padding: 16px 18px;
+  padding: 20px;
 }
 .stat-label {
   font-family: var(--sans);
@@ -150,12 +150,14 @@
   font-weight: 700;
   color: var(--ash);
   letter-spacing: -0.02em;
+  margin-top: 4px;
 }
 .server-version {
   font-family: var(--sans);
   font-size: 11.5px;
   color: var(--mist);
-  margin-top: 3px;
+  margin-top: 4px;
+  margin-bottom: 4px;
 }
 
 /* ── Stats page ──────────────────────────────────────────────── */
@@ -183,10 +185,10 @@
 .stats-range-btn.active { background: var(--amber-dim); color: var(--amber); }
 
 .stats-charts {
-  margin-top: 8px;
+  margin-top: 20px;
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: 16px;
 }
 
 .stats-help-btn {

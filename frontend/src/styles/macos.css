@@ -584,11 +584,15 @@
   border-color: var(--amber);
   background: var(--accent-05);
 }
-.fun-card-emoji {
-  font-size: 22px;
+.fun-card-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
   flex-shrink: 0;
-  line-height: 1;
+  color: var(--mist);
+  transition: color 200ms;
 }
+.fun-card.fun-active .fun-card-icon { color: var(--amber); }
 .fun-card-text { flex: 1; }
 .fun-card-title {
   font-family: var(--sans);

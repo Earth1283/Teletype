@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { api } from '../api/client'
 import { useContextMenu } from '../ContextMenu'
+import { useToast } from '../ToastContext'
 import { IconRefresh } from '../Icons'
 import PromptModal, { type PromptVariant } from './PromptModal'
 
@@ -61,6 +62,7 @@ function PlayerAvatar({ player, large = false }: { player: Player; large?: boole
 }
 
 export default function PlayerList() {
+  const toast = useToast()
   const { data, isLoading, error, refetch, isFetching } = useQuery<Player[]>({
     queryKey: ['players'],
     queryFn: () => api.get('/players').then((r) => r.data),
@@ -69,23 +71,40 @@ export default function PlayerList() {
   const [selected, setSelected] = useState<string | null>(null)
   const [prompt, setPrompt] = useState<PromptState>(null)
   const [customActionPlayer, setCustomActionPlayer] = useState<Player | null>(null)
+  // Persists between player selections so the command isn't reset each time
   const [customCommand, setCustomCommand] = useState('effect give {player} minecraft:speed 60 1')
+  const [loadingAction, setLoadingAction] = useState<string | null>(null)
   const { openContextMenu } = useContextMenu()
 
   function showPrompt(title: string, message: React.ReactNode, variant: PromptVariant = 'info') {
     setPrompt({ title, message, variant })
   }
 
-  async function runCommand(command: string) {
+  async function runCommand(command: string, successMsg?: string) {
     try {
       await api.post('/execute', { command })
+      if (successMsg) toast.success(successMsg)
     } catch (e: any) {
-      showPrompt('Command failed', e.response?.data?.error ?? `Could not dispatch: ${command}`, 'error')
+      const msg = e.response?.data?.error ?? `Command failed: ${command}`
+      toast.error(msg)
+      showPrompt('Command failed', msg, 'error')
       throw e
     }
   }
 
-  function kick(name: string) { runCommand(`kick ${name}`).catch(() => {}) }
+  async function runActionButton(key: string, command: string, successMsg?: string) {
+    setLoadingAction(key)
+    try {
+      await runCommand(command, successMsg)
+    } finally {
+      setLoadingAction(null)
+    }
+  }
+
+  function kick(name: string) {
+    runActionButton(`kick-${name}`, `kick ${name}`, `Kicked ${name}`)
+  }
+
   function ban(name: string) {
     setPrompt({
       title: 'Ban player?',
@@ -93,21 +112,21 @@ export default function PlayerList() {
       variant: 'danger',
       confirmLabel: 'Ban',
       cancelLabel: 'Cancel',
-      onConfirm: () => runCommand(`ban ${name}`),
+      onConfirm: () => runCommand(`ban ${name}`, `Banned ${name}`),
     })
   }
 
   function runCustomAction() {
     if (!customActionPlayer || !customCommand.trim()) return
     const command = customCommand.trim().replaceAll('{player}', customActionPlayer.name)
-    runCommand(command)
+    runCommand(command, 'Command sent')
       .then(() => setCustomActionPlayer(null))
       .catch(() => {})
   }
 
   function openCustomAction(player: Player) {
     setCustomActionPlayer(player)
-    setCustomCommand('effect give {player} minecraft:speed 60 1')
+    // Don't reset command — preserve last used command
   }
 
   function openPlayerCtx(e: React.MouseEvent, player: Player) {
@@ -116,11 +135,11 @@ export default function PlayerList() {
       { label: 'Copy UUID', action: () => navigator.clipboard.writeText(player.uuid) },
       { label: 'Copy Skin URL', action: () => navigator.clipboard.writeText(playerSkinUrl(player.uuid)) },
       { type: 'separator' },
-      { label: 'Heal', action: () => runCommand(`effect give ${player.name} minecraft:instant_health 1 10`).catch(() => {}) },
-      { label: 'Feed', action: () => runCommand(`effect give ${player.name} minecraft:saturation 1 10`).catch(() => {}) },
-      { label: 'Send to Spawn', action: () => runCommand(`spawn ${player.name}`).catch(() => {}) },
-      { label: 'Creative Mode', action: () => runCommand(`gamemode creative ${player.name}`).catch(() => {}) },
-      { label: 'Survival Mode', action: () => runCommand(`gamemode survival ${player.name}`).catch(() => {}) },
+      { label: 'Heal', action: () => runCommand(`effect give ${player.name} minecraft:instant_health 1 10`, `Healed ${player.name}`).catch(() => {}) },
+      { label: 'Feed', action: () => runCommand(`effect give ${player.name} minecraft:saturation 1 10`, `Fed ${player.name}`).catch(() => {}) },
+      { label: 'Send to Spawn', action: () => runCommand(`spawn ${player.name}`, `Teleported ${player.name} to spawn`).catch(() => {}) },
+      { label: 'Creative Mode', action: () => runCommand(`gamemode creative ${player.name}`, `${player.name} → Creative`).catch(() => {}) },
+      { label: 'Survival Mode', action: () => runCommand(`gamemode survival ${player.name}`, `${player.name} → Survival`).catch(() => {}) },
       { label: 'Custom Command...', action: () => openCustomAction(player) },
       { type: 'separator' },
       { label: 'Kick Player', action: () => kick(player.name) },
@@ -130,6 +149,9 @@ export default function PlayerList() {
 
   const count = data?.length ?? 0
   const sel = data?.find(p => p.uuid === selected) ?? null
+
+  // If selected player left mid-session, show offline message
+  const selectedGone = selected !== null && !sel && !isLoading
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', height: '100%', overflow: 'hidden' }}>
@@ -155,7 +177,7 @@ export default function PlayerList() {
           </div>
 
           {isLoading && <div style={{ padding: '12px 14px', fontSize: 12, color: 'var(--mist)' }}>Loading…</div>}
-          {error && <div style={{ padding: '12px 14px', fontSize: 12, color: 'var(--red)' }}>Failed to load</div>}
+          {error && <div style={{ padding: '12px 14px', fontSize: 12, color: 'var(--red)' }}>Failed to load players</div>}
 
           {data?.map(p => (
             <div
@@ -180,7 +202,16 @@ export default function PlayerList() {
         </div>
 
         <div className="mac-detail-pane">
-          {!sel ? (
+          {selectedGone ? (
+            <div className="mac-detail-empty">
+              <div className="mac-detail-empty-text" style={{ color: 'var(--ghost)', fontSize: 12 }}>
+                Player went offline
+              </div>
+              <button className="btn-ghost btn-xs" style={{ marginTop: 8 }} onClick={() => setSelected(null)}>
+                Dismiss
+              </button>
+            </div>
+          ) : !sel ? (
             <div className="mac-detail-empty">
               <svg className="mac-detail-empty-icon" width="52" height="52" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1">
                 <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" /><circle cx="9" cy="7" r="4" />
@@ -236,20 +267,36 @@ export default function PlayerList() {
               </div>
 
               <div className="mac-player-detail-actions">
-                <button className="mac-player-action-btn" onClick={() => runCommand(`effect give ${sel.name} minecraft:instant_health 1 10`).catch(() => {})}>
-                  Heal
+                <button
+                  className="mac-player-action-btn"
+                  disabled={loadingAction === `heal-${sel.name}`}
+                  onClick={() => runActionButton(`heal-${sel.name}`, `effect give ${sel.name} minecraft:instant_health 1 10`, `Healed ${sel.name}`)}
+                >
+                  {loadingAction === `heal-${sel.name}` ? '…' : 'Heal'}
                 </button>
-                <button className="mac-player-action-btn" onClick={() => runCommand(`effect give ${sel.name} minecraft:saturation 1 10`).catch(() => {})}>
-                  Feed
+                <button
+                  className="mac-player-action-btn"
+                  disabled={loadingAction === `feed-${sel.name}`}
+                  onClick={() => runActionButton(`feed-${sel.name}`, `effect give ${sel.name} minecraft:saturation 1 10`, `Fed ${sel.name}`)}
+                >
+                  {loadingAction === `feed-${sel.name}` ? '…' : 'Feed'}
                 </button>
               </div>
 
               <div className="mac-player-detail-actions">
-                <button className="mac-player-action-btn" onClick={() => runCommand(`gamemode survival ${sel.name}`).catch(() => {})}>
-                  Survival
+                <button
+                  className="mac-player-action-btn"
+                  disabled={loadingAction === `surv-${sel.name}`}
+                  onClick={() => runActionButton(`surv-${sel.name}`, `gamemode survival ${sel.name}`, `${sel.name} → Survival`)}
+                >
+                  {loadingAction === `surv-${sel.name}` ? '…' : 'Survival'}
                 </button>
-                <button className="mac-player-action-btn" onClick={() => runCommand(`gamemode creative ${sel.name}`).catch(() => {})}>
-                  Creative
+                <button
+                  className="mac-player-action-btn"
+                  disabled={loadingAction === `crea-${sel.name}`}
+                  onClick={() => runActionButton(`crea-${sel.name}`, `gamemode creative ${sel.name}`, `${sel.name} → Creative`)}
+                >
+                  {loadingAction === `crea-${sel.name}` ? '…' : 'Creative'}
                 </button>
               </div>
 
@@ -257,8 +304,12 @@ export default function PlayerList() {
                 <button className="mac-player-action-btn" onClick={() => openCustomAction(sel)}>
                   Custom
                 </button>
-                <button className="mac-player-action-btn" onClick={() => kick(sel.name)}>
-                  Kick
+                <button
+                  className="mac-player-action-btn"
+                  disabled={loadingAction === `kick-${sel.name}`}
+                  onClick={() => kick(sel.name)}
+                >
+                  {loadingAction === `kick-${sel.name}` ? '…' : 'Kick'}
                 </button>
                 <button className="mac-player-action-btn danger" onClick={() => ban(sel.name)}>
                   Ban

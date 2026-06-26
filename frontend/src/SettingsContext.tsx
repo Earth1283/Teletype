@@ -5,6 +5,7 @@ export interface TeletypeSettings {
   theme: string
   greyBeardMode: boolean
   fun: boolean
+  appleify: boolean
 
   glance: {
     anomalyThresholdTps: number
@@ -69,6 +70,7 @@ export const DEFAULT_SETTINGS: TeletypeSettings = {
   theme: DEFAULT_THEME_ID,
   greyBeardMode: false,
   fun: false,
+  appleify: false,
   glance: {
     anomalyThresholdTps: 2.0,
     anomalyThresholdTick: 2.0,

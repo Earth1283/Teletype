@@ -1,6 +1,9 @@
 import { useRef } from 'react'
 import { useSettings } from '../SettingsContext'
-import { IconEyeOff, IconSliders, IconTerminal, IconCommand, IconCode, IconPalette } from '../Icons'
+import {
+  IconEyeOff, IconSliders, IconTerminal, IconCommand, IconCode, IconPalette,
+  IconActivity, IconSettings, IconRefresh, IconMonitor, IconApple,
+} from '../Icons'
 import { THEMES, getTheme } from '../themes'
 import { CONTEXT_WHEEL_ACTIONS } from '../contextWheelActions'
 
@@ -70,7 +73,7 @@ function Section({ title, icon, dimmed, children, sectionRef }: {
 
 // ── Sidebar nav item ──────────────────────────────────────────────────────────
 
-function NavItem({ label, icon, onClick }: { label: string; icon: string; onClick: () => void }) {
+function NavItem({ label, icon, onClick }: { label: string; icon: React.ReactNode; onClick: () => void }) {
   return (
     <button className="s-nav-item" onClick={onClick}>
       <span className="s-nav-icon">{icon}</span>
@@ -103,7 +106,7 @@ export default function SettingsPage() {
   const refReset      = useRef<HTMLDivElement>(null)
 
   const scrollTo = (ref: React.RefObject<HTMLDivElement | null>) => {
-    ref.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+    ref.current?.scrollIntoView({ behavior: 'smooth', block: 'nearest' })
   }
 
   return (
@@ -111,26 +114,40 @@ export default function SettingsPage() {
       {/* Sidebar */}
       <div className="s-sidebar">
         <div className="s-sidebar-header">Preferences</div>
-        <NavItem label="Fun Mode"      icon="🖥️" onClick={() => scrollTo(refFunMode)} />
-        <NavItem label="Appearance"    icon="🎨" onClick={() => scrollTo(refTheme)} />
-        <NavItem label="Grey Beard"    icon="👤" onClick={() => scrollTo(refGreyBeard)} />
+        <NavItem label="Fun Mode"      icon={<IconMonitor size={13} />}  onClick={() => scrollTo(refFunMode)} />
+        <NavItem label="Appearance"    icon={<IconPalette size={13} />}  onClick={() => scrollTo(refTheme)} />
+        <NavItem label="Grey Beard"    icon={<IconEyeOff size={13} />}   onClick={() => scrollTo(refGreyBeard)} />
         <div className="s-sidebar-sep" />
-        <NavItem label="Glance"        icon="📊" onClick={() => scrollTo(refGlance)} />
-        <NavItem label="Console"       icon="⌨️" onClick={() => scrollTo(refConsole)} />
-        <NavItem label="Stats"         icon="📈" onClick={() => scrollTo(refStats)} />
+        <NavItem label="Glance"        icon={<IconActivity size={13} />} onClick={() => scrollTo(refGlance)} />
+        <NavItem label="Console"       icon={<IconTerminal size={13} />} onClick={() => scrollTo(refConsole)} />
+        <NavItem label="Stats"         icon={<IconSliders size={13} />}  onClick={() => scrollTo(refStats)} />
         <div className="s-sidebar-sep" />
-        <NavItem label="Palette"       icon="⌘" onClick={() => scrollTo(refPalette)} />
-        <NavItem label="Context Wheel" icon="◉" onClick={() => scrollTo(refWheel)} />
-        <NavItem label="Editor"        icon="📝" onClick={() => scrollTo(refEditor)} />
+        <NavItem label="Palette"       icon={<IconCommand size={13} />}  onClick={() => scrollTo(refPalette)} />
+        <NavItem label="Context Wheel" icon={<IconSettings size={13} />} onClick={() => scrollTo(refWheel)} />
+        <NavItem label="Editor"        icon={<IconCode size={13} />}     onClick={() => scrollTo(refEditor)} />
         <div className="s-sidebar-sep" />
-        <NavItem label="Reset"         icon="↺" onClick={() => scrollTo(refReset)} />
+        <NavItem label="Reset"         icon={<IconRefresh size={13} />}  onClick={() => scrollTo(refReset)} />
       </div>
 
       {/* Content */}
       <div className="s-content">
+        {/* ── Appleify (mobile-only easter egg) ────────────────────── */}
+        <div className={`appleify-card${settings.appleify ? ' fun-active' : ''}`}>
+          <span className="appleify-card-icon"><IconApple size={22} /></span>
+          <div className="appleify-card-body">
+            <div className="appleify-card-title">Appleify</div>
+            <div className="appleify-card-desc">
+              Transforms Teletype into an Apple HCI experience — iOS navigation bars,
+              Liquid Glass materials, Apple color system, and auto dark / light mode.
+              Activate secretly: tap the Teletype logo 5 times.
+            </div>
+          </div>
+          <Toggle value={settings.appleify} onChange={v => update({ appleify: v })} />
+        </div>
+
         {/* ── Fun Mode ─────────────────────────────────────────────── */}
         <div ref={refFunMode} className={`fun-card${settings.fun ? ' fun-active' : ''}`}>
-          <span className="fun-card-emoji">🖥️</span>
+          <span className="fun-card-icon"><IconMonitor size={22} /></span>
           <div className="fun-card-text">
             <div className="fun-card-title">Fun Mode</div>
             <div className="fun-card-desc">

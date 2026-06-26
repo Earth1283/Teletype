@@ -590,7 +590,6 @@ export default function MacOSDesktop() {
             onMax={maxWin}
             onNavigate={(t) => openApp(t as Tab)}
             onTitleCtx={winTitleCtx}
-            finderViewMode={finderViewMode}
             threadDumpText={threadDumpText}
           />
         ))}
@@ -669,11 +668,10 @@ interface MacWindowProps {
   onMax: (id: Tab) => void
   onNavigate: (t: string) => void
   onTitleCtx: (e: React.MouseEvent, id: Tab) => void
-  finderViewMode: 'icons' | 'list'
   threadDumpText: string
 }
 
-function MacWindow({ win, isActive, onFocus, onStartDrag, onStartResize, onClose, onMin, onMax, onNavigate, onTitleCtx, finderViewMode, threadDumpText }: MacWindowProps) {
+function MacWindow({ win, isActive, onFocus, onStartDrag, onStartResize, onClose, onMin, onMax, onNavigate, onTitleCtx, threadDumpText }: MacWindowProps) {
   const app = APPS.find(a => a.id === win.id)!
   const posStyle = win.max
     ? { zIndex: win.z }
@@ -699,7 +697,7 @@ function MacWindow({ win, isActive, onFocus, onStartDrag, onStartResize, onClose
         <span className="mac-titlebar-title">{app.label}</span>
       </div>
       <div className="mac-window-content">
-        <PageContent id={win.id} onNavigate={onNavigate} finderViewMode={finderViewMode} threadDumpText={threadDumpText} />
+        <PageContent id={win.id} onNavigate={onNavigate} threadDumpText={threadDumpText} />
       </div>
       {!win.max && (
         <div className="mac-resize-handle" onMouseDown={e => onStartResize(e, win.id)} />
@@ -708,10 +706,9 @@ function MacWindow({ win, isActive, onFocus, onStartDrag, onStartResize, onClose
   )
 }
 
-function PageContent({ id, onNavigate, finderViewMode, threadDumpText }: {
+function PageContent({ id, onNavigate, threadDumpText }: {
   id: Tab
   onNavigate: (t: string) => void
-  finderViewMode: 'icons' | 'list'
   threadDumpText: string
 }) {
   switch (id) {
@@ -719,7 +716,7 @@ function PageContent({ id, onNavigate, finderViewMode, threadDumpText }: {
     case 'console':     return <Console />
     case 'players':     return <PlayerList />
     case 'stats':       return <ServerStats onNavigate={onNavigate} />
-    case 'files':       return <FileManager viewMode={finderViewMode} />
+    case 'files':       return <FileManager />
     case 'actions':     return <ActionsPage />
     case 'audit':       return <AuditPage />
     case 'network':     return <NetworkPage />

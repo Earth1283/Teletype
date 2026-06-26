@@ -32,6 +32,8 @@ const KNOWN_ACTIONS = [
   'category_create', 'category_delete',
 ]
 
+const PAGE_SIZE = 100
+
 function pad(n: number) { return n.toString().padStart(2, '0') }
 function fmtTs(ts: number): string {
   const d = new Date(ts)
@@ -42,17 +44,23 @@ export default function AuditPage() {
   const [actorFilter, setActorFilter]   = useState('')
   const [actionFilter, setActionFilter] = useState('')
   const [sinceInput, setSinceInput]     = useState('')
+  const [offset, setOffset]             = useState(0)
   const { openContextMenu } = useContextMenu()
 
-  const since = sinceInput ? new Date(sinceInput).getTime() || undefined : undefined
+  // Validate sinceInput — don't send NaN to backend
+  const sinceMs = (() => {
+    if (!sinceInput) return undefined
+    const t = new Date(sinceInput).getTime()
+    return isNaN(t) ? undefined : t
+  })()
 
-  const params = new URLSearchParams({ limit: '200' })
+  const params = new URLSearchParams({ limit: String(PAGE_SIZE), offset: String(offset) })
   if (actorFilter)  params.set('actor', actorFilter)
   if (actionFilter) params.set('action', actionFilter)
-  if (since)        params.set('since', String(since))
+  if (sinceMs)      params.set('since', String(sinceMs))
 
-  const { data: entries = [], dataUpdatedAt } = useQuery<AuditEntry[]>({
-    queryKey: ['audit', actorFilter, actionFilter, since],
+  const { data: entries = [], dataUpdatedAt, isFetching } = useQuery<AuditEntry[]>({
+    queryKey: ['audit', actorFilter, actionFilter, sinceMs, offset],
     queryFn: () => api.get(`/audit?${params}`).then(r => r.data),
     refetchInterval: 30_000,
     staleTime: 5_000,
@@ -71,7 +79,7 @@ export default function AuditPage() {
     URL.revokeObjectURL(url)
   }
 
-  const reset = () => { setActorFilter(''); setActionFilter(''); setSinceInput('') }
+  const reset = () => { setActorFilter(''); setActionFilter(''); setSinceInput(''); setOffset(0) }
 
   const openCtx = (e: React.MouseEvent, entry: AuditEntry) => {
     openContextMenu(e, [
@@ -84,17 +92,20 @@ export default function AuditPage() {
         },
       },
       { type: 'separator' },
-      { label: 'Filter by Actor', action: () => setActorFilter(entry.actor) },
-      { label: 'Filter by Action', action: () => setActionFilter(entry.action) },
+      { label: 'Filter by Actor', action: () => { setActorFilter(entry.actor); setOffset(0) } },
+      { label: 'Filter by Action', action: () => { setActionFilter(entry.action); setOffset(0) } },
     ], { kind: 'auditEntry', id: entry.id })
   }
+
+  const hasMore = entries.length === PAGE_SIZE
+  const hasPrev = offset > 0
 
   return (
     <div className="audit-root">
       <div className="audit-toolbar">
         <span className="audit-title">Audit Log</span>
         <span className="audit-meta">
-          {entries.length} entries · refreshes every 30s
+          {isFetching ? 'Refreshing…' : `${entries.length} entries`}
           {dataUpdatedAt ? ` · ${new Date(dataUpdatedAt).toLocaleTimeString()}` : ''}
         </span>
 
@@ -102,12 +113,12 @@ export default function AuditPage() {
           className="audit-filter-input"
           placeholder="Filter by actor…"
           value={actorFilter}
-          onChange={e => setActorFilter(e.target.value)}
+          onChange={e => { setActorFilter(e.target.value); setOffset(0) }}
         />
         <select
           className="audit-filter-select"
           value={actionFilter}
-          onChange={e => setActionFilter(e.target.value)}
+          onChange={e => { setActionFilter(e.target.value); setOffset(0) }}
         >
           <option value="">All actions</option>
           {KNOWN_ACTIONS.map(a => <option key={a} value={a}>{a}</option>)}
@@ -116,7 +127,7 @@ export default function AuditPage() {
           type="datetime-local"
           className="audit-filter-input"
           value={sinceInput}
-          onChange={e => setSinceInput(e.target.value)}
+          onChange={e => { setSinceInput(e.target.value); setOffset(0) }}
         />
         {(actorFilter || actionFilter || sinceInput) && (
           <button className="audit-reset-btn" onClick={reset}>Reset</button>
@@ -161,6 +172,19 @@ export default function AuditPage() {
         </table>
       </div>
 
+      {(hasPrev || hasMore) && (
+        <div className="audit-pagination">
+          <button className="btn-ghost btn-sm" disabled={!hasPrev} onClick={() => setOffset(o => Math.max(0, o - PAGE_SIZE))}>
+            ← Previous
+          </button>
+          <span className="audit-meta">
+            {offset + 1}–{offset + entries.length}
+          </span>
+          <button className="btn-ghost btn-sm" disabled={!hasMore} onClick={() => setOffset(o => o + PAGE_SIZE)}>
+            Next →
+          </button>
+        </div>
+      )}
     </div>
   )
 }

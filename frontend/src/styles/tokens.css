@@ -1,12 +1,12 @@
 /* ── Design system ──────────────────────────────────────────── */
 :root {
-  --void:        #0c0c10;
-  --surface:     #111118;
-  --elevated:    #18181f;
-  --border:      #24242e;
-  --border-hi:   #30303c;
+  --void:        #07080c;
+  --surface:     #0c0d14;
+  --elevated:    #10111a;
+  --border:      #1c1d2a;
+  --border-hi:   #252638;
 
-  --amber:       #f59e0b;
+  --amber:       #e8952a;
   /* Derived from --amber so all themes get correct tints by only overriding --amber */
   --amber-dim:   color-mix(in srgb, var(--amber) 12%, transparent);
   --amber-glow:  color-mix(in srgb, var(--amber) 25%, transparent);
@@ -17,22 +17,35 @@
   --accent-40:   color-mix(in srgb, var(--amber) 40%, transparent);
   --accent-50:   color-mix(in srgb, var(--amber) 50%, transparent);
 
-  --ash:         #dddbe8;
-  --mist:        #8484a0;
-  --ghost:       #5c5c78;
+  /* Live/connected status — teal, distinct from accent */
+  --live:        #2dd4bf;
 
-  --green:       #4ade80;
-  --red:         #f87171;
-  --blue:        #60a5fa;
+  --ash:         #eceef5;
+  --mist:        #7c80a0;
+  --ghost:       #4a4d66;
+
+  --green:       #34d399;
+  --red:         #f56565;
+  --blue:        #6ba3f7;
   --yellow:      #fbbf24;
 
-  --display: 'Space Grotesk', system-ui, sans-serif;
-  --sans:    'Geist', system-ui, sans-serif;
+  --display: 'Inter', system-ui, sans-serif;
+  --sans:    'Inter', system-ui, sans-serif;
   --mono:    'JetBrains Mono', monospace;
 
   --r-sm: 6px;
   --r-md: 10px;
   --r-lg: 16px;
+
+  /* Z-index scale */
+  --z-base:         1;
+  --z-sidebar:      10;
+  --z-mobile-nav:   30;
+  --z-mobile-header: 40;
+  --z-modal:        100;
+  --z-palette:      200;
+  --z-toast:        250;
+  --z-banner:       300;
 }
 
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
@@ -49,3 +62,5 @@ body {
 ::-webkit-scrollbar-track { background: transparent; }
 ::-webkit-scrollbar-thumb { background: var(--ghost); border-radius: 3px; }
 ::-webkit-scrollbar-thumb:hover { background: var(--mist); }
+/* Firefox */
+* { scrollbar-width: thin; scrollbar-color: var(--ghost) transparent; }

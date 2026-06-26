@@ -100,8 +100,12 @@ export default function Console() {
     const cmd = input.trim()
     if (!cmd) return
     clearCompletions()
-    socketSend(cmd)
-    setInput('')
+    try {
+      socketSend(cmd)
+      setInput('')
+    } catch {
+      // Keep input on send failure so the user doesn't lose the command
+    }
     inputRef.current?.focus()
   }, [input, socketSend])
 
@@ -247,8 +251,8 @@ export default function Console() {
         atBottomStateChange={setIsAtBottom}
         itemContent={(_, line) => (
           <div
-            className={`log-line ${lineClass(line)}`}
-            style={{ fontSize, whiteSpace: wordWrap ? 'pre-wrap' : 'pre' }}
+            className={`log-line ${lineClass(line)}${wordWrap ? ' wrap' : ''}`}
+            style={{ fontSize }}
             dangerouslySetInnerHTML={{ __html: convert.toHtml(formatLine(line)) }}
             onContextMenu={e => openCtx(e, line)}
           />

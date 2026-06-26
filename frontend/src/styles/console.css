@@ -36,7 +36,7 @@
   height: 6px;
   border-radius: 50%;
 }
-.conn-badge .dot.on { background: var(--green); animation: pulse-dot 2.4s ease infinite; }
+.conn-badge .dot.on { background: var(--live); animation: pulse-dot-live 2.4s ease infinite; }
 .conn-badge .dot.off { background: var(--red); }
 
 .console-bottom-btn {
@@ -72,10 +72,11 @@
   font-size: 12.5px;
   line-height: 1.7;
   padding: 0 16px;
-  white-space: pre-wrap;
-  word-break: break-all;
+  white-space: pre;
+  overflow-x: hidden;
   color: var(--ash);
 }
+.log-line.wrap { white-space: pre-wrap; word-break: break-all; }
 .log-line.info  { color: var(--ash); }
 .log-line.warn  { color: var(--yellow); }
 .log-line.error { color: var(--red); }

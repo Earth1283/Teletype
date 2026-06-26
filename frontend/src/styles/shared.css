@@ -6,7 +6,7 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  z-index: 130000;
+  z-index: var(--z-modal);
   backdrop-filter: blur(2px);
 }
 .modal-card {
@@ -277,4 +277,15 @@
     flex: 1 1 140px;
     height: 34px;
   }
+}
+
+/* ── Audit pagination ────────────────────────────────────────── */
+.audit-pagination {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 16px;
+  border-top: 1px solid var(--border);
+  flex-shrink: 0;
+  justify-content: center;
 }

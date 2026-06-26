@@ -308,60 +308,88 @@
 /* ── Mobile (≤640px) ───────────────────────────────────────────────────────── */
 @media (max-width: 640px) {
   .s-root { padding: 16px 14px 24px; max-width: 100%; }
+
+  /* Section headers */
+  .s-section-head { padding: 11px 14px; }
+  .s-section-title {
+    font-size: 12px;
+    letter-spacing: 0.06em;
+  }
+  .s-subsection-label {
+    font-size: 11.5px;
+    color: var(--mist);
+    padding: 10px 14px 3px;
+  }
+
+  /* Rows */
   .s-row {
     align-items: flex-start;
-    gap: 8px;
+    gap: 6px;
     flex-wrap: wrap;
-    padding: 10px 12px;
+    padding: 12px 14px;
+    min-height: 44px;
   }
   .s-row-labels {
     flex: 1 0 160px;
   }
   .s-row-label {
-    font-size: 13px;
+    font-size: 15px;
   }
   .s-row-sub {
-    font-size: 10.5px;
-    line-height: 1.35;
+    font-size: 13px;
+    color: var(--mist);
+    line-height: 1.4;
+    margin-top: 2px;
   }
   .s-row-ctrl {
     flex: 1 0 100%;
     justify-content: flex-end;
   }
+
+  /* Toggle — bigger tap target */
   .s-toggle {
-    width: 44px;
-    height: 26px;
-    border-radius: 13px;
+    width: 48px;
+    height: 28px;
+    border-radius: 14px;
   }
   .s-toggle-thumb {
     top: 4px;
     left: 4px;
-    width: 18px;
-    height: 18px;
+    width: 20px;
+    height: 20px;
   }
-  .s-toggle.on .s-toggle-thumb { transform: translateX(18px); }
-  .s-slider-wrap {
-    width: 100%;
-  }
-  .s-slider {
-    flex: 1;
-    width: auto;
-  }
+  .s-toggle.on .s-toggle-thumb { transform: translateX(20px); }
+
+  /* Slider */
+  .s-slider-wrap { width: 100%; }
+  .s-slider { flex: 1; width: auto; height: 4px; }
+  .s-slider::-webkit-slider-thumb { width: 22px; height: 22px; }
   .s-slider-val {
+    font-size: 13px;
     min-width: 56px;
   }
+
+  /* Theme picker */
   .s-theme-grid { grid-template-columns: repeat(auto-fill, minmax(70px, 1fr)); }
-  .s-theme-preview {
-    width: 60px;
-    height: 42px;
-  }
-  .s-seg {
-    width: 100%;
-  }
+  .s-theme-preview { width: 60px; height: 42px; }
+  .s-theme-name { font-size: 11px; }
+
+  /* Segmented control */
+  .s-seg { width: 100%; }
   .s-seg-btn {
     flex: 1;
-    min-height: 32px;
+    font-size: 13px;
+    min-height: 36px;
   }
+
+  /* Grey Beard card description */
+  .gbm-desc {
+    font-size: 13px;
+    color: var(--mist);
+  }
+
+  /* Divider more breathing room */
+  .s-divider { margin: 10px 0; }
 }
 
 /* ── Settings sidebar layout ───────────────────────────────────────────────── */
@@ -423,7 +451,7 @@
 
 .s-nav-item:hover { background: rgba(255,255,255,0.06); }
 
-.s-nav-icon { font-size: 13px; width: 18px; text-align: center; flex-shrink: 0; }
+.s-nav-icon { width: 18px; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
 .s-nav-label { flex: 1; }
 
 .s-content {
@@ -458,21 +486,21 @@
   .s-sidebar-sep { display: none; }
   .s-nav-item {
     white-space: nowrap;
-    padding: 7px 10px;
-    min-height: 34px;
+    padding: 8px 12px;
+    min-height: 36px;
+    font-size: 13px;
   }
   .s-content {
     padding: 12px 10px calc(18px + env(safe-area-inset-bottom, 0px));
     gap: 10px;
   }
-  .gbm-card,
-  .fun-card {
+  .fun-card { display: none; }
+  .gbm-card {
     align-items: flex-start;
     gap: 10px;
     padding: 12px;
   }
-  .gbm-text,
-  .fun-card-text {
+  .gbm-card-text {
     min-width: 0;
   }
 }

@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { api } from '../api/client'
+import { useToast } from '../ToastContext'
 import { IconNetwork, IconPencil, IconTrash, IconX } from '../Icons'
 
 interface RouteMapping {
@@ -253,6 +254,7 @@ function RouteModal({
 
 export default function NetworkPage() {
   const qc = useQueryClient()
+  const toast = useToast()
   const [section, setSection] = useState<'routes' | 'forwards'>('routes')
   const [modal, setModal] = useState<'add' | RouteMapping | null>(null)
   const [deletingId, setDeletingId] = useState<string | null>(null)
@@ -278,22 +280,26 @@ export default function NetworkPage() {
   const createMut = useMutation({
     mutationFn: (r: Omit<RouteMapping, 'id'>) => api.post('/network/routes', r),
     onSuccess: () => { setModal(null); invalidate() },
+    onError: (e: any) => toast.error(e.response?.data?.message ?? 'Failed to create route'),
   })
 
   const updateMut = useMutation({
     mutationFn: ({ id, ...r }: RouteMapping) => api.put(`/network/routes/${id}`, r),
     onSuccess: () => { setModal(null); invalidate() },
+    onError: (e: any) => toast.error(e.response?.data?.message ?? 'Failed to update route'),
   })
 
   const deleteMut = useMutation({
     mutationFn: (id: string) => api.delete(`/network/routes/${id}`),
     onSuccess: () => { setDeletingId(null); invalidate() },
+    onError: (e: any) => toast.error(e.response?.data?.message ?? 'Failed to delete route'),
   })
 
   const toggleMut = useMutation({
     mutationFn: (route: RouteMapping) =>
       api.put(`/network/routes/${route.id}`, { ...route, enabled: !route.enabled }),
     onSuccess: () => invalidate(),
+    onError: () => { invalidate(); toast.error('Failed to toggle route — state reverted') },
   })
 
   const { data: forwards = [] } = useQuery<PortForward[]>({
@@ -309,22 +315,26 @@ export default function NetworkPage() {
   const createFwdMut = useMutation({
     mutationFn: (f: Omit<PortForward, 'id'>) => api.post('/network/forwards', f),
     onSuccess: () => { setFwdModal(null); invalidateFwd() },
+    onError: (e: any) => toast.error(e.response?.data?.message ?? 'Failed to create forward'),
   })
 
   const updateFwdMut = useMutation({
     mutationFn: ({ id, ...f }: PortForward) => api.put(`/network/forwards/${id}`, f),
     onSuccess: () => { setFwdModal(null); invalidateFwd() },
+    onError: (e: any) => toast.error(e.response?.data?.message ?? 'Failed to update forward'),
   })
 
   const deleteFwdMut = useMutation({
     mutationFn: (id: string) => api.delete(`/network/forwards/${id}`),
     onSuccess: () => { setDeletingFwdId(null); invalidateFwd() },
+    onError: (e: any) => toast.error(e.response?.data?.message ?? 'Failed to delete forward'),
   })
 
   const toggleFwdMut = useMutation({
     mutationFn: (fwd: PortForward) =>
       api.put(`/network/forwards/${fwd.id}`, { ...fwd, enabled: !fwd.enabled }),
     onSuccess: () => invalidateFwd(),
+    onError: () => { invalidateFwd(); toast.error('Failed to toggle forward — state reverted') },
   })
 
   const muxOn = status?.muxEnabled ?? false

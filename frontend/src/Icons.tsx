@@ -230,6 +230,29 @@ export const IconNetwork = ({ size = 16, className }: IconProps) => (
   </svg>
 )
 
+export const IconMonitor = ({ size = 16, className }: IconProps) => (
+  <svg {...s(size)} viewBox="0 0 24 24" fill="none" stroke="currentColor" className={className}>
+    <rect x="2" y="3" width="20" height="14" rx="2" />
+    <line x1="8" y1="21" x2="16" y2="21" />
+    <line x1="12" y1="17" x2="12" y2="21" />
+  </svg>
+)
+
+export const IconApple = ({ size = 16, className }: IconProps) => (
+  <svg {...s(size)} viewBox="0 0 24 24" fill="none" stroke="currentColor" className={className}>
+    <path d="M12 4.5c0 0 1.5-2.5 4-2.5-.2 2.5-2 3.2-4 2.5z" fill="currentColor" stroke="none" />
+    <path d="M8.5 7.5C5.5 7.5 3 11 3 14.5 3 19 5.5 22 8.5 22c1.4 0 2.4-.9 3.5-.9s2.1.9 3.5.9C18.5 22 21 19 21 14.5 21 11 18.5 7.5 15.5 7.5c-1.4 0-2.4.9-3.5.9s-2.1-.9-3.5-.9z" />
+  </svg>
+)
+
+export const IconDots = ({ size = 16, className }: IconProps) => (
+  <svg width={size} height={size} viewBox="0 0 24 24" fill="none" className={className}>
+    <circle cx="5" cy="12" r="1.8" fill="currentColor" />
+    <circle cx="12" cy="12" r="1.8" fill="currentColor" />
+    <circle cx="19" cy="12" r="1.8" fill="currentColor" />
+  </svg>
+)
+
 // Logo: stylized TTY terminal icon
 export const TeletypeLogo = ({ size = 22 }: { size?: number }) => (
   <svg width={size} height={size} viewBox="0 0 22 22" fill="none" style={{ color: 'var(--amber)' }}>

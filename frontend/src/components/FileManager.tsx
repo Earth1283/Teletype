@@ -231,11 +231,7 @@ interface UploadItem {
   error?: string
 }
 
-interface FileManagerProps {
-  viewMode: 'icons' | 'list'
-}
-
-export default function FileManager({ viewMode }: FileManagerProps) {
+export default function FileManager() {
   const [cwd, setCwd] = useState('')
   const [history, setHistory] = useState<string[]>([''])
   const [historyIdx, setHistoryIdx] = useState(0)
@@ -257,6 +253,7 @@ export default function FileManager({ viewMode }: FileManagerProps) {
   const [favs, setFavs] = useState<SidebarFav[]>(loadFavs)
   const [uploadItems, setUploadItems] = useState<UploadItem[]>([])
   const [uploadRunning, setUploadRunning] = useState(false)
+  const [viewMode, setViewMode] = useState<'icons' | 'list'>('list')
   const [prompt, setPrompt] = useState<PromptState>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
   const uploadItemsRef = useRef<UploadItem[]>([])
@@ -810,7 +807,7 @@ export default function FileManager({ viewMode }: FileManagerProps) {
           <button
             className={`finder-view-btn${effectiveView === 'icons' ? ' active' : ''}`}
             title="Icon view"
-            onClick={() => {}}
+            onClick={() => setViewMode('icons')}
           >
             <svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor">
               <rect x="3" y="3" width="7" height="7" rx="1.5"/>
@@ -822,7 +819,7 @@ export default function FileManager({ viewMode }: FileManagerProps) {
           <button
             className={`finder-view-btn${effectiveView === 'list' ? ' active' : ''}`}
             title="List view"
-            onClick={() => {}}
+            onClick={() => setViewMode('list')}
           >
             <IconList size={13} />
           </button>
