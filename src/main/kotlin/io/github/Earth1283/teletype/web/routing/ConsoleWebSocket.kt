@@ -28,9 +28,12 @@ suspend fun DefaultWebSocketServerSession.consoleWebSocket(plugin: Teletype) {
         return
     }
 
-    // Browsers cannot send custom WS headers — accept token via query parameter
-    val token = call.request.queryParameters["token"]
-    if (token == null || plugin.jwtService.verify(token) == null) {
+    // Browsers cannot set custom WS headers; accept token in the first message frame
+    val authFrame = runCatching { incoming.receive() }.getOrNull()
+    val authMsg = (authFrame as? Frame.Text)?.let {
+        runCatching { Json.decodeFromString<WsMessage>(it.readText()) }.getOrNull()
+    }
+    if (authMsg?.type != "auth" || authMsg.payload.isBlank() || plugin.jwtService.verify(authMsg.payload) == null) {
         close(CloseReason(CloseReason.Codes.VIOLATED_POLICY, "Unauthorized"))
         return
     }

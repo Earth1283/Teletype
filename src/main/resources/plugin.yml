@@ -4,7 +4,7 @@ version: '${version}'
 main: io.github.Earth1283.teletype.Teletype
 api-version: '1.21'
 load: STARTUP
-description: Removing the hosts's web panel something that actually works.
+description: Minecraft web admin panel — console, players, files, metrics, and more.
 
 authors: [ Earth1283 ]
 

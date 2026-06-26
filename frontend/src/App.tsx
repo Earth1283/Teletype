@@ -31,8 +31,6 @@ import {
   IconChevronLeft, IconChevronRight, IconCommand, IconDots,
 } from './Icons'
 
-const qc = new QueryClient()
-
 function ThemeApplier() {
   const { settings } = useSettings()
   useEffect(() => {
@@ -57,6 +55,63 @@ const TABS: { id: Tab; label: string; Icon: React.FC<{ size?: number }> }[] = [
 
 const PRIMARY_MOBILE_TABS: Tab[] = ['glance', 'console', 'players', 'actions']
 const SECONDARY_MOBILE_TABS: Tab[] = ['stats', 'files', 'audit', 'network', 'settings']
+const PHONE_VIEWPORT_QUERY = '(max-width: 640px)'
+const COARSE_POINTER_QUERY = '(hover: none) and (pointer: coarse)'
+const MAX_PHONE_SCREEN_SIDE = 500
+const MAX_PHONE_SCREEN_LONG_SIDE = 1000
+
+function hasTouchInput() {
+  return navigator.maxTouchPoints > 0 || 'ontouchstart' in window
+}
+
+function hasMobileUserAgentData() {
+  const nav = navigator as Navigator & { userAgentData?: { mobile?: boolean } }
+  return nav.userAgentData?.mobile === true
+}
+
+function hasPhoneUserAgent() {
+  const ua = navigator.userAgent
+  return /\b(iPhone|iPod)\b/i.test(ua)
+    || (/\bAndroid\b/i.test(ua) && /\bMobile\b/i.test(ua))
+    || /\b(IEMobile|Windows Phone|BlackBerry|BB10|Opera Mini)\b/i.test(ua)
+}
+
+function getIsPhoneViewport() {
+  if (hasPhoneUserAgent() || hasMobileUserAgentData()) return true
+  if (window.matchMedia(PHONE_VIEWPORT_QUERY).matches) return true
+
+  const shortSide = Math.min(window.screen.width, window.screen.height)
+  const longSide = Math.max(window.screen.width, window.screen.height)
+  const hasPhoneSizedScreen = shortSide <= MAX_PHONE_SCREEN_SIDE && longSide <= MAX_PHONE_SCREEN_LONG_SIDE
+  return hasTouchInput()
+    && window.matchMedia(COARSE_POINTER_QUERY).matches
+    && hasPhoneSizedScreen
+}
+
+function useIsPhoneViewport() {
+  const [isPhoneViewport, setIsPhoneViewport] = useState(getIsPhoneViewport)
+
+  useEffect(() => {
+    const phoneMq = window.matchMedia(PHONE_VIEWPORT_QUERY)
+    const pointerMq = window.matchMedia(COARSE_POINTER_QUERY)
+    const update = () => setIsPhoneViewport(getIsPhoneViewport())
+
+    update()
+    phoneMq.addEventListener('change', update)
+    pointerMq.addEventListener('change', update)
+    window.addEventListener('resize', update)
+    window.addEventListener('orientationchange', update)
+
+    return () => {
+      phoneMq.removeEventListener('change', update)
+      pointerMq.removeEventListener('change', update)
+      window.removeEventListener('resize', update)
+      window.removeEventListener('orientationchange', update)
+    }
+  }, [])
+
+  return isPhoneViewport
+}
 
 // Heartbeat sparkline: renders last N TPS readings as a miniature SVG line
 function TpsSparkline({ tpsHistory }: { tpsHistory: number[] }) {
@@ -137,25 +192,30 @@ function PanelContextActions({ tab, onNavigate, onOpenPalette }: {
   return null
 }
 
-function MainApp() {
+function LogoutButton({ onLogout, className = 'sidebar-logout', title = 'Sign out', size = 14 }: {
+  onLogout: () => void
+  className?: string
+  title?: string
+  size?: number
+}) {
+  return (
+    <button className={className} title={title} onClick={onLogout}>
+      <IconLogOut size={size} />
+    </button>
+  )
+}
+
+function MainApp({ onLogout }: { onLogout: () => void }) {
   const [tab, setTab] = useState<Tab>('glance')
+  const [visitedTabs, setVisitedTabs] = useState<Set<Tab>>(() => new Set<Tab>(['glance']))
   const [paletteOpen, setPaletteOpen] = useState(false)
   const [sidebarOpen, setSidebarOpen] = useState(true)
   const [mobileMoreOpen, setMobileMoreOpen] = useState(false)
   const [tpsHistory, setTpsHistory] = useState<number[]>([])
+  const [forceMobile, setForceMobile] = useState(false)
   const { settings, update } = useSettings()
   const { connected } = useLogs()
-  const activeTab = TABS.find(t => t.id === tab)
-  const [isMobile, setIsMobile] = useState(() =>
-    window.matchMedia('(hover: none) and (pointer: coarse)').matches
-  )
-
-  useEffect(() => {
-    const mq = window.matchMedia('(hover: none) and (pointer: coarse)')
-    const handler = (e: MediaQueryListEvent) => setIsMobile(e.matches)
-    mq.addEventListener('change', handler)
-    return () => mq.removeEventListener('change', handler)
-  }, [])
+  const isPhoneViewport = useIsPhoneViewport()
 
   // Poll current TPS for sparkline
   const { data: glanceCurrent } = useQuery<{ tps1: number }>({
@@ -194,9 +254,12 @@ function MainApp() {
   }, [mobileMoreOpen])
 
   useEffect(() => {
-    if (isMobile && settings.fun) update({ fun: false })
-    if (!isMobile && settings.appleify) update({ appleify: false })
-  }, [isMobile, settings.fun, settings.appleify, update])
+    setVisitedTabs(prev => prev.has(tab) ? prev : new Set([...prev, tab]))
+  }, [tab])
+
+  useEffect(() => {
+    if (isPhoneViewport && settings.fun) update({ fun: false })
+  }, [isPhoneViewport, settings.fun, update])
 
   const tapCountRef = useRef(0)
   const tapTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
@@ -219,11 +282,11 @@ function MainApp() {
     setPaletteOpen(true)
   }
 
-  if (settings.fun && !isMobile) return <MacOSDesktop />
-  if (settings.appleify && isMobile) return <AppleShell />
+  if (settings.fun && !isPhoneViewport) return <MacOSDesktop />
+  if (settings.appleify) return <AppleShell />
 
   return (
-    <div className="shell">
+    <div className={`shell${forceMobile ? ' force-mobile' : ''}`}>
       <PanelContextActions
         tab={tab}
         onNavigate={setTab}
@@ -244,6 +307,28 @@ function MainApp() {
           <span className="mobile-status-dot" />
           {connected ? 'online' : 'offline'}
         </span>
+        {forceMobile && (
+          <button
+            className="mobile-quick-btn"
+            type="button"
+            title="Exit mobile view"
+            aria-label="Exit mobile view"
+            onClick={() => setForceMobile(false)}
+          >
+            🖥️
+          </button>
+        )}
+        {!isPhoneViewport && !forceMobile && (
+          <button
+            className="mobile-quick-btn force-mobile-btn"
+            type="button"
+            title="Switch to mobile view"
+            aria-label="Switch to mobile view"
+            onClick={() => setForceMobile(true)}
+          >
+            📱
+          </button>
+        )}
         {settings.palette.enabled && (
           <button
             className="mobile-quick-btn"
@@ -302,12 +387,7 @@ function MainApp() {
                 >
                   <IconChevronLeft size={13} />
                 </button>
-                <button className="sidebar-logout" title="Sign out" onClick={() => {
-                  localStorage.removeItem(TOKEN_KEY)
-                  window.location.reload()
-                }}>
-                  <IconLogOut size={14} />
-                </button>
+                <LogoutButton onLogout={onLogout} />
               </div>
             </>
           ) : (
@@ -320,31 +400,32 @@ function MainApp() {
               >
                 <IconChevronRight size={13} />
               </button>
-              <button className="sidebar-logout" title="Sign out" onClick={() => {
-                localStorage.removeItem(TOKEN_KEY)
-                window.location.reload()
-              }}>
-                <IconLogOut size={14} />
-              </button>
+              <LogoutButton onLogout={onLogout} />
             </>
           )}
         </div>
       </aside>
 
       <main className="main">
-        <ErrorBoundary key={tab} label={`${activeTab?.label ?? 'Page'} failed to render`}>
-          <div className="page-content" style={{ display: 'contents' }}>
-            {tab === 'glance'   && <GlancePage />}
-            {tab === 'console'  && <Console />}
-            {tab === 'players'  && <PlayerList />}
-            {tab === 'stats'    && <ServerStats onNavigate={t => setTab(t as Tab)} />}
-            {tab === 'files'    && <FileManager />}
-            {tab === 'actions'  && <ActionsPage />}
-            {tab === 'audit'    && <AuditPage />}
-            {tab === 'network'  && <NetworkPage />}
-            {tab === 'settings' && <SettingsPage />}
-          </div>
-        </ErrorBoundary>
+        {TABS.map(({ id, label }) => {
+          if (!visitedTabs.has(id)) return null
+          const active = id === tab
+          return (
+            <div key={id} style={{ display: active ? 'contents' : 'none' }}>
+              <ErrorBoundary label={`${label} failed to render`}>
+                {id === 'glance'   && <GlancePage />}
+                {id === 'console'  && <Console />}
+                {id === 'players'  && <PlayerList />}
+                {id === 'stats'    && <ServerStats onNavigate={t => setTab(t as Tab)} />}
+                {id === 'files'    && <FileManager />}
+                {id === 'actions'  && <ActionsPage />}
+                {id === 'audit'    && <AuditPage />}
+                {id === 'network'  && <NetworkPage />}
+                {id === 'settings' && <SettingsPage />}
+              </ErrorBoundary>
+            </div>
+          )
+        })}
       </main>
 
       <nav className="mobile-bottom-nav" aria-label="Primary navigation">
@@ -403,7 +484,7 @@ function MainApp() {
           <button
             type="button"
             className="mobile-sheet-signout"
-            onClick={() => { localStorage.removeItem(TOKEN_KEY); window.location.reload() }}
+            onClick={onLogout}
           >
             <IconLogOut size={18} />
             <span>Sign out</span>
@@ -421,7 +502,14 @@ function MainApp() {
 }
 
 export default function App() {
+  const [qc] = useState(() => new QueryClient())
   const [authed, setAuthed] = useState(() => !!localStorage.getItem(TOKEN_KEY))
+
+  const handleLogout = useCallback(() => {
+    localStorage.removeItem(TOKEN_KEY)
+    qc.clear()
+    setAuthed(false)
+  }, [qc])
 
   return (
     <QueryClientProvider client={qc}>
@@ -431,7 +519,7 @@ export default function App() {
           <ContextMenuProvider>
             <ToastProvider>
               <InsecureHttpBanner />
-              {authed ? <MainApp /> : <AuthSetup onAuth={() => setAuthed(true)} />}
+              {authed ? <MainApp onLogout={handleLogout} /> : <AuthSetup onAuth={() => setAuthed(true)} />}
             </ToastProvider>
           </ContextMenuProvider>
         </LogProvider>

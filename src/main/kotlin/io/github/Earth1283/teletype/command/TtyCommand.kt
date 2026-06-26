@@ -84,7 +84,7 @@ class TtyCommand(private val plugin: Teletype) : CommandExecutor, TabCompleter {
             }
         }
 
-        val jwt = plugin.jwtService.issueToken(expiryHours = plugin.teletypeConfig.jwtExpiryHours)
+        val jwt = plugin.jwtService.issueToken(expiryMinutes = plugin.teletypeConfig.jwtExpiryMinutes)
         if (plugin.challengeStore.verify(uuid, jwt)) {
             plugin.messages.send(sender, "command.verify.success")
         } else {

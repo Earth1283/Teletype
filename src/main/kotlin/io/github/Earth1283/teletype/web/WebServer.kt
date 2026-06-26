@@ -107,7 +107,18 @@ class WebServer(private val plugin: Teletype) {
             }
 
             install(CORS) {
-                anyHost()
+                if (cfg.corsOrigins.isEmpty()) {
+                    anyHost()
+                } else {
+                    cfg.corsOrigins.forEach { origin ->
+                        runCatching {
+                            val uri = java.net.URI(origin)
+                            val scheme = uri.scheme ?: "https"
+                            val authority = if (uri.port != -1) "${uri.host}:${uri.port}" else uri.host
+                            if (authority != null) allowHost(authority, schemes = listOf(scheme))
+                        }
+                    }
+                }
                 allowHeader(HttpHeaders.Authorization)
                 allowHeader(HttpHeaders.ContentType)
                 allowMethod(HttpMethod.Options)
@@ -155,6 +166,12 @@ class WebServer(private val plugin: Teletype) {
                     rateLimiter(limit = execLimit, refillPeriod = 1.minutes)
                     requestKey { call -> call.request.origin.remoteAddress }
                 }
+                // WebSocket connections: separate bucket — WS reconnects are not auth attempts
+                val wsLimit = if (cfg.rateLimitEnabled) 20 else Int.MAX_VALUE
+                register(RateLimitName("ws")) {
+                    rateLimiter(limit = wsLimit, refillPeriod = 1.minutes)
+                    requestKey { call -> call.request.origin.remoteAddress }
+                }
             }
 
             install(StatusPages) {
@@ -171,20 +188,25 @@ class WebServer(private val plugin: Teletype) {
                 get("/") {
                     val bytes = staticBytes("webroot/index.html")
                         ?: return@get call.respond(HttpStatusCode.NotFound, ErrorResponse("Not found"))
+                    call.response.headers.append(HttpHeaders.CacheControl, "no-cache")
                     call.respondBytes(bytes, ContentType.Text.Html)
                 }
                 get("/favicon.svg") {
                     val bytes = staticBytes("webroot/favicon.svg") ?: return@get
+                    call.response.headers.append(HttpHeaders.CacheControl, "public, max-age=3600")
                     call.respondBytes(bytes, ContentType.Image.SVG)
                 }
                 get("/icons.svg") {
                     val bytes = staticBytes("webroot/icons.svg") ?: return@get
+                    call.response.headers.append(HttpHeaders.CacheControl, "public, max-age=3600")
                     call.respondBytes(bytes, ContentType.Image.SVG)
                 }
                 get("/assets/{file...}") {
                     val file = call.parameters.getAll("file")?.joinToString("/") ?: return@get
                     val bytes = staticBytes("webroot/assets/$file")
                         ?: return@get call.respond(HttpStatusCode.NotFound, ErrorResponse("Not found"))
+                    // Vite output uses content-hashed filenames — safe to cache indefinitely
+                    call.response.headers.append(HttpHeaders.CacheControl, "public, max-age=31536000, immutable")
                     call.respondBytes(bytes, when {
                         file.endsWith(".js") || file.endsWith(".mjs") -> ContentType.Application.JavaScript
                         file.endsWith(".css") -> ContentType.Text.CSS
@@ -198,6 +220,7 @@ class WebServer(private val plugin: Teletype) {
                 get("{...}") {
                     val bytes = staticBytes("webroot/index.html")
                         ?: return@get call.respond(HttpStatusCode.NotFound, ErrorResponse("Not found"))
+                    call.response.headers.append(HttpHeaders.CacheControl, "no-cache")
                     call.respondBytes(bytes, ContentType.Text.Html)
                 }
 
@@ -220,7 +243,7 @@ class WebServer(private val plugin: Teletype) {
                     }
                 }
 
-                rateLimit(RateLimitName("auth")) {
+                rateLimit(RateLimitName("ws")) {
                     webSocket("/ws/console") {
                         consoleWebSocket(plugin)
                     }

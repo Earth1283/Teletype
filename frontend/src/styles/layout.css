@@ -528,6 +528,39 @@ body.mobile-nav-open {
   .mobile-sheet-signout:active { color: var(--red); background: rgba(248,113,113,0.07); }
 }
 
+/* ── Force-mobile override (same rules, class-driven) ───────── */
+.shell.force-mobile { flex-direction: column; }
+.shell.force-mobile .sidebar { display: none; }
+.shell.force-mobile .main {
+  min-height: 0;
+  padding-bottom: calc(58px + env(safe-area-inset-bottom, 0px));
+}
+.shell.force-mobile .mobile-header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  height: calc(48px + env(safe-area-inset-top, 0px));
+  padding: env(safe-area-inset-top, 0px) 14px 0;
+  background: var(--surface);
+  border-bottom: 1px solid var(--border);
+  flex-shrink: 0;
+  z-index: var(--z-mobile-header);
+}
+.shell.force-mobile .mobile-bottom-nav {
+  display: flex;
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  z-index: var(--z-mobile-nav);
+  background: color-mix(in srgb, var(--surface) 92%, transparent);
+  backdrop-filter: blur(12px) saturate(1.2);
+  -webkit-backdrop-filter: blur(12px) saturate(1.2);
+  border-top: 1px solid var(--border);
+  padding-bottom: env(safe-area-inset-bottom, 0px);
+}
+.shell.force-mobile .force-mobile-btn { display: none; }
+
 /* ── Toast system ────────────────────────────────────────────── */
 .toast-container {
   position: fixed;

@@ -11,12 +11,12 @@ class JwtService(secret: String) {
     private val algorithm = Algorithm.HMAC256(secret)
     private val verifier = JWT.require(algorithm).withIssuer("teletype").build()
 
-    fun issueToken(subject: String = "admin", expiryHours: Long = 24): String =
+    fun issueToken(subject: String = "admin", expiryMinutes: Long = 1440): String =
         JWT.create()
             .withIssuer("teletype")
             .withSubject(subject)
             .withIssuedAt(Date())
-            .withExpiresAt(Date.from(Instant.now().plus(expiryHours, ChronoUnit.HOURS)))
+            .withExpiresAt(Date.from(Instant.now().plus(expiryMinutes, ChronoUnit.MINUTES)))
             .sign(algorithm)
 
     fun verify(token: String): DecodedJWT? = runCatching { verifier.verify(token) }.getOrNull()

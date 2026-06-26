@@ -10,7 +10,7 @@ class JwtServiceTest {
     fun `issued tokens verify with the same secret`() {
         val service = JwtService("test-secret")
 
-        val token = service.issueToken(subject = "console", expiryHours = 1)
+        val token = service.issueToken(subject = "console", expiryMinutes = 60)
         val decoded = service.verify(token)
 
         assertNotNull(decoded)
@@ -28,7 +28,7 @@ class JwtServiceTest {
     @Test
     fun `expired tokens are rejected`() {
         val service = JwtService("test-secret")
-        val token = service.issueToken(expiryHours = -1)
+        val token = service.issueToken(expiryMinutes = -1)
 
         assertNull(service.verify(token))
     }

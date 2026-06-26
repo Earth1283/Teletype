@@ -24,9 +24,10 @@ export class ConsoleSocket {
     if (this.stopped) return
     const token = localStorage.getItem(TOKEN_KEY) ?? ''
     const proto = location.protocol === 'https:' ? 'wss' : 'ws'
-    this.ws = new WebSocket(`${proto}://${location.host}/ws/console?token=${encodeURIComponent(token)}`)
+    this.ws = new WebSocket(`${proto}://${location.host}/ws/console`)
 
     this.ws.onopen = () => {
+      this.ws!.send(JSON.stringify({ type: 'auth', payload: token }))
       this.reconnectDelay = 1000
       this.connHandlers.forEach(h => h())
     }
