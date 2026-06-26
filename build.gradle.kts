@@ -78,7 +78,8 @@ tasks {
         commandLine("npm", "install", "--prefer-offline")
         inputs.file("frontend/package.json")
         inputs.file("frontend/package-lock.json")
-        outputs.dir("frontend/node_modules")
+        // Use the lock file npm writes after install as a marker — avoids hashing all of node_modules
+        outputs.file("frontend/node_modules/.package-lock.json")
     }
 
     val buildFrontend by registering(Exec::class) {
