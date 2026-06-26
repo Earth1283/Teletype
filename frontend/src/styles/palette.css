@@ -169,3 +169,36 @@ kbd {
   margin-right: 4px;
 }
 .sidebar-palette-hint:hover { color: var(--amber); border-color: var(--amber); }
+
+@media (max-width: 640px) {
+  .palette-overlay {
+    align-items: flex-start;
+    padding: calc(8px + env(safe-area-inset-top, 0px)) 8px 8px;
+  }
+  .palette-dialog {
+    width: 100%;
+    max-height: min(560px, calc(100vh - 16px - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px)));
+    border-radius: var(--r-md);
+  }
+  .palette-search-row {
+    padding: 10px 12px;
+  }
+  .palette-input {
+    font-size: 16px;
+  }
+  .palette-esc-hint,
+  .palette-footer,
+  .palette-item-enter {
+    display: none;
+  }
+  .palette-item {
+    min-height: 42px;
+    padding: 9px 12px;
+  }
+  .palette-item-label {
+    font-size: 13.5px;
+  }
+  .palette-item-sub {
+    max-width: 120px;
+  }
+}

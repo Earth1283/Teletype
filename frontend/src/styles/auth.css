@@ -3,12 +3,15 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  height: 100vh;
+  min-height: 100vh;
+  padding: 24px;
+  box-sizing: border-box;
   background: var(--void);
   background-image: radial-gradient(ellipse 80% 60% at 50% 0%, var(--accent-04) 0%, transparent 60%);
 }
 .auth-card {
   width: 480px;
+  max-width: 100%;
   padding: 40px;
   background: var(--surface);
   border: 1px solid var(--border);
@@ -38,6 +41,8 @@
   line-height: 1.6;
 }
 .tty-display {
+  display: block;
+  width: 100%;
   background: #000;
   border: 1px solid var(--border);
   border-radius: var(--r-md);
@@ -47,9 +52,58 @@
   font-size: 13.5px;
   color: var(--amber);
   line-height: 1.8;
+  text-align: left;
+}
+.tty-copy {
+  cursor: pointer;
+  transition: border-color 120ms, background 120ms;
+}
+.tty-copy:not(:disabled):hover,
+.tty-copy:not(:disabled):focus-visible {
+  border-color: var(--amber-glow);
+  background: rgba(0, 0, 0, 0.84);
+}
+.tty-copy:disabled {
+  cursor: wait;
+}
+.tty-copy:focus-visible {
+  outline: 2px solid var(--amber-glow);
+  outline-offset: 2px;
+}
+.tty-command-line {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  min-width: 0;
+}
+.tty-copy-state {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  margin-left: auto;
+  color: var(--mist);
+  font-family: var(--sans);
+  font-size: 11px;
+  line-height: 1;
+  flex-shrink: 0;
+}
+.tty-copy.copied .tty-copy-state {
+  color: var(--green);
+}
+.tty-copy.failed .tty-copy-state {
+  color: var(--red);
+}
+.tty-expiry {
+  margin-top: 8px;
+  color: #52525e;
+  font-size: 11px;
 }
 .tty-prompt { color: var(--green); }
-.tty-cmd { color: #c4c0b6; }
+.tty-cmd {
+  color: #c4c0b6;
+  overflow-wrap: anywhere;
+  word-break: break-word;
+}
 .tty-uuid { color: var(--amber); font-weight: 600; letter-spacing: 0.02em; }
 .tty-cursor {
   display: inline-block;
@@ -83,4 +137,77 @@
   border: 1px solid rgba(248,113,113,.2);
   border-radius: var(--r-sm);
   padding: 10px 14px;
+}
+
+.auth-challenge {
+  margin-bottom: 16px;
+}
+.auth-challenge-label {
+  font-family: var(--mono);
+  font-size: 11px;
+  color: var(--mist);
+  margin-bottom: 6px;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+.auth-challenge-value {
+  font-family: var(--mono);
+  font-size: 13.5px;
+  color: var(--amber);
+  background: var(--elevated);
+  border: 1px solid var(--border);
+  border-radius: var(--r-sm);
+  padding: 8px 12px;
+  letter-spacing: 0.04em;
+  overflow-wrap: anywhere;
+  word-break: break-word;
+}
+
+@media (max-width: 640px) {
+  .auth-root {
+    align-items: flex-start;
+    padding: calc(18px + env(safe-area-inset-top, 0px)) 12px calc(18px + env(safe-area-inset-bottom, 0px));
+  }
+  .auth-card {
+    padding: 22px 16px;
+    border-radius: var(--r-md);
+  }
+  .auth-wordmark {
+    font-size: 22px;
+    letter-spacing: 0;
+  }
+  .auth-sub {
+    margin-bottom: 22px;
+  }
+  .auth-instruction {
+    font-size: 12.5px;
+  }
+  .tty-display {
+    padding: 13px 12px;
+    font-size: 12.5px;
+  }
+  .tty-command-line {
+    align-items: flex-start;
+    flex-wrap: wrap;
+  }
+  .tty-prompt {
+    flex-shrink: 0;
+  }
+  .tty-cmd {
+    flex: 1 1 170px;
+    min-width: 0;
+    line-height: 1.55;
+  }
+  .tty-copy-state {
+    width: 100%;
+    justify-content: center;
+    min-height: 34px;
+    margin: 8px 0 0;
+    border-top: 1px solid rgba(255,255,255,0.08);
+    padding-top: 9px;
+  }
+  .auth-challenge-value {
+    font-size: 12px;
+    line-height: 1.55;
+  }
 }

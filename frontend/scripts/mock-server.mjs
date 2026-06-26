@@ -297,6 +297,7 @@ const server = http.createServer(async (req, res) => {
   if (m === 'PUT'    && path === '/api/files/write')    return json(res, { status: 'saved' })
   if (m === 'POST'   && path === '/api/files/mkdir')    return json(res, { status: 'created' })
   if (m === 'PATCH'  && path === '/api/files/rename')   return json(res, { status: 'moved' })
+  if (m === 'POST'   && path === '/api/files/copy')     return json(res, { status: 'copied' })
   if (m === 'POST'   && path === '/api/files/upload')   return json(res, { status: 'uploaded 1 file(s)' })
   if (m === 'POST'   && path === '/api/files/upload-chunk') return json(res, { status: 'chunk received' })
   if (m === 'DELETE' && path === '/api/files')          return json(res, { status: 'deleted' })

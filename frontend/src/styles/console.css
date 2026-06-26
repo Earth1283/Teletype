@@ -65,6 +65,7 @@
 
 .console-log {
   flex: 1;
+  min-height: 0;
 }
 .log-line {
   font-family: var(--mono);
@@ -254,4 +255,82 @@
   background: var(--amber-dim);
   border-color: var(--amber-glow);
   color: var(--amber);
+}
+
+@media (max-width: 640px) {
+  .console-header {
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 6px;
+    padding: 8px 10px;
+  }
+  .console-header-title {
+    flex: 1 1 auto;
+    min-width: 120px;
+    letter-spacing: 0.04em;
+  }
+  .console-search-bar {
+    order: 2;
+    flex: 1 0 100%;
+    height: auto;
+    min-height: 38px;
+    padding: 7px 9px;
+    flex-wrap: wrap;
+  }
+  .console-search-input {
+    flex-basis: calc(100% - 28px);
+    font-size: 16px;
+  }
+  .console-search-count {
+    margin-left: auto;
+  }
+  .fuzzy-slider-wrap {
+    width: 100%;
+    justify-content: space-between;
+  }
+  .fuzzy-slider {
+    flex: 1;
+    min-width: 0;
+    width: auto;
+  }
+  .conn-badge {
+    font-size: 0;
+  }
+  .conn-badge .dot {
+    width: 8px;
+    height: 8px;
+  }
+  .console-bottom-btn {
+    height: 32px;
+    padding: 0 9px;
+  }
+  .log-line {
+    padding: 1px 10px;
+    line-height: 1.65;
+    word-break: break-word;
+    overflow-wrap: anywhere;
+  }
+  .console-input-row {
+    gap: 8px;
+    padding: 9px 10px calc(9px + env(safe-area-inset-bottom, 0px));
+  }
+  .console-completions {
+    left: 8px;
+    right: 8px;
+    max-height: min(260px, 45vh);
+  }
+  .console-completion-item {
+    min-height: 36px;
+    display: flex;
+    align-items: center;
+    font-size: 12.5px;
+  }
+  .console-input {
+    min-height: 34px;
+    font-size: 16px;
+  }
+  .console-send-btn {
+    min-height: 34px;
+    padding: 6px 12px;
+  }
 }

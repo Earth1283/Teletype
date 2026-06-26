@@ -1,6 +1,7 @@
 package io.github.Earth1283.teletype.web.routing
 
 import io.github.Earth1283.teletype.Teletype
+import io.github.Earth1283.teletype.web.model.CopyRequest
 import io.github.Earth1283.teletype.web.model.ErrorResponse
 import io.github.Earth1283.teletype.web.model.FetchRequest
 import io.github.Earth1283.teletype.web.model.FileEntry
@@ -280,6 +281,40 @@ fun Route.fileRoutes(plugin: Teletype) {
             call.respond(StatusResponse("moved"))
             auditAsync(plugin, "file_rename", "${req.from} → ${req.to}")
         } else call.respond(HttpStatusCode.InternalServerError, ErrorResponse("Rename failed"))
+    }
+
+    post("/copy") {
+        val req = call.receive<CopyRequest>()
+        val from = resolve(req.from)
+            ?: return@post call.respond(HttpStatusCode.Forbidden, ErrorResponse("Source path outside root"))
+        val to = resolve(req.to)
+            ?: return@post call.respond(HttpStatusCode.Forbidden, ErrorResponse("Destination path outside root"))
+
+        if (!from.exists())
+            return@post call.respond(HttpStatusCode.NotFound, ErrorResponse("Source not found"))
+        if (to.exists())
+            return@post call.respond(HttpStatusCode.Conflict, ErrorResponse("Destination already exists"))
+
+        val fromPath = from.canonicalFile.path
+        val toPath = to.canonicalFile.path
+        if (from.isDirectory && (toPath == fromPath || toPath.startsWith(fromPath + File.separator)))
+            return@post call.respond(HttpStatusCode.BadRequest, ErrorResponse("Cannot copy a folder into itself"))
+
+        val copied = withContext(Dispatchers.IO) {
+            runCatching {
+                to.parentFile?.mkdirs()
+                if (from.isDirectory) from.copyRecursively(to, overwrite = false)
+                else {
+                    from.copyTo(to, overwrite = false)
+                    true
+                }
+            }.getOrDefault(false)
+        }
+
+        if (copied) {
+            call.respond(StatusResponse("copied"))
+            auditAsync(plugin, "file_copy", "${req.from} → ${req.to}")
+        } else call.respond(HttpStatusCode.InternalServerError, ErrorResponse("Copy failed"))
     }
 
     get("/search") {

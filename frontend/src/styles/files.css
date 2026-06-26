@@ -126,8 +126,7 @@
   min-width: 0;
 }
 .fm-file-list.compact {
-  flex: 0 0 260px;
-  border-right: 1px solid var(--border);
+  flex: 1 1 auto;
 }
 .fm-editor-panel {
   flex: 1;
@@ -148,6 +147,14 @@
   margin-bottom: 1px;
 }
 .fm-row:hover { background: var(--elevated); border-color: var(--border); }
+.fm-row.selected {
+  background: rgba(10, 132, 255, 0.16);
+  border-color: rgba(10, 132, 255, 0.34);
+}
+.fm-row.selected:hover {
+  background: rgba(10, 132, 255, 0.2);
+  border-color: rgba(10, 132, 255, 0.42);
+}
 .fm-row-icon { flex-shrink: 0; color: var(--mist); display: flex; }
 .fm-row-icon.dir { color: var(--amber); }
 .fm-row-name {
@@ -233,6 +240,28 @@
   background: var(--elevated);
   border-bottom: 1px solid var(--border);
   flex-shrink: 0;
+}
+
+.fm-selection-bar {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 10px;
+  background: var(--elevated);
+  border-bottom: 1px solid var(--border);
+  flex-shrink: 0;
+  font-family: var(--mono);
+  font-size: 11px;
+  color: var(--mist);
+}
+
+.fm-selection-bar span {
+  margin-right: 2px;
+  color: var(--ash);
+}
+
+.fm-selection-bar .btn-ghost.danger {
+  color: var(--red);
 }
 .fm-search-row {
   display: flex;
@@ -558,6 +587,11 @@
   overflow: hidden;
 }
 
+.finder-main.with-editor {
+  flex: 0 0 260px;
+  border-right: 1px solid var(--border);
+}
+
 /* ── Icon grid ───────────────────────────────────────────────────────────── */
 
 .finder-icon-grid {
@@ -635,4 +669,154 @@
   color: rgba(200, 220, 235, 0.82);
   white-space: pre;
   scrollbar-width: thin;
+}
+
+@media (max-width: 640px) {
+  .finder-toolbar {
+    position: sticky;
+    top: 0;
+    z-index: 5;
+    flex-wrap: wrap;
+    gap: 6px;
+    padding: 8px 10px;
+  }
+  .finder-nav-btn,
+  .finder-view-btn,
+  .icon-btn {
+    width: 34px;
+    height: 34px;
+  }
+  .finder-breadcrumbs {
+    order: 2;
+    flex: 1 0 100%;
+    overflow-x: auto;
+    padding: 2px 0;
+    scrollbar-width: none;
+  }
+  .finder-breadcrumbs::-webkit-scrollbar { display: none; }
+  .fm-crumb {
+    font-size: 12px;
+    padding: 5px 6px;
+  }
+  .finder-view-toggle {
+    margin-left: auto;
+  }
+  .finder-toolbar .pill-btn {
+    height: 34px;
+    padding: 0 10px;
+  }
+  .finder-toolbar .pill-btn svg {
+    flex-shrink: 0;
+  }
+  .fm-search-panel,
+  .fm-inline-form,
+  .fm-selection-bar {
+    padding: 8px 10px;
+  }
+  .fm-inline-form,
+  .fm-search-row,
+  .fm-selection-bar {
+    flex-wrap: wrap;
+  }
+  .fm-inline-form .text-input,
+  .fm-search-input {
+    flex: 1 0 100%;
+    min-height: 36px;
+    font-size: 16px;
+  }
+  .fm-search-row .fm-scope-toggle {
+    width: 100%;
+  }
+  .scope-btn {
+    flex: 1;
+    height: 34px;
+  }
+  .fm-fuzzy {
+    padding-left: 0;
+  }
+  .finder-body {
+    min-height: 0;
+  }
+  .finder-sidebar {
+    display: none;
+  }
+  .fm-file-list {
+    padding: 6px 6px calc(10px + env(safe-area-inset-bottom, 0px));
+  }
+  .fm-row {
+    min-height: 44px;
+    gap: 9px;
+    padding: 8px 9px;
+  }
+  .fm-row:hover {
+    transform: none;
+  }
+  .fm-row-name {
+    font-size: 13px;
+  }
+  .fm-row-path,
+  .fm-row-date,
+  .fm-row-size {
+    display: none;
+  }
+  .fm-row-actions {
+    opacity: 1;
+  }
+  .row-action-btn {
+    width: 34px;
+    height: 34px;
+  }
+  .finder-icon-grid {
+    grid-template-columns: repeat(auto-fill, minmax(78px, 1fr));
+    padding: 10px 6px calc(12px + env(safe-area-inset-bottom, 0px));
+  }
+  .finder-icon-item {
+    min-height: 96px;
+    justify-content: flex-start;
+  }
+  .finder-icon-squircle {
+    width: 52px;
+    height: 52px;
+  }
+  .finder-main.with-editor {
+    display: none;
+  }
+  .fm-editor-panel {
+    flex: 1 1 auto;
+    min-width: 0;
+  }
+  .fm-editor-bar {
+    flex-wrap: wrap;
+    padding: 8px 10px;
+  }
+  .fm-editor-path {
+    flex: 1 0 100%;
+  }
+  .fm-editor-bar .pill-btn {
+    flex: 1;
+    justify-content: center;
+    min-height: 34px;
+  }
+  .fm-upload-panel {
+    grid-template-columns: 1fr;
+    padding: 9px 10px;
+  }
+  .fm-upload-actions {
+    justify-content: flex-start;
+  }
+  .fm-upload-current,
+  .fm-upload-meta {
+    white-space: normal;
+  }
+  .fm-upload-file {
+    grid-template-columns: minmax(0, 1fr) 48px;
+  }
+  .fm-upload-file-size {
+    display: none;
+  }
+  .thread-dump-view {
+    padding: 10px;
+    white-space: pre-wrap;
+    word-break: break-word;
+  }
 }

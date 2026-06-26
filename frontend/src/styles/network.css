@@ -224,6 +224,82 @@
 
 /* ── Mobile ─────────────────────────────────────────────────── */
 @media (max-width: 640px) {
-  .net-page { padding: 14px; gap: 12px; overflow-y: auto; }
-  .net-table-wrap { overflow-x: auto; }
+  .net-page {
+    padding: 12px 10px calc(18px + env(safe-area-inset-bottom, 0px));
+    gap: 12px;
+    overflow-y: auto;
+  }
+  .net-header {
+    align-items: flex-start;
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+  .net-banner {
+    align-items: flex-start;
+    padding: 10px;
+    line-height: 1.4;
+  }
+  .net-toolbar {
+    flex-wrap: wrap;
+  }
+  .net-toolbar .pill-btn,
+  .net-toolbar .btn-primary,
+  .net-toolbar .btn-ghost {
+    flex: 1 1 150px;
+    justify-content: center;
+    min-height: 36px;
+  }
+  .net-table-wrap {
+    overflow: visible;
+    border: 0;
+    border-radius: 0;
+  }
+  .net-table,
+  .net-table tbody,
+  .net-table tr,
+  .net-table td {
+    display: block;
+    width: 100%;
+  }
+  .net-table thead {
+    display: none;
+  }
+  .net-table tr {
+    box-sizing: border-box;
+    margin-bottom: 10px;
+    border: 1px solid var(--border);
+    border-radius: var(--r-md);
+    background: var(--surface);
+    overflow: hidden;
+  }
+  .net-table td {
+    box-sizing: border-box;
+    padding: 8px 10px;
+    border-bottom: 1px solid var(--border);
+  }
+  .net-table td:last-child {
+    border-bottom: 0;
+  }
+  .net-actions {
+    flex-wrap: wrap;
+  }
+  .net-actions .icon-btn,
+  .net-actions .btn-ghost {
+    min-width: 34px;
+    min-height: 34px;
+  }
+  .net-toggle input[type="checkbox"] {
+    width: 40px;
+    height: 24px;
+    border-radius: 12px;
+  }
+  .net-toggle input[type="checkbox"]::after {
+    width: 16px;
+    height: 16px;
+    top: 3px;
+    left: 3px;
+  }
+  .net-toggle input[type="checkbox"]:checked::after {
+    transform: translateX(16px);
+  }
 }

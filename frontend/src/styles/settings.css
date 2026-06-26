@@ -308,10 +308,60 @@
 /* ── Mobile (≤640px) ───────────────────────────────────────────────────────── */
 @media (max-width: 640px) {
   .s-root { padding: 16px 14px 24px; max-width: 100%; }
-  .s-section { padding: 14px; }
-  .s-row { gap: 8px; flex-wrap: wrap; }
-  .s-row-ctrl { flex-shrink: 0; }
-  .s-theme-grid { grid-template-columns: repeat(auto-fill, minmax(56px, 1fr)); }
+  .s-row {
+    align-items: flex-start;
+    gap: 8px;
+    flex-wrap: wrap;
+    padding: 10px 12px;
+  }
+  .s-row-labels {
+    flex: 1 0 160px;
+  }
+  .s-row-label {
+    font-size: 13px;
+  }
+  .s-row-sub {
+    font-size: 10.5px;
+    line-height: 1.35;
+  }
+  .s-row-ctrl {
+    flex: 1 0 100%;
+    justify-content: flex-end;
+  }
+  .s-toggle {
+    width: 44px;
+    height: 26px;
+    border-radius: 13px;
+  }
+  .s-toggle-thumb {
+    top: 4px;
+    left: 4px;
+    width: 18px;
+    height: 18px;
+  }
+  .s-toggle.on .s-toggle-thumb { transform: translateX(18px); }
+  .s-slider-wrap {
+    width: 100%;
+  }
+  .s-slider {
+    flex: 1;
+    width: auto;
+  }
+  .s-slider-val {
+    min-width: 56px;
+  }
+  .s-theme-grid { grid-template-columns: repeat(auto-fill, minmax(70px, 1fr)); }
+  .s-theme-preview {
+    width: 60px;
+    height: 42px;
+  }
+  .s-seg {
+    width: 100%;
+  }
+  .s-seg-btn {
+    flex: 1;
+    min-height: 32px;
+  }
 }
 
 /* ── Settings sidebar layout ───────────────────────────────────────────────── */
@@ -389,9 +439,40 @@
 
 @media (max-width: 640px) {
   .s-root-with-sidebar { flex-direction: column; }
-  .s-sidebar { width: 100%; flex-direction: row; overflow-x: auto; padding: 8px; border-right: none; border-bottom: 0.5px solid rgba(255,255,255,0.07); flex-wrap: nowrap; gap: 4px; }
+  .s-sidebar {
+    position: sticky;
+    top: 0;
+    z-index: 4;
+    width: 100%;
+    flex-direction: row;
+    overflow-x: auto;
+    padding: 8px;
+    border-right: none;
+    border-bottom: 0.5px solid rgba(255,255,255,0.07);
+    flex-wrap: nowrap;
+    gap: 4px;
+    scrollbar-width: none;
+  }
+  .s-sidebar::-webkit-scrollbar { display: none; }
   .s-sidebar-header { display: none; }
   .s-sidebar-sep { display: none; }
-  .s-nav-item { white-space: nowrap; padding: 5px 10px; }
-  .s-content { padding: 14px; }
+  .s-nav-item {
+    white-space: nowrap;
+    padding: 7px 10px;
+    min-height: 34px;
+  }
+  .s-content {
+    padding: 12px 10px calc(18px + env(safe-area-inset-bottom, 0px));
+    gap: 10px;
+  }
+  .gbm-card,
+  .fun-card {
+    align-items: flex-start;
+    gap: 10px;
+    padding: 12px;
+  }
+  .gbm-text,
+  .fun-card-text {
+    min-width: 0;
+  }
 }

@@ -506,10 +506,57 @@
     padding: 10px 12px;
     gap: 8px;
   }
+  .glance-status-bar {
+    flex-wrap: wrap;
+    gap: 7px;
+  }
+  .glance-status-uptime,
+  .glance-live-badge {
+    font-size: 10.5px;
+  }
   .glance-stat-rail {
-    grid-template-columns: repeat(auto-fill, minmax(100px, 1fr));
+    grid-template-columns: repeat(2, minmax(0, 1fr));
     gap: 6px;
   }
   .glance-stat-card { padding: 8px 10px 10px; }
   .glance-stat-value { font-size: 18px; }
+  .glance-window-bar {
+    overflow-x: auto;
+    padding-bottom: 2px;
+    scrollbar-width: none;
+  }
+  .glance-window-bar::-webkit-scrollbar { display: none; }
+  .glance-window-btn,
+  .glance-show-logs-btn {
+    min-height: 32px;
+    flex-shrink: 0;
+  }
+  .glance-selection-badge {
+    flex-shrink: 0;
+    margin-left: 2px;
+  }
+  .glance-chart-card {
+    padding: 9px 8px 2px;
+    overflow-x: auto;
+    cursor: default;
+  }
+  .glance-chart-card:hover {
+    transform: none;
+    box-shadow: none;
+  }
+  .glance-chart-header {
+    align-items: flex-start;
+    flex-wrap: wrap;
+    gap: 4px 8px;
+  }
+  .glance-chart-value {
+    font-size: 16px;
+  }
+  .glance-chart-sigma {
+    margin-left: 0;
+    width: 100%;
+  }
+  .glance-tooltip {
+    max-width: min(290px, calc(100vw - 24px));
+  }
 }

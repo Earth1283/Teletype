@@ -51,6 +51,9 @@ data class FileEntry(
 data class RenameRequest(val from: String, val to: String)
 
 @Serializable
+data class CopyRequest(val from: String, val to: String)
+
+@Serializable
 data class FetchRequest(val url: String, val destPath: String, val fileName: String? = null)
 
 @Serializable

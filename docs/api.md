@@ -341,6 +341,7 @@ All paths are relative to `files.root` in `config.yml`. Path traversal (`../`) i
 | `DELETE` | `/api/files` | `?path=` | Delete file or directory recursively. Audited. |
 | `POST` | `/api/files/mkdir` | `?path=` | Create directory |
 | `PATCH` | `/api/files/rename` | — | Move/rename. Body: `{"from":"...","to":"..."}`. Audited. |
+| `POST` | `/api/files/copy` | — | Copy file or directory. Body: `{"from":"...","to":"..."}`. Audited. |
 | `POST` | `/api/files/fetch` | — | Download URL to server. Body: `{"url":"...","destPath":"...","fileName":"..."}` |
 
 **`FileEntry` object:**
@@ -399,6 +400,7 @@ Query the persistent audit log.
 | `file_write` | `PUT /api/files/write` |
 | `file_delete` | `DELETE /api/files` |
 | `file_rename` | `PATCH /api/files/rename` |
+| `file_copy` | `POST /api/files/copy` |
 | `file_upload` | `POST /api/files/upload` |
 
 The `detail` field contains action-specific context: the command run, the snippet name and vars, the file path, etc.

@@ -376,3 +376,118 @@
   overflow: hidden;
 }
 .cat-preview-row { padding: 8px 0 4px; }
+
+@media (max-width: 640px) {
+  .actions-subnav {
+    overflow-x: auto;
+    padding: 8px 10px 0;
+    scrollbar-width: none;
+  }
+  .actions-subnav::-webkit-scrollbar { display: none; }
+  .subnav-btn {
+    min-height: 38px;
+    padding: 8px 12px;
+    white-space: nowrap;
+  }
+  .actions-content {
+    padding: 12px 10px calc(18px + env(safe-area-inset-bottom, 0px));
+  }
+  .cat-filter-row {
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    padding-bottom: 2px;
+    scrollbar-width: none;
+  }
+  .cat-filter-row::-webkit-scrollbar { display: none; }
+  .cat-tab {
+    min-height: 34px;
+    white-space: nowrap;
+    flex-shrink: 0;
+  }
+  .snippet-grid {
+    grid-template-columns: 1fr;
+    gap: 10px;
+  }
+  .snippet-card {
+    padding: 12px;
+    border-radius: var(--r-md);
+  }
+  .snippet-card-top {
+    align-items: flex-start;
+  }
+  .snippet-name {
+    white-space: normal;
+    overflow-wrap: anywhere;
+  }
+  .snippet-cmd-text,
+  .run-cmd-text {
+    white-space: normal;
+    overflow-wrap: anywhere;
+  }
+  .snippet-card-btns .icon-btn {
+    width: 34px;
+    height: 34px;
+  }
+  .snippet-menu {
+    position: fixed;
+    right: 10px;
+    left: 10px;
+    top: auto;
+    bottom: calc(10px + env(safe-area-inset-bottom, 0px));
+  }
+  .snippet-menu-item {
+    min-height: 38px;
+  }
+  .schedule-view {
+    overflow-x: visible;
+  }
+  .sched-table,
+  .sched-table tbody,
+  .sched-table tr,
+  .sched-table td {
+    display: block;
+    width: 100%;
+  }
+  .sched-table thead {
+    display: none;
+  }
+  .sched-table tr {
+    margin-bottom: 10px;
+    border: 1px solid var(--border);
+    border-radius: var(--r-md);
+    background: var(--surface);
+    overflow: hidden;
+  }
+  .sched-table td {
+    box-sizing: border-box;
+    padding: 8px 10px;
+    border-bottom: 1px solid var(--border);
+  }
+  .sched-table td:last-child {
+    border-bottom: none;
+  }
+  .sched-row-acts {
+    justify-content: flex-start;
+    overflow-x: auto;
+  }
+  .sched-row-acts .icon-btn,
+  .sched-row-acts .btn-ghost {
+    min-width: 34px;
+    min-height: 34px;
+  }
+  .sched-mode-row,
+  .interval-row {
+    flex-wrap: wrap;
+  }
+  .sched-mode-btn {
+    min-height: 38px;
+  }
+  .interval-num {
+    flex: 1 1 100%;
+  }
+  .color-swatch,
+  .color-custom {
+    width: 30px;
+    height: 30px;
+  }
+}

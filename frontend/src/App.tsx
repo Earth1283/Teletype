@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { QueryClient, QueryClientProvider, useQuery } from '@tanstack/react-query'
 import { api, TOKEN_KEY } from './api/client'
 import { LogProvider } from './LogContext'
@@ -24,7 +24,7 @@ import { CONTEXT_WHEEL_ACTIONS } from './contextWheelActions'
 import {
   TeletypeLogo, IconTerminal, IconUsers, IconCpu, IconFolder,
   IconLogOut, IconActivity, IconZap, IconSettings, IconList, IconNetwork,
-  IconChevronLeft, IconChevronRight,
+  IconChevronLeft, IconChevronRight, IconCommand, IconX,
 } from './Icons'
 
 const qc = new QueryClient()
@@ -110,7 +110,10 @@ function MainApp() {
   const [tab, setTab] = useState<Tab>('glance')
   const [paletteOpen, setPaletteOpen] = useState(false)
   const [sidebarOpen, setSidebarOpen] = useState(true)
+  const [mobileNavOpen, setMobileNavOpen] = useState(false)
+  const navTouchStartY = useRef<number | null>(null)
   const { settings } = useSettings()
+  const activeTab = TABS.find(t => t.id === tab)
 
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
@@ -123,6 +126,37 @@ function MainApp() {
     return () => window.removeEventListener('keydown', handler)
   }, [settings.palette.enabled])
 
+  useEffect(() => {
+    if (!mobileNavOpen) return
+    const handler = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') setMobileNavOpen(false)
+    }
+    document.body.classList.add('mobile-nav-open')
+    window.addEventListener('keydown', handler)
+    return () => {
+      document.body.classList.remove('mobile-nav-open')
+      window.removeEventListener('keydown', handler)
+    }
+  }, [mobileNavOpen])
+
+  const openPalette = () => {
+    setMobileNavOpen(false)
+    setPaletteOpen(true)
+  }
+
+  const handleMobileNavTouchStart = (e: React.TouchEvent<HTMLElement>) => {
+    navTouchStartY.current = e.touches[0]?.clientY ?? null
+  }
+
+  const handleMobileNavTouchEnd = (e: React.TouchEvent<HTMLElement>) => {
+    const startY = navTouchStartY.current
+    navTouchStartY.current = null
+    const endY = e.changedTouches[0]?.clientY
+    if (startY !== null && endY !== undefined && startY - endY > 42) {
+      setMobileNavOpen(false)
+    }
+  }
+
   if (settings.fun) return <MacOSDesktop />
 
   return (
@@ -130,12 +164,34 @@ function MainApp() {
       <PanelContextActions
         tab={tab}
         onNavigate={setTab}
-        onOpenPalette={() => setPaletteOpen(true)}
+        onOpenPalette={openPalette}
       />
       <header className="mobile-header">
+        <button
+          className="mobile-menu-btn"
+          type="button"
+          aria-label={mobileNavOpen ? 'Close navigation' : 'Open navigation'}
+          aria-expanded={mobileNavOpen}
+          aria-controls="mobile-navigation"
+          onClick={() => setMobileNavOpen(open => !open)}
+        >
+          {mobileNavOpen ? <IconX size={18} /> : <IconList size={18} />}
+        </button>
         <TeletypeLogo size={18} />
         <span className="mobile-header-title">Teletype</span>
+        <span className="mobile-header-section">{activeTab?.label}</span>
         <span className="status-dot live" />
+        {settings.palette.enabled && (
+          <button
+            className="mobile-quick-btn"
+            type="button"
+            title="Command palette"
+            aria-label="Open command palette"
+            onClick={openPalette}
+          >
+            <IconCommand size={16} />
+          </button>
+        )}
         <button
           className="sidebar-logout"
           title="Sign out"
@@ -206,15 +262,32 @@ function MainApp() {
         {tab === 'settings' && <SettingsPage />}
       </main>
 
-      <nav className="mobile-nav">
+      {mobileNavOpen && (
+        <button
+          className="mobile-nav-backdrop"
+          type="button"
+          aria-label="Close navigation"
+          onClick={() => setMobileNavOpen(false)}
+        />
+      )}
+      <nav
+        id="mobile-navigation"
+        className={`mobile-nav${mobileNavOpen ? ' open' : ''}`}
+        aria-label="Primary navigation"
+        onTouchStart={handleMobileNavTouchStart}
+        onTouchEnd={handleMobileNavTouchEnd}
+      >
         {TABS.map(({ id, label, Icon }) => (
           <button
             key={id}
             className={`mobile-nav-btn${tab === id ? ' active' : ''}`}
-            onClick={() => setTab(id)}
+            onClick={() => {
+              setTab(id)
+              setMobileNavOpen(false)
+            }}
             title={label}
           >
-            <Icon size={20} />
+            <Icon size={18} />
             <span className="mobile-nav-label">{label}</span>
           </button>
         ))}

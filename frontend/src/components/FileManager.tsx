@@ -211,6 +211,7 @@ function fmtDate(ts: number) {
 
 type Modal = { type: 'rename'; entry: FileEntry } | { type: 'mkdir' } | { type: 'fetch' } | null
 type UploadStatus = 'queued' | 'uploading' | 'done' | 'error'
+type FileClipboard = { action: 'copy' | 'cut'; entries: FileEntry[] } | null
 type PromptState = {
   title: string
   message: React.ReactNode
@@ -238,7 +239,9 @@ export default function FileManager({ viewMode }: FileManagerProps) {
   const [cwd, setCwd] = useState('')
   const [history, setHistory] = useState<string[]>([''])
   const [historyIdx, setHistoryIdx] = useState(0)
-  const [selected, setSelected] = useState<string | null>(null)
+  const [selectedPaths, setSelectedPaths] = useState<string[]>([])
+  const [selectionAnchor, setSelectionAnchor] = useState<string | null>(null)
+  const [fileClipboard, setFileClipboard] = useState<FileClipboard>(null)
   const [editing, setEditing] = useState<{ path: string } | null>(null)
   const [editorContent, setEditorContent] = useState('')
   const [saving, setSaving] = useState(false)
@@ -298,11 +301,62 @@ export default function FileManager({ viewMode }: FileManagerProps) {
   const breadcrumbs = cwd ? cwd.split('/').filter(Boolean) : []
   const canGoBack = historyIdx > 0
   const canGoForward = historyIdx < history.length - 1
+  const displayEntries = searchOpen && searchQuery.trim() ? searchResults : entries
+  const selectedSet = new Set(selectedPaths)
+  const selectedEntries = displayEntries.filter(entry => selectedSet.has(entry.path))
+  const clipboardCount = fileClipboard?.entries.length ?? 0
+
+  function joinPath(dir: string, name: string) {
+    return dir ? `${dir}/${name}` : name
+  }
+
+  function clearSelection() {
+    setSelectedPaths([])
+    setSelectionAnchor(null)
+  }
+
+  function selectOnly(path: string) {
+    setSelectedPaths([path])
+    setSelectionAnchor(path)
+  }
+
+  function toggleSelection(path: string) {
+    setSelectedPaths(prev => prev.includes(path) ? prev.filter(p => p !== path) : [...prev, path])
+    setSelectionAnchor(path)
+  }
+
+  function selectRange(path: string) {
+    if (!selectionAnchor) {
+      selectOnly(path)
+      return
+    }
+    const paths = displayEntries.map(entry => entry.path)
+    const start = paths.indexOf(selectionAnchor)
+    const end = paths.indexOf(path)
+    if (start === -1 || end === -1) {
+      selectOnly(path)
+      return
+    }
+    const [from, to] = start < end ? [start, end] : [end, start]
+    setSelectedPaths(paths.slice(from, to + 1))
+  }
+
+  function handleEntrySelect(e: React.MouseEvent, entry: FileEntry) {
+    e.stopPropagation()
+    if (e.shiftKey) selectRange(entry.path)
+    else if (e.metaKey || e.ctrlKey) toggleSelection(entry.path)
+    else selectOnly(entry.path)
+  }
+
+  function selectAllVisible() {
+    setSelectedPaths(displayEntries.map(entry => entry.path))
+    setSelectionAnchor(displayEntries[0]?.path ?? null)
+  }
 
   function navigate(path: string) {
     setCwd(path)
     setEditing(null)
-    setSelected(null)
+    clearSelection()
     setHistory(prev => [...prev.slice(0, historyIdx + 1), path])
     setHistoryIdx(prev => prev + 1)
   }
@@ -312,7 +366,7 @@ export default function FileManager({ viewMode }: FileManagerProps) {
     setHistoryIdx(idx)
     setCwd(history[idx])
     setEditing(null)
-    setSelected(null)
+    clearSelection()
   }
 
   function goForward() {
@@ -320,10 +374,11 @@ export default function FileManager({ viewMode }: FileManagerProps) {
     setHistoryIdx(idx)
     setCwd(history[idx])
     setEditing(null)
-    setSelected(null)
+    clearSelection()
   }
 
   function invalidate() { qc.invalidateQueries({ queryKey: qKey }) }
+  function invalidateFiles() { qc.invalidateQueries({ queryKey: ['files'] }) }
 
   function showPrompt(title: string, message: React.ReactNode, variant: PromptVariant = 'info') {
     setPrompt({ title, message, variant })
@@ -391,23 +446,59 @@ export default function FileManager({ viewMode }: FileManagerProps) {
     finally { setSaving(false) }
   }
 
-  async function deleteEntry(entry: FileEntry) {
+  async function deleteEntries(entriesToDelete: FileEntry[]) {
+    if (entriesToDelete.length === 0) return
+    const single = entriesToDelete.length === 1
+    const label = single ? `"${entriesToDelete[0].name}"` : `${entriesToDelete.length} items`
     setPrompt({
-      title: 'Delete item?',
-      message: `Delete "${entry.name}"? This cannot be undone from Teletype.`,
+      title: single ? 'Delete item?' : 'Delete selected items?',
+      message: `Delete ${label}? This cannot be undone from Teletype.`,
       variant: 'danger',
       confirmLabel: 'Delete',
       cancelLabel: 'Cancel',
       onConfirm: async () => {
         try {
-          await api.delete('/files', { params: { path: entry.path } })
-          invalidate()
+          for (const entry of entriesToDelete) {
+            await api.delete('/files', { params: { path: entry.path } })
+          }
+          clearSelection()
+          invalidateFiles()
         } catch (e: any) {
-          showPrompt('Delete failed', e.response?.data?.error ?? 'The item could not be deleted.', 'error')
+          showPrompt('Delete failed', e.response?.data?.error ?? 'The selected item could not be deleted.', 'error')
           throw e
         }
       },
     })
+  }
+
+  async function deleteEntry(entry: FileEntry) {
+    deleteEntries([entry])
+  }
+
+  function setFileActionClipboard(action: 'copy' | 'cut', entriesToCopy: FileEntry[]) {
+    if (entriesToCopy.length === 0) return
+    setFileClipboard({ action, entries: entriesToCopy })
+  }
+
+  async function pasteClipboard(destDir = cwd) {
+    if (!fileClipboard || fileClipboard.entries.length === 0) return
+    try {
+      for (const entry of fileClipboard.entries) {
+        const to = joinPath(destDir, entry.name)
+        if (to === entry.path) continue
+        if (fileClipboard.action === 'copy') await api.post('/files/copy', { from: entry.path, to })
+        else await api.patch('/files/rename', { from: entry.path, to })
+      }
+      if (fileClipboard.action === 'cut') setFileClipboard(null)
+      clearSelection()
+      invalidateFiles()
+    } catch (e: any) {
+      showPrompt('Paste failed', e.response?.data?.error ?? 'The selected item could not be pasted here.', 'error')
+    }
+  }
+
+  function copyPaths(entriesToCopy: FileEntry[]) {
+    navigator.clipboard.writeText(entriesToCopy.map(entry => entry.path).join('\n'))
   }
 
   async function doRename() {
@@ -569,36 +660,65 @@ export default function FileManager({ viewMode }: FileManagerProps) {
   // ── Right-click context menu ─────────────────────────────────────────────
 
   function openFileCtx(e: React.MouseEvent, entry: FileEntry) {
-    const items: ContextMenuItem[] = [
-      { label: 'Open', action: () => handleIconActivate(entry) },
-    ]
-    if (!entry.isDirectory) {
-      items.push({ label: 'Download', action: () => downloadFile(entry) })
+    const isAlreadySelected = selectedPaths.includes(entry.path)
+    const contextEntries = isAlreadySelected && selectedEntries.length > 0 ? selectedEntries : [entry]
+    const isBulk = contextEntries.length > 1
+    if (!isAlreadySelected) selectOnly(entry.path)
+
+    const items: ContextMenuItem[] = []
+    if (isBulk) {
+      items.push({ type: 'header', label: `${contextEntries.length} items selected` })
+    } else {
+      items.push({ label: 'Open', action: () => handleIconActivate(entry) })
+      if (!entry.isDirectory) {
+        items.push({ label: 'Download', action: () => downloadFile(entry) })
+      }
     }
     items.push(
-      { label: 'Copy Path', action: () => navigator.clipboard.writeText(entry.path) },
+      { label: isBulk ? 'Copy' : 'Copy Item', action: () => setFileActionClipboard('copy', contextEntries) },
+      { label: isBulk ? 'Cut' : 'Cut Item', action: () => setFileActionClipboard('cut', contextEntries) },
+      { label: isBulk ? 'Copy Paths' : 'Copy Path', action: () => copyPaths(contextEntries) },
       { type: 'separator' },
     )
-    if (entry.isDirectory) {
+    if (!isBulk && entry.isDirectory) {
+      if (fileClipboard) {
+        items.push({
+          label: `Paste ${clipboardCount} Item${clipboardCount === 1 ? '' : 's'} Into Folder`,
+          action: () => pasteClipboard(entry.path),
+        })
+      }
       items.push({
         label: 'Add to Favorites',
         disabled: favs.some(f => f.path === entry.path),
         action: () => addFav(entry.name, entry.path),
       })
     }
-    items.push(
-      { label: 'Rename', action: () => openModal({ type: 'rename', entry }, entry.name) },
-      { type: 'separator' },
-      { label: 'Delete', danger: true, action: () => deleteEntry(entry) },
-    )
+    if (!isBulk) {
+      items.push(
+        { label: 'Rename', action: () => openModal({ type: 'rename', entry }, entry.name) },
+        { type: 'separator' },
+      )
+    }
+    items.push({ label: isBulk ? 'Delete Selected' : 'Delete', danger: true, action: () => deleteEntries(contextEntries) })
     openContextMenu(e, items, { kind: 'file', path: entry.path, isDirectory: entry.isDirectory })
   }
 
   function openFolderCtx(e: React.MouseEvent) {
-    openContextMenu(e, [
+    const items: ContextMenuItem[] = [
       { label: 'New Folder', action: () => openModal({ type: 'mkdir' }) },
       { label: 'Upload Files...', action: () => fileInputRef.current?.click() },
       { label: 'Fetch from URL...', action: () => { setFetchUrl(''); setFetchName(''); setModal({ type: 'fetch' }) } },
+      { type: 'separator' },
+    ]
+    if (fileClipboard) {
+      items.push({
+        label: `Paste ${clipboardCount} Item${clipboardCount === 1 ? '' : 's'}`,
+        action: () => pasteClipboard(cwd),
+      })
+    }
+    items.push(
+      { label: 'Select All', disabled: displayEntries.length === 0, action: selectAllVisible },
+      { label: 'Clear Selection', disabled: selectedPaths.length === 0, action: clearSelection },
       { type: 'separator' },
       {
         label: 'Add Current Folder to Favorites',
@@ -606,7 +726,8 @@ export default function FileManager({ viewMode }: FileManagerProps) {
         action: () => addFav(cwd.split('/').filter(Boolean).pop() || 'Server Root', cwd),
       },
       { label: 'Copy Folder Path', disabled: !cwd, action: () => navigator.clipboard.writeText(cwd) },
-    ], { kind: 'folderBackground', path: cwd })
+    )
+    openContextMenu(e, items, { kind: 'folderBackground', path: cwd })
   }
 
   function openFavoriteCtx(e: React.MouseEvent, fav: SidebarFav) {
@@ -644,7 +765,6 @@ export default function FileManager({ viewMode }: FileManagerProps) {
     automaticLayout: true,
   }
 
-  const displayEntries = searchOpen && searchQuery.trim() ? searchResults : entries
   const uploadTotal = uploadItems.reduce((sum, item) => sum + item.size, 0)
   const uploadLoaded = uploadItems.reduce((sum, item) => sum + Math.min(item.loaded, item.size), 0)
   const uploadPercent = uploadTotal > 0 ? Math.round((uploadLoaded / uploadTotal) * 100) : 0
@@ -766,6 +886,16 @@ export default function FileManager({ viewMode }: FileManagerProps) {
         </div>
       )}
 
+      {selectedEntries.length > 1 && (
+        <div className="fm-selection-bar">
+          <span>{selectedEntries.length} selected</span>
+          <button className="btn-ghost btn-xs" onClick={() => setFileActionClipboard('copy', selectedEntries)}>Copy</button>
+          <button className="btn-ghost btn-xs" onClick={() => setFileActionClipboard('cut', selectedEntries)}>Cut</button>
+          <button className="btn-ghost btn-xs danger" onClick={() => deleteEntries(selectedEntries)}>Delete</button>
+          <button className="btn-ghost btn-xs" onClick={clearSelection}>Clear</button>
+        </div>
+      )}
+
       {/* ── Inline mkdir form ──────────────────────────────────────────── */}
       {modal?.type === 'mkdir' && (
         <div className="fm-inline-form">
@@ -840,7 +970,7 @@ export default function FileManager({ viewMode }: FileManagerProps) {
         )}
 
         {/* File area */}
-        <div className="finder-main" onContextMenu={openFolderCtx}>
+        <div className={`finder-main${editing ? ' with-editor' : ''}`} onContextMenu={openFolderCtx}>
 
           {/* Loading / error */}
           {isLoading && <div className="dim" style={{ padding: 12 }}>Loading…</div>}
@@ -848,14 +978,14 @@ export default function FileManager({ viewMode }: FileManagerProps) {
 
           {/* Search results always use list view */}
           {searchOpen && searchQuery.trim() ? (
-            <div className="fm-file-list" style={{ flex: 1 }}>
+            <div className="fm-file-list" style={{ flex: 1 }} onClick={clearSelection}>
               {searching && <div className="dim" style={{ padding: '8px 10px' }}>Searching…</div>}
               {!searching && searchResults.length === 0 && (
                 <div className="dim" style={{ padding: '8px 10px' }}>No results for "{searchQuery}"</div>
               )}
               {searchResults.map(entry => (
-                <div key={entry.path} className="fm-row"
-                  onClick={() => setSelected(entry.path)}
+                <div key={entry.path} className={`fm-row${selectedSet.has(entry.path) ? ' selected' : ''}`}
+                  onClick={e => handleEntrySelect(e, entry)}
                   onContextMenu={e => openFileCtx(e, entry)}
                   onDoubleClick={() => {
                     if (entry.isDirectory) { navigate(entry.path); setSearchOpen(false); setSearchQuery('') }
@@ -881,11 +1011,11 @@ export default function FileManager({ viewMode }: FileManagerProps) {
 
           ) : effectiveView === 'icons' ? (
             /* ── Icon grid ──────────────────────────────────────────── */
-            <div className="finder-icon-grid" onClick={() => setSelected(null)}>
+            <div className="finder-icon-grid" onClick={clearSelection}>
               {cwd && (
                 <div
-                  className={`finder-icon-item${selected === '..' ? ' selected' : ''}`}
-                  onClick={e => { e.stopPropagation(); setSelected('..') }}
+                  className={`finder-icon-item${selectedPaths.includes('..') ? ' selected' : ''}`}
+                  onClick={e => { e.stopPropagation(); selectOnly('..') }}
                   onDoubleClick={e => { e.stopPropagation(); goBack() }}
                   title="Parent folder"
                 >
@@ -904,8 +1034,8 @@ export default function FileManager({ viewMode }: FileManagerProps) {
                 return (
                   <div
                     key={entry.path}
-                    className={`finder-icon-item${selected === entry.path ? ' selected' : ''}`}
-                    onClick={e => { e.stopPropagation(); setSelected(entry.path) }}
+                    className={`finder-icon-item${selectedSet.has(entry.path) ? ' selected' : ''}`}
+                    onClick={e => handleEntrySelect(e, entry)}
                     onDoubleClick={e => { e.stopPropagation(); handleIconActivate(entry) }}
                     onContextMenu={e => openFileCtx(e, entry)}
                     title={entry.name}
@@ -923,10 +1053,10 @@ export default function FileManager({ viewMode }: FileManagerProps) {
 
           ) : (
             /* ── List view ──────────────────────────────────────────── */
-            <div className={`fm-file-list${editing ? ' compact' : ''}`}>
+            <div className={`fm-file-list${editing ? ' compact' : ''}`} onClick={clearSelection}>
               {cwd && (
-                <div className="fm-row"
-                  onClick={() => setSelected('..')}
+                <div className={`fm-row${selectedPaths.includes('..') ? ' selected' : ''}`}
+                  onClick={e => { e.stopPropagation(); selectOnly('..') }}
                   onDoubleClick={() => goBack()}
                 >
                   <span className="fm-row-icon dir"><IconFolder size={14} /></span>
@@ -934,8 +1064,8 @@ export default function FileManager({ viewMode }: FileManagerProps) {
                 </div>
               )}
               {displayEntries.map(entry => (
-                <div key={entry.path} className="fm-row"
-                  onClick={() => setSelected(entry.path)}
+                <div key={entry.path} className={`fm-row${selectedSet.has(entry.path) ? ' selected' : ''}`}
+                  onClick={e => handleEntrySelect(e, entry)}
                   onDoubleClick={() => handleIconActivate(entry)}
                   onContextMenu={e => openFileCtx(e, entry)}
                 >

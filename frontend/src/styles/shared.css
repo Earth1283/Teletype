@@ -230,3 +230,51 @@
 }
 
 .audit-export-btn:hover { background: rgba(255,255,255,0.06); }
+
+@media (max-width: 640px) {
+  .modal-overlay {
+    align-items: flex-end;
+    justify-content: center;
+    padding: 12px;
+    padding-bottom: calc(12px + env(safe-area-inset-bottom, 0px));
+    box-sizing: border-box;
+  }
+  .modal-card {
+    width: 100%;
+    min-width: 0;
+    max-width: none;
+    max-height: min(720px, calc(100vh - 24px - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px)));
+    overflow-y: auto;
+    padding: 18px 16px;
+    border-radius: var(--r-md);
+  }
+  .modal-footer {
+    gap: 8px;
+    flex-wrap: wrap;
+  }
+  .modal-footer .pill-btn,
+  .modal-footer .btn-primary,
+  .modal-footer .btn-ghost,
+  .modal-footer .btn-danger {
+    flex: 1;
+    justify-content: center;
+    min-height: 38px;
+  }
+  .modal-input,
+  .text-input,
+  .modal-select {
+    font-size: 16px;
+    min-height: 38px;
+    box-sizing: border-box;
+  }
+  .audit-toolbar {
+    padding: 8px 10px;
+  }
+  .audit-filter-input,
+  .audit-filter-select,
+  .audit-reset-btn,
+  .audit-export-btn {
+    flex: 1 1 140px;
+    height: 34px;
+  }
+}
