@@ -1,7 +1,9 @@
 package io.github.Earth1283.teletype.metrics
 
 import io.github.Earth1283.teletype.Teletype
+import io.github.Earth1283.teletype.web.model.GcEvent
 import io.github.Earth1283.teletype.web.model.MetricSnapshot
+import com.sun.management.GarbageCollectionNotificationInfo
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.channels.BufferOverflow
@@ -12,6 +14,10 @@ import kotlinx.coroutines.launch
 import org.bukkit.Bukkit
 import org.bukkit.scheduler.BukkitRunnable
 import java.lang.management.ManagementFactory
+import javax.management.Notification
+import javax.management.NotificationEmitter
+import javax.management.NotificationListener
+import javax.management.openmbean.CompositeData
 
 private data class SystemMetricSnapshot(
     val memUsedMb: Long,
@@ -33,9 +39,11 @@ class MetricsCollector(private val plugin: Teletype, private val db: MetricsData
     private val heavySampleEvery = (100L / sampleIntervalTicks).coerceAtLeast(1L).toInt()
 
     private val buffer = ArrayDeque<MetricSnapshot>(maxSnapshots + 1)
+    private val gcBuffer = ArrayDeque<GcEvent>(maxSnapshots + 64)
 
     // Ring buffer that feeds SQLite flush; DROP_OLDEST on overflow so the main thread never blocks.
     private val flushChannel = Channel<MetricSnapshot>(capacity = 128, onBufferOverflow = BufferOverflow.DROP_OLDEST)
+    private val gcFlushChannel = Channel<GcEvent>(capacity = 256, onBufferOverflow = BufferOverflow.DROP_OLDEST)
 
     @Volatile var latest: MetricSnapshot? = null
     @Volatile private var latestSystem: SystemMetricSnapshot? = null
@@ -44,6 +52,7 @@ class MetricsCollector(private val plugin: Teletype, private val db: MetricsData
     private var cachedLoadedChunks = 0
     private var cachedPingP50: Int? = null
     private var cachedPingP95: Int? = null
+    private val gcListeners = mutableListOf<Pair<NotificationEmitter, NotificationListener>>()
 
     private val osMx: com.sun.management.OperatingSystemMXBean? = runCatching {
         ManagementFactory.getOperatingSystemMXBean() as com.sun.management.OperatingSystemMXBean
@@ -59,6 +68,8 @@ class MetricsCollector(private val plugin: Teletype, private val db: MetricsData
 
     init {
         if (plugin.teletypeConfig.metricsEnabled) {
+            installGcListeners()
+
             val isPaper = runCatching {
                 Class.forName("io.papermc.paper.configuration.GlobalConfiguration"); true
             }.getOrDefault(runCatching {
@@ -142,16 +153,59 @@ class MetricsCollector(private val plugin: Teletype, private val db: MetricsData
             // Coroutine: drain the channel and write to SQLite every 15 seconds.
             if (plugin.teletypeConfig.metricsSqliteEnabled) scope.launch {
                 val batch = mutableListOf<MetricSnapshot>()
+                val gcBatch = mutableListOf<GcEvent>()
                 while (isActive) {
                     delay(flushIntervalMs)
                     while (true) {
                         batch += flushChannel.tryReceive().getOrNull() ?: break
                     }
+                    while (true) {
+                        gcBatch += gcFlushChannel.tryReceive().getOrNull() ?: break
+                    }
                     if (batch.isNotEmpty()) {
                         db.insert(batch.toList())
                         batch.clear()
                     }
+                    if (gcBatch.isNotEmpty()) {
+                        db.insertGcEvents(gcBatch.toList())
+                        gcBatch.clear()
+                    }
                 }
+            }
+        }
+    }
+
+    private fun installGcListeners() {
+        val runtimeStartMs = ManagementFactory.getRuntimeMXBean().startTime
+        ManagementFactory.getGarbageCollectorMXBeans().forEach { bean ->
+            val emitter = bean as? NotificationEmitter ?: return@forEach
+            val listener = NotificationListener { notification: Notification, _ ->
+                if (notification.type != GarbageCollectionNotificationInfo.GARBAGE_COLLECTION_NOTIFICATION) return@NotificationListener
+                val event = runCatching {
+                    val info = GarbageCollectionNotificationInfo.from(notification.userData as CompositeData)
+                    GcEvent(
+                        ts         = runtimeStartMs + info.gcInfo.endTime,
+                        name       = info.gcName,
+                        action     = info.gcAction,
+                        cause      = info.gcCause,
+                        durationMs = info.gcInfo.duration,
+                    )
+                }.getOrNull() ?: return@NotificationListener
+
+                synchronized(gcBuffer) {
+                    if (gcBuffer.size >= maxSnapshots + 64) gcBuffer.removeFirst()
+                    gcBuffer.addLast(event)
+                }
+                if (plugin.teletypeConfig.metricsSqliteEnabled) {
+                    gcFlushChannel.trySend(event)
+                }
+            }
+
+            runCatching {
+                emitter.addNotificationListener(listener, null, null)
+                gcListeners += emitter to listener
+            }.onFailure { e ->
+                plugin.logger.fine("[Teletype] Could not attach GC listener to ${bean.name}: ${e.message}")
             }
         }
     }
@@ -198,5 +252,17 @@ class MetricsCollector(private val plugin: Teletype, private val db: MetricsData
     fun history(windowMinutes: Int): List<MetricSnapshot> {
         val from = System.currentTimeMillis() - windowMinutes.coerceAtLeast(1) * 60_000L
         return synchronized(buffer) { buffer.filter { it.timestamp >= from } }
+    }
+
+    fun gcEvents(windowMinutes: Int): List<GcEvent> {
+        val from = System.currentTimeMillis() - windowMinutes.coerceAtLeast(1) * 60_000L
+        return synchronized(gcBuffer) { gcBuffer.filter { it.ts >= from } }
+    }
+
+    fun close() {
+        gcListeners.forEach { (emitter, listener) ->
+            runCatching { emitter.removeNotificationListener(listener) }
+        }
+        gcListeners.clear()
     }
 }

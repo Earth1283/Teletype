@@ -14,6 +14,7 @@ import io.ktor.http.content.PartData
 import io.ktor.http.content.forEachPart
 import io.ktor.utils.io.jvm.javaio.toInputStream
 import io.ktor.server.request.receive
+import io.ktor.server.request.receiveChannel
 import io.ktor.server.request.receiveMultipart
 import io.ktor.server.response.header
 import io.ktor.server.response.respond
@@ -28,16 +29,27 @@ import io.ktor.server.routing.put
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import java.io.File
+import java.util.concurrent.ConcurrentHashMap
 
 private const val MAX_TEXT_SIZE = 2 * 1024 * 1024L // 2 MB
+private const val MAX_UPLOAD_CHUNKS = 100_000
+private val uploadAssemblyLocks = ConcurrentHashMap<String, Any>()
 
 fun Route.fileRoutes(plugin: Teletype) {
     val root = plugin.teletypeConfig.filesRoot.canonicalFile
     val rootPath = root.path
+    val chunkRoot = File(plugin.dataFolder, "upload-chunks").canonicalFile
 
     fun resolve(path: String): File? {
         val resolved = File(root, path).canonicalFile
         return if (resolved.path == rootPath || resolved.path.startsWith(rootPath + File.separator)) resolved else null
+    }
+
+    fun resolveUploadDestination(dir: File, filename: String): File? {
+        val cleanName = File(filename).name.takeIf { it.isNotBlank() } ?: return null
+        val dest = File(dir, cleanName).canonicalFile
+        val dirPath = dir.canonicalFile.path
+        return if (dest.parentFile?.path == dirPath) dest else null
     }
 
     get("/list") {
@@ -132,6 +144,93 @@ fun Route.fileRoutes(plugin: Teletype) {
         }
         call.respond(StatusResponse("uploaded $count file(s)"))
         auditAsync(plugin, "file_upload", "$count file(s) to $dirPath")
+    }
+
+    post("/upload-chunk") {
+        val dirPath = call.request.queryParameters["path"] ?: ""
+        val dir = resolve(dirPath)
+            ?: return@post call.respond(HttpStatusCode.Forbidden, ErrorResponse("Path outside root"))
+        if (!dir.exists() || !dir.isDirectory)
+            return@post call.respond(HttpStatusCode.NotFound, ErrorResponse("Directory not found"))
+
+        val params = call.request.queryParameters
+        val uploadId = params["uploadId"]?.takeIf { it.matches(Regex("[A-Za-z0-9._-]{8,120}")) }
+            ?: return@post call.respond(HttpStatusCode.BadRequest, ErrorResponse("Invalid upload id"))
+        val filename = params["filename"] ?: return@post call.respond(HttpStatusCode.BadRequest, ErrorResponse("Missing filename"))
+        val chunkIndex = params["chunkIndex"]?.toIntOrNull()
+            ?: return@post call.respond(HttpStatusCode.BadRequest, ErrorResponse("Invalid chunk index"))
+        val totalChunks = params["totalChunks"]?.toIntOrNull()
+            ?: return@post call.respond(HttpStatusCode.BadRequest, ErrorResponse("Invalid total chunks"))
+        val totalSize = params["totalSize"]?.toLongOrNull()
+            ?: return@post call.respond(HttpStatusCode.BadRequest, ErrorResponse("Invalid total size"))
+
+        if (totalChunks !in 1..MAX_UPLOAD_CHUNKS || chunkIndex !in 0 until totalChunks || totalSize < 0)
+            return@post call.respond(HttpStatusCode.BadRequest, ErrorResponse("Invalid chunk metadata"))
+
+        val dest = resolveUploadDestination(dir, filename)
+            ?: return@post call.respond(HttpStatusCode.BadRequest, ErrorResponse("Invalid filename"))
+        val uploadDir = File(chunkRoot, uploadId).canonicalFile
+        if (uploadDir.parentFile?.path != chunkRoot.path)
+            return@post call.respond(HttpStatusCode.BadRequest, ErrorResponse("Invalid upload id"))
+
+        val lockKey = "${dir.canonicalPath}/$uploadId/${dest.name}"
+        val lock = uploadAssemblyLocks.computeIfAbsent(lockKey) { Any() }
+        val partFile = File(uploadDir, "$chunkIndex.part")
+        val tmpPartFile = File(uploadDir, "$chunkIndex.part.tmp-${System.nanoTime()}")
+
+        withContext(Dispatchers.IO) {
+            uploadDir.mkdirs()
+            call.receiveChannel().toInputStream().use { input ->
+                tmpPartFile.outputStream().use { output -> input.copyTo(output) }
+            }
+        }
+
+        var completed = false
+        var assembledSize = 0L
+        var sizeMismatch = false
+        try {
+            withContext(Dispatchers.IO) {
+                synchronized(lock) {
+                    partFile.delete()
+                    if (!tmpPartFile.renameTo(partFile)) {
+                        tmpPartFile.inputStream().use { input ->
+                            partFile.outputStream().use { output -> input.copyTo(output) }
+                        }
+                        tmpPartFile.delete()
+                    }
+
+                    val parts = (0 until totalChunks).map { File(uploadDir, "$it.part") }
+                    if (parts.all { it.exists() }) {
+                        assembledSize = parts.sumOf { it.length() }
+                        if (assembledSize != totalSize) {
+                            uploadDir.deleteRecursively()
+                            sizeMismatch = true
+                            return@synchronized
+                        }
+                        dest.parentFile?.mkdirs()
+                        dest.outputStream().use { output ->
+                            parts.forEach { part -> part.inputStream().use { input -> input.copyTo(output) } }
+                        }
+                        uploadDir.deleteRecursively()
+                        completed = true
+                    }
+                }
+            }
+        } finally {
+            if (completed || !uploadDir.exists()) uploadAssemblyLocks.remove(lockKey, lock)
+        }
+
+        if (sizeMismatch) {
+            call.respond(
+                HttpStatusCode.BadRequest,
+                ErrorResponse("Chunk size mismatch: expected $totalSize bytes, received $assembledSize")
+            )
+        } else if (completed) {
+            call.respond(StatusResponse("uploaded ${dest.name} ($assembledSize bytes)"))
+            auditAsync(plugin, "file_upload", "${dest.name} to $dirPath")
+        } else {
+            call.respond(StatusResponse("chunk ${chunkIndex + 1}/$totalChunks received"))
+        }
     }
 
     delete("") {

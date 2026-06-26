@@ -2,6 +2,7 @@ package io.github.Earth1283.teletype.metrics
 
 import io.github.Earth1283.teletype.web.model.MetricSnapshot
 import io.github.Earth1283.teletype.web.model.PlayerEvent
+import io.github.Earth1283.teletype.web.model.GcEvent
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
@@ -45,6 +46,16 @@ class MetricsDatabase(dataFolder: File) {
                 )
             """.trimIndent())
             stmt.executeUpdate("CREATE INDEX IF NOT EXISTS idx_player_events_ts ON player_events(ts)")
+            stmt.executeUpdate("""
+                CREATE TABLE IF NOT EXISTS gc_events (
+                  ts          INTEGER NOT NULL,
+                  name        TEXT    NOT NULL,
+                  action      TEXT    NOT NULL,
+                  cause       TEXT    NOT NULL,
+                  duration_ms INTEGER NOT NULL
+                )
+            """.trimIndent())
+            stmt.executeUpdate("CREATE INDEX IF NOT EXISTS idx_gc_events_ts ON gc_events(ts)")
         }
         // Idempotent column migrations — add new columns to existing tables without data loss.
         val newCols = linkedMapOf(
@@ -117,6 +128,27 @@ class MetricsDatabase(dataFolder: File) {
                     throw e
                 } finally {
                     conn.autoCommit = true
+                }
+            }
+        }
+    }
+
+    suspend fun insertGcEvents(events: List<GcEvent>) {
+        if (events.isEmpty()) return
+        mutex.withLock {
+            withContext(Dispatchers.IO) {
+                conn.prepareStatement(
+                    "INSERT INTO gc_events (ts, name, action, cause, duration_ms) VALUES (?,?,?,?,?)"
+                ).use { ps ->
+                    for (event in events) {
+                        ps.setLong(1, event.ts)
+                        ps.setString(2, event.name)
+                        ps.setString(3, event.action)
+                        ps.setString(4, event.cause)
+                        ps.setLong(5, event.durationMs)
+                        ps.addBatch()
+                    }
+                    ps.executeBatch()
                 }
             }
         }
@@ -286,9 +318,38 @@ class MetricsDatabase(dataFolder: File) {
         }
     }
 
+    suspend fun gcEvents(from: Long, to: Long): List<GcEvent> = mutex.withLock {
+        withContext(Dispatchers.IO) {
+            val result = mutableListOf<GcEvent>()
+            conn.prepareStatement(
+                "SELECT ts, name, action, cause, duration_ms FROM gc_events WHERE ts >= ? AND ts <= ? ORDER BY ts"
+            ).use { ps ->
+                ps.setLong(1, from); ps.setLong(2, to)
+                ps.executeQuery().use { rs ->
+                    while (rs.next()) result += GcEvent(
+                        ts         = rs.getLong("ts"),
+                        name       = rs.getString("name"),
+                        action     = rs.getString("action"),
+                        cause      = rs.getString("cause"),
+                        durationMs = rs.getLong("duration_ms"),
+                    )
+                }
+            }
+            result
+        }
+    }
+
     suspend fun prunePlayerEvents(before: Long) = mutex.withLock {
         withContext(Dispatchers.IO) {
             conn.prepareStatement("DELETE FROM player_events WHERE ts < ?").use { ps ->
+                ps.setLong(1, before); ps.executeUpdate()
+            }
+        }
+    }
+
+    suspend fun pruneGcEvents(before: Long) = mutex.withLock {
+        withContext(Dispatchers.IO) {
+            conn.prepareStatement("DELETE FROM gc_events WHERE ts < ?").use { ps ->
                 ps.setLong(1, before); ps.executeUpdate()
             }
         }

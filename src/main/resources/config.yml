@@ -99,7 +99,7 @@ rate-limit:
   auth:
     # Max requests per minute per IP on /api/auth/* (challenge + poll).
     # Protects against brute-force login attempts.
-    requests-per-minute: 10
+    requests-per-minute: 8
 
   api:
     # Max requests per minute per authenticated user on all /api/* routes.

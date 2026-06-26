@@ -39,6 +39,7 @@ class RetentionJob(
             db.downsampleTo15Min(from = d8, to = d7)
             // Prune player events older than 30 days
             db.prunePlayerEvents(before = d30)
+            db.pruneGcEvents(before = d30)
             plugin.messages.console("metrics.retention-done")
         } catch (e: Exception) {
             plugin.messages.console("metrics.retention-failed", "error" to (e.message ?: "unknown"))

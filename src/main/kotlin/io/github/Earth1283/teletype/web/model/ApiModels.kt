@@ -77,6 +77,15 @@ data class MetricSnapshot(
 )
 
 @Serializable
+data class GcEvent(
+    val ts: Long,
+    val name: String,
+    val action: String,
+    val cause: String,
+    val durationMs: Long,
+)
+
+@Serializable
 data class PlayerEvent(
     val ts: Long,
     val uuid: String,

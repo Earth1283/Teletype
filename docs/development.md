@@ -102,13 +102,13 @@ Open `http://localhost:5173`. Auth is bypassed — clicking verify returns a tok
 
 **Metrics:** Brownian-motion state machine updated every 1 second, pre-filled with 300 snapshots (5 minutes of history):
 - **TPS** — random walk [18.5, 20.0] with 2% lag event chance (drops to ~15 TPS for 10–30s, then recovers)
-- **JVM heap** — sawtooth: fills at ~0.3 MB/s, GC drop at 85% usage or 0.4% random chance
+- **JVM heap + GC events** — sawtooth heap growth with synthetic GC events from `/api/glance/gc-events`
 - **CPU %** — random walk [5, 95]
 - **System RAM** — slow drift [40%, 80%]
 - **Entity/chunk/player counts** — slow random walks
 - Disk stays constant (no state machine needed)
 
-**Console:** WebSocket at `/ws/console`. On connect: 40-line log replay burst. Then variable-cadence stream (400–2600ms between lines) using recursive `setTimeout`. Commands echo back; `list` returns a fake player count, `gc` triggers a simulated GC drop.
+**Console:** WebSocket at `/ws/console`. On connect: 40-line log replay burst. Then variable-cadence stream (400–2600ms between lines) using recursive `setTimeout`. Commands echo back; `list` returns a fake player count, `gc` triggers a simulated GC event and heap drop.
 
 Tab completion: the mock returns a static list of common Minecraft commands for any partial input.
 

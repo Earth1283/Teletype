@@ -208,6 +208,25 @@ Returns an array of `MetricSnapshot` objects (same schema as `/glance/current`).
 
 The ≤ 15 tier uses the in-memory ring buffer (no disk I/O). The ≤ 60 tier is the same 1-second resolution data read from SQLite, which holds up to 24 hours of raw rows before downsampling.
 
+### `GET /api/glance/gc-events?window=<minutes>`
+
+Returns JVM garbage collection events for the selected Glance window. `window` range: 1-43200 (30 days). Default: `5`.
+
+Events are collected from JVM GC MXBean notifications when the runtime exposes them. When SQLite metrics are enabled, events are persisted and retained for 30 days.
+
+**Response 200:**
+```json
+[
+  {
+    "ts": 1700000123456,
+    "name": "G1 Young Generation",
+    "action": "end of minor GC",
+    "cause": "G1 Evacuation Pause",
+    "durationMs": 18
+  }
+]
+```
+
 ---
 
 ## Stats — Player Events
@@ -318,6 +337,7 @@ All paths are relative to `files.root` in `config.yml`. Path traversal (`../`) i
 | `PUT` | `/api/files/write` | `?path=` | Write file (plain text body). Audited. |
 | `GET` | `/api/files/download` | `?path=` | Download file as attachment |
 | `POST` | `/api/files/upload` | `?path=` multipart | Upload files to directory. Audited. |
+| `POST` | `/api/files/upload-chunk` | `?path=&uploadId=&filename=&chunkIndex=&totalChunks=&totalSize=` binary body | Upload one file chunk; server assembles when all chunks arrive. Audited on completion. |
 | `DELETE` | `/api/files` | `?path=` | Delete file or directory recursively. Audited. |
 | `POST` | `/api/files/mkdir` | `?path=` | Create directory |
 | `PATCH` | `/api/files/rename` | — | Move/rename. Body: `{"from":"...","to":"..."}`. Audited. |

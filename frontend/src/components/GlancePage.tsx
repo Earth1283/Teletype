@@ -28,6 +28,14 @@ interface Snap {
 
 interface ProcessedSnap extends Snap { memPct: number }
 
+interface GcEvent {
+  ts: number
+  name: string
+  action: string
+  cause: string
+  durationMs: number
+}
+
 interface SeriesStats { mean: number; std: number }
 interface DataStats { tps1: SeriesStats; tickTimeMs: SeriesStats; memPct: SeriesStats }
 interface AnomalyThresholds { tps: number; tick: number; mem: number }
@@ -47,6 +55,7 @@ const FOCUS_SEC: Record<number, number> = {
 }
 
 const MAX_DISPLAY_PTS = 600
+const MAX_GC_MARKERS = 160
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -113,6 +122,9 @@ function fmtTime(ts: number): string {
 function fmtTimeFull(ts: number): string {
   const d = new Date(ts)
   return `${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}.${d.getMilliseconds().toString().padStart(3, '0')}`
+}
+function fmtGcDuration(ms: number): string {
+  return ms >= 1000 ? `${(ms / 1000).toFixed(1)}s` : `${Math.round(ms)}ms`
 }
 function logLevel(line: string): string {
   const u = line.toUpperCase()
@@ -270,7 +282,9 @@ interface GlanceChartProps {
   greyBeardMode: boolean
   showBifurcation: boolean
   logCorrelation: boolean
-  gcEvents?: number[]
+  gcEvents?: GcEvent[]
+  showGcLabels?: boolean
+  showGcHint?: boolean
 }
 
 function GlanceChart({
@@ -278,7 +292,7 @@ function GlanceChart({
   stats, allStats, thresholds, bifurTs, chartId,
   getLogsAround, logWindowMs, onPointClick,
   greyBeardMode, showBifurcation, logCorrelation,
-  gcEvents,
+  gcEvents, showGcLabels = false, showGcHint = false,
 }: GlanceChartProps) {
   const latest = data[data.length - 1]
   const currentVal = latest ? (latest[dataKey] as number) : 0
@@ -388,15 +402,22 @@ function GlanceChart({
             </>
           )}
 
-          {gcEvents && gcEvents.map(ts => (
+          {gcEvents && gcEvents.map(event => (
             <ReferenceLine
-              key={`gc-${ts}`}
-              x={ts}
+              key={`gc-${event.ts}-${event.name}-${event.durationMs}`}
+              x={event.ts}
               stroke="var(--blue)"
               strokeDasharray="2 3"
               strokeWidth={1}
               strokeOpacity={0.5}
-              label={{ value: 'GC?', position: 'insideTopLeft', fill: 'var(--blue)', fontSize: 7, fontFamily: 'var(--mono)', opacity: 0.7 }}
+              label={showGcLabels ? {
+                value: `GC ${fmtGcDuration(event.durationMs)}`,
+                position: 'insideTopLeft',
+                fill: 'var(--blue)',
+                fontSize: 7,
+                fontFamily: 'var(--mono)',
+                opacity: 0.7,
+              } : undefined}
             />
           ))}
 
@@ -412,8 +433,10 @@ function GlanceChart({
           />
         </ComposedChart>
       </ResponsiveContainer>
-      {gcEvents && gcEvents.length > 0 && !greyBeardMode && (
-        <div className="glance-gc-hint">GC? = heuristic — sharp memory drop detected, not a real JVM GC event</div>
+      {showGcHint && gcEvents && gcEvents.length > 0 && !greyBeardMode && (
+        <div className="glance-gc-hint">
+          GC markers are JVM JMX events. Short windows label duration.
+        </div>
       )}
     </div>
   )
@@ -540,6 +563,13 @@ export default function GlancePage() {
     refetchInterval: gs.refreshIntervalMs,
   })
 
+  const { data: rawGcEvents = [] } = useQuery<GcEvent[]>({
+    queryKey: ['glance-gc-events', windowMin],
+    queryFn: () => api.get(`/glance/gc-events?window=${windowMin}`).then(r => r.data),
+    refetchInterval: windowMin <= 5 ? Math.max(gs.refreshIntervalMs, 2000) : 30_000,
+    staleTime: 1_000,
+  })
+
   const rawData = useMemo(() => {
     if (!current) return histData
     const lastTs = histData[histData.length - 1]?.timestamp ?? 0
@@ -600,14 +630,15 @@ export default function GlancePage() {
 
   const showLogPanel = !gbm && gs.showLogPanel
 
-  // Heuristic: a sharp drop in JVM heap usage likely indicates a GC event.
-  // This is NOT from a real JVM GC notification — it's inferred from the data.
   const gcEvents = useMemo(() => {
-    const GC_DROP_THRESHOLD = 0.06  // 6 percentage-point drop between consecutive samples
-    return data
-      .filter((d, i) => i > 0 && data[i - 1].memPct - d.memPct >= GC_DROP_THRESHOLD)
-      .map(d => d.timestamp)
-  }, [data])
+    if (data.length === 0) return []
+    const from = data[0].timestamp
+    const to = data[data.length - 1].timestamp
+    const visible = rawGcEvents.filter(event => event.ts >= from && event.ts <= to)
+    if (visible.length <= MAX_GC_MARKERS) return visible
+    const step = Math.ceil(visible.length / MAX_GC_MARKERS)
+    return visible.filter((_, i) => i % step === 0)
+  }, [data, rawGcEvents])
 
   const SHARED = {
     data,
@@ -724,23 +755,26 @@ export default function GlancePage() {
             {gs.showChartTps && (
               <GlanceChart {...SHARED} title="TPS" dataKey="tps1"
                 color={tpsColor(current?.tps1 ?? 20)} yDomain={[0, 21]}
-                yFormatter={v => v.toFixed(0)} stats={allStats.tps1} chartId="tps" />
+                yFormatter={v => v.toFixed(0)} stats={allStats.tps1} chartId="tps"
+                gcEvents={!gbm ? gcEvents : undefined} showGcLabels={windowMin <= 15} />
             )}
             {gs.showChartTick && (
               <GlanceChart {...SHARED} title="Tick Time" dataKey="tickTimeMs"
                 color={tickColor(current?.tickTimeMs ?? 0)} yDomain={[0, 'auto']}
-                yFormatter={v => `${Math.round(v)}ms`} stats={allStats.tickTimeMs} chartId="tick" />
+                yFormatter={v => `${Math.round(v)}ms`} stats={allStats.tickTimeMs} chartId="tick"
+                gcEvents={!gbm ? gcEvents : undefined} showGcLabels={windowMin <= 15} />
             )}
             {gs.showChartMem && (
               <GlanceChart {...SHARED} title="Memory" dataKey="memUsedMb"
                 color={memColor(memP)} yDomain={[0, memMaxMb]}
                 yFormatter={fmtMem} stats={allStats.memPct} chartId="mem"
-                gcEvents={!gbm ? gcEvents : undefined} />
+                gcEvents={!gbm ? gcEvents : undefined} showGcLabels={windowMin <= 15} showGcHint />
             )}
             {gs.showChartCpu && hasCpuData && (
               <GlanceChart {...SHARED} title="Host CPU" dataKey="cpuPercent"
                 color={cpuColor(current!.cpuPercent!)} yDomain={[0, 100]}
-                yFormatter={v => `${v.toFixed(0)}%`} stats={cpuStats} chartId="cpu" />
+                yFormatter={v => `${v.toFixed(0)}%`} stats={cpuStats} chartId="cpu"
+                gcEvents={!gbm ? gcEvents : undefined} showGcLabels={windowMin <= 15} />
             )}
           </>
         )}

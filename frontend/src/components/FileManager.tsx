@@ -31,6 +31,9 @@ const DEFAULT_FAVS: SidebarFav[] = [
 const FAVS_KEY = 'teletype_finder_favs'
 const DEFAULT_FAV_IDS = new Set(DEFAULT_FAVS.map(f => f.id))
 const LEGACY_DEFAULT_FAV_IDS = new Set(['worlds', 'mods'])
+const UPLOAD_CHUNK_SIZE = 8 * 1024 * 1024
+const CHUNKED_UPLOAD_THRESHOLD = UPLOAD_CHUNK_SIZE * 2
+const CHUNK_UPLOAD_CONCURRENCY = 4
 
 function loadFavs(): SidebarFav[] {
   try {
@@ -51,6 +54,12 @@ function loadFavs(): SidebarFav[] {
 
 function saveFavs(favs: SidebarFav[]) {
   localStorage.setItem(FAVS_KEY, JSON.stringify(favs))
+}
+
+function createUploadId(index: number, filename: string) {
+  const randomId = globalThis.crypto?.randomUUID?.() ?? Math.random().toString(36).slice(2)
+  const safeName = filename.replace(/[^A-Za-z0-9._-]/g, '_').slice(0, 48)
+  return `${Date.now()}-${index}-${randomId}-${safeName}`
 }
 
 // ── Icon grid helpers ─────────────────────────────────────────────────────────
@@ -451,17 +460,68 @@ export default function FileManager({ viewMode }: FileManagerProps) {
     setUploadRunning(true)
     if (fileInputRef.current) fileInputRef.current.value = ''
 
-    async function uploadOne(file: File, item: UploadItem) {
+    async function uploadSmallFile(file: File, item: UploadItem) {
       const fd = new FormData()
       fd.append('file', file)
+      await api.post('/files/upload', fd, {
+        params: { path: uploadPath },
+        onUploadProgress: (event) => {
+          patchUploadItem(item.id, { loaded: event.loaded }, true)
+        },
+      })
+    }
+
+    async function uploadChunkedFile(file: File, item: UploadItem) {
+      const uploadId = createUploadId(item.index, file.name)
+      const totalChunks = Math.ceil(file.size / UPLOAD_CHUNK_SIZE)
+      const loadedByChunk = Array(totalChunks).fill(0)
+
+      function reportProgress() {
+        const loaded = loadedByChunk.reduce((sum, loaded) => sum + loaded, 0)
+        patchUploadItem(item.id, { loaded: Math.min(loaded, file.size) }, true)
+      }
+
+      let nextChunk = 0
+      let failure: any = null
+      const workerCount = Math.min(CHUNK_UPLOAD_CONCURRENCY, totalChunks)
+      await Promise.all(Array.from({ length: workerCount }, async () => {
+        while (failure == null && nextChunk < totalChunks) {
+          const chunkIndex = nextChunk++
+          const start = chunkIndex * UPLOAD_CHUNK_SIZE
+          const end = Math.min(start + UPLOAD_CHUNK_SIZE, file.size)
+          const chunk = file.slice(start, end)
+          try {
+            await api.post('/files/upload-chunk', chunk, {
+              params: {
+                path: uploadPath,
+                uploadId,
+                filename: file.name,
+                chunkIndex,
+                totalChunks,
+                totalSize: file.size,
+              },
+              headers: { 'Content-Type': 'application/octet-stream' },
+              onUploadProgress: (event) => {
+                loadedByChunk[chunkIndex] = Math.min(event.loaded, chunk.size)
+                reportProgress()
+              },
+            })
+            loadedByChunk[chunkIndex] = chunk.size
+            reportProgress()
+          } catch (e) {
+            failure = e
+          }
+        }
+      }))
+
+      if (failure) throw failure
+    }
+
+    async function uploadOne(file: File, item: UploadItem) {
       patchUploadItem(item.id, { status: 'uploading', loaded: 0 })
       try {
-        await api.post('/files/upload', fd, {
-          params: { path: uploadPath },
-          onUploadProgress: (event) => {
-            patchUploadItem(item.id, { loaded: event.loaded }, true)
-          },
-        })
+        if (file.size >= CHUNKED_UPLOAD_THRESHOLD) await uploadChunkedFile(file, item)
+        else await uploadSmallFile(file, item)
         patchUploadItem(item.id, { status: 'done', loaded: file.size })
       } catch (e: any) {
         patchUploadItem(item.id, {

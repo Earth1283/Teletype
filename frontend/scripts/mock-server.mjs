@@ -22,11 +22,12 @@ const SYS_MEM_TOTAL = 32_768
 const DISK_USED    = 120  // GB
 const DISK_TOTAL   = 500
 const START_MS     = Date.now()
+const gcEvents = []
 
 function clamp(v, lo, hi) { return Math.max(lo, Math.min(hi, v)) }
 function rnd(lo, hi)      { return lo + Math.random() * (hi - lo) }
 
-function tick() {
+function tick(now = Date.now()) {
   // TPS: brownian, 2% chance of lag event
   if (Math.random() < 0.02) tps -= rnd(3, 9)
   else                       tps += rnd(-0.25, 0.30)
@@ -37,6 +38,14 @@ function tick() {
   memUsed += rnd(8, 25)
   if (memUsed > MEM_MAX * 0.85 || Math.random() < 0.004) {
     memUsed = MEM_MAX * rnd(0.35, 0.55)
+    gcEvents.push({
+      ts: now,
+      name: 'G1 Young Generation',
+      action: 'end of minor GC',
+      cause: 'G1 Evacuation Pause',
+      durationMs: Math.round(rnd(8, 85)),
+    })
+    while (gcEvents.length > 400) gcEvents.shift()
   }
   memUsed = clamp(memUsed, 0, MEM_MAX)
 
@@ -49,11 +58,11 @@ function tick() {
   sysMemUsed  = clamp(sysMemUsed, 8_000, 28_000)
 }
 
-function snap() {
+function snap(now = Date.now()) {
   const t5  = clamp(tps + rnd(-0.5, 0.5), 0, 20)
   const t15 = clamp(tps + rnd(-1,   1),   0, 20)
   return {
-    timestamp:    Date.now(),
+    timestamp:    now,
     tps1:         +tps.toFixed(2),
     tps5:         +t5.toFixed(2),
     tps15:        +t15.toFixed(2),
@@ -61,7 +70,7 @@ function snap() {
     memUsedMb:    Math.round(memUsed),
     memTotalMb:   Math.round(memUsed * 1.15),
     memMaxMb:     MEM_MAX,
-    uptimeMs:     Date.now() - START_MS,
+    uptimeMs:     now - START_MS,
     cpuPercent:   +cpuPct.toFixed(1),
     sysMemUsedMb: Math.round(sysMemUsed),
     sysMemTotalMb: SYS_MEM_TOTAL,
@@ -73,15 +82,15 @@ function snap() {
 // Pre-fill with 5 min of history, then keep rolling
 const history = []
 for (let ago = 300; ago >= 0; ago--) {
-  tick()
-  const s = snap()
-  s.timestamp = Date.now() - ago * 1000
-  history.push(s)
+  const sampleTs = Date.now() - ago * 1000
+  tick(sampleTs)
+  history.push(snap(sampleTs))
 }
 
 setInterval(() => {
-  tick()
-  history.push(snap())
+  const now = Date.now()
+  tick(now)
+  history.push(snap(now))
   if (history.length > 900) history.shift()
 }, 1000)
 
@@ -261,6 +270,11 @@ const server = http.createServer(async (req, res) => {
     const since = Date.now() - win * 60_000
     return json(res, history.filter(s => s.timestamp >= since))
   }
+  if (m === 'GET' && path === '/api/glance/gc-events') {
+    const win  = parseInt(url.searchParams.get('window') ?? '5')
+    const since = Date.now() - win * 60_000
+    return json(res, gcEvents.filter(e => e.ts >= since))
+  }
 
   // ── Actions ────────────────────────────────────────────────────────────────
   if (m === 'GET'    && path === '/api/actions/categories')          return json(res, CATEGORIES)
@@ -284,6 +298,7 @@ const server = http.createServer(async (req, res) => {
   if (m === 'POST'   && path === '/api/files/mkdir')    return json(res, { status: 'created' })
   if (m === 'PATCH'  && path === '/api/files/rename')   return json(res, { status: 'moved' })
   if (m === 'POST'   && path === '/api/files/upload')   return json(res, { status: 'uploaded 1 file(s)' })
+  if (m === 'POST'   && path === '/api/files/upload-chunk') return json(res, { status: 'chunk received' })
   if (m === 'DELETE' && path === '/api/files')          return json(res, { status: 'deleted' })
   if (m === 'GET'    && path === '/api/files/download') {
     res.writeHead(200, { 'Content-Type': 'application/octet-stream', 'Access-Control-Allow-Origin': '*' })
@@ -341,6 +356,14 @@ wss.on('connection', ws => {
           send(`${ts()} [Server thread/INFO]: There are ${PLAYERS.length} of a max of 20 players online: ${PLAYERS.map(p => p.name).join(', ')}`)
         }
         if (msg.payload === 'gc') {
+          memUsed = MEM_MAX * rnd(0.35, 0.55)
+          gcEvents.push({
+            ts: Date.now(),
+            name: 'G1 Old Generation',
+            action: 'end of major GC',
+            cause: 'System.gc()',
+            durationMs: Math.round(rnd(35, 220)),
+          })
           send(`${ts()} [Server thread/INFO]: GC forced.`)
         }
       }

@@ -145,6 +145,7 @@ class Teletype : JavaPlugin() {
         snippetScheduler.stopAll()
         webServer.stop()
         ConsoleInterceptor.uninstall()
+        metricsCollector.close()
         pluginScope.cancel()
         metricsDatabase.close()
         auditLog.close()
