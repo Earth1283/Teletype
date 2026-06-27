@@ -8,7 +8,8 @@
     "build": "tsc -b && vite build",
     "lint": "eslint .",
     "preview": "vite preview",
-    "testFrontend": "concurrently -n mock,vite -c cyan,green \"node scripts/mock-server.mjs\" \"vite\""
+    "testFrontend": "concurrently -n mock,vite -c cyan,green \"node scripts/mock-server.mjs\" \"vite\"",
+    "e2e": "node scripts/e2e-mobile.mjs"
   },
   "dependencies": {
     "@monaco-editor/react": "^4.7.0",
@@ -31,6 +32,7 @@
     "eslint-plugin-react-hooks": "^7.1.1",
     "eslint-plugin-react-refresh": "^0.5.2",
     "globals": "^17.6.0",
+    "puppeteer-core": "^25.2.1",
     "typescript": "~6.0.2",
     "typescript-eslint": "^8.59.2",
     "vite": "^8.0.12",

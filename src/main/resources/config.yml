@@ -1,8 +1,3 @@
-# ─────────────────────────────────────────────────────────────────────────────
-# Teletype — Plugin Configuration
-# Changes take effect after /tty reload (or server restart for port changes).
-# ─────────────────────────────────────────────────────────────────────────────
-
 # ── Web server ───────────────────────────────────────────────────────────────
 server:
   # Port the embedded HTTP server listens on.

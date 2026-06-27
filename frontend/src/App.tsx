@@ -82,6 +82,8 @@ function getIsPhoneViewport() {
 
   const shortSide = Math.min(window.screen.width, window.screen.height)
   const longSide = Math.max(window.screen.width, window.screen.height)
+  // Guard: zero means unreported dimensions (some headless/embedded envs) — not a phone
+  if (shortSide <= 0) return false
   const hasPhoneSizedScreen = shortSide <= MAX_PHONE_SCREEN_SIDE && longSide <= MAX_PHONE_SCREEN_LONG_SIDE
   return hasTouchInput()
     && window.matchMedia(COARSE_POINTER_QUERY).matches
