@@ -29,7 +29,7 @@
   display: block;
   font-family: var(--sans);
   font-size: 10.5px;
-  color: var(--ghost);
+  color: var(--mist);
   margin-top: 3px;
 }
 
@@ -66,7 +66,7 @@
 .gbm-desc {
   font-family: var(--sans);
   font-size: 10px;
-  color: var(--ghost);
+  color: var(--mist);
   line-height: 1.5;
 }
 
@@ -104,7 +104,7 @@
   font-weight: 600;
   letter-spacing: 0.08em;
   text-transform: uppercase;
-  color: var(--ghost);
+  color: var(--mist);
   padding: 8px 14px 2px;
 }
 .s-divider {
@@ -133,7 +133,7 @@
 .s-row-sub {
   font-family: var(--sans);
   font-size: 9.5px;
-  color: var(--ghost);
+  color: var(--mist);
   display: block;
   margin-top: 1px;
 }
@@ -210,7 +210,7 @@
 .s-reset-btn {
   font-family: var(--sans);
   font-size: 11px;
-  color: var(--ghost);
+  color: var(--mist);
   background: none;
   border: 1px solid var(--border);
   border-radius: 5px;

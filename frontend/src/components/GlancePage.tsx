@@ -476,18 +476,28 @@ function GlanceLogViewer({ tsLogs, clickedTs, onClear, isOpen, onToggle }: {
 }) {
   const virtuosoRef = useRef<VirtuosoHandle>(null)
   const [highlightRange, setHighlightRange] = useState<{ from: number; to: number } | null>(null)
+  const [showAll, setShowAll] = useState(false)
+
+  // Correlation view: all logs around clicked point. Default: WARN/ERROR only.
+  const displayLogs = useMemo(() => {
+    if (clickedTs !== null) return tsLogs
+    if (showAll) return tsLogs
+    return tsLogs.filter(l => logLevel(l.line) !== '')
+  }, [tsLogs, clickedTs, showAll])
 
   useEffect(() => {
     if (clickedTs === null) { setHighlightRange(null); return }
     const W = 5000
     setHighlightRange({ from: clickedTs - W, to: clickedTs + W })
-    const idx = tsLogs.findIndex(l => l.ts >= clickedTs - W)
+    const idx = displayLogs.findIndex(l => l.ts >= clickedTs - W)
     if (idx >= 0) {
       requestAnimationFrame(() => {
         virtuosoRef.current?.scrollToIndex({ index: Math.max(0, idx), behavior: 'smooth', align: 'center' })
       })
     }
-  }, [clickedTs, tsLogs])
+  }, [clickedTs, displayLogs])
+
+  const isFiltered = clickedTs === null && !showAll
 
   return (
     <>
@@ -506,20 +516,28 @@ function GlanceLogViewer({ tsLogs, clickedTs, onClear, isOpen, onToggle }: {
           />
         </button>
         {isOpen && <>
-          <span className="glance-log-title">Logs</span>
-          {clickedTs !== null && (
+          <span className="glance-log-title">{isFiltered ? 'Errors' : 'Logs'}</span>
+          {clickedTs !== null ? (
             <>
               <span className="glance-log-ts-badge">{fmtTime(clickedTs)} ±5s</span>
               <button className="glance-log-clear" onClick={onClear} title="Clear highlight">×</button>
             </>
+          ) : (
+            <button
+              className="glance-log-filter-btn"
+              onClick={() => setShowAll(v => !v)}
+              title={showAll ? 'Filter to warnings/errors' : 'Show all logs'}
+            >
+              {showAll ? 'errors' : 'all'}
+            </button>
           )}
         </>}
       </div>
       <div className={`glance-log-body${isOpen ? '' : ' hidden'}`}>
         <Virtuoso
           ref={virtuosoRef}
-          data={tsLogs}
-          style={{ flex: 1, minHeight: 0 }}
+          data={displayLogs}
+          style={{ flex: 1, minHeight: 0, overflowX: 'visible' }}
           followOutput={clickedTs === null}
           itemContent={(_, log) => {
             const inRange = highlightRange !== null && log.ts >= highlightRange.from && log.ts <= highlightRange.to
@@ -531,7 +549,11 @@ function GlanceLogViewer({ tsLogs, clickedTs, onClear, isOpen, onToggle }: {
             )
           }}
           components={{
-            EmptyPlaceholder: () => <div className="glance-log-empty">waiting for logs…</div>,
+            EmptyPlaceholder: () => (
+              <div className="glance-log-empty">
+                {isFiltered ? 'no warnings or errors' : 'waiting for logs…'}
+              </div>
+            ),
           }}
         />
       </div>
@@ -764,14 +786,12 @@ export default function GlancePage() {
             {gs.showChartTps && (
               <GlanceChart {...SHARED} title="TPS" dataKey="tps1"
                 color={tpsColor(current?.tps1 ?? 20)} yDomain={[0, 21]}
-                yFormatter={v => v.toFixed(0)} stats={allStats.tps1} chartId="tps"
-                gcEvents={!gbm ? gcEvents : undefined} showGcLabels={windowMin <= 15} />
+                yFormatter={v => v.toFixed(0)} stats={allStats.tps1} chartId="tps" />
             )}
             {gs.showChartTick && (
               <GlanceChart {...SHARED} title="Tick Time" dataKey="tickTimeMs"
                 color={tickColor(current?.tickTimeMs ?? 0)} yDomain={[0, 'auto']}
-                yFormatter={v => `${Math.round(v)}ms`} stats={allStats.tickTimeMs} chartId="tick"
-                gcEvents={!gbm ? gcEvents : undefined} showGcLabels={windowMin <= 15} />
+                yFormatter={v => `${Math.round(v)}ms`} stats={allStats.tickTimeMs} chartId="tick" />
             )}
             {gs.showChartMem && (
               <GlanceChart {...SHARED} title="Memory" dataKey="memUsedMb"
@@ -782,8 +802,7 @@ export default function GlancePage() {
             {gs.showChartCpu && hasCpuData && (
               <GlanceChart {...SHARED} title="Host CPU" dataKey="cpuPercent"
                 color={cpuColor(current!.cpuPercent!)} yDomain={[0, 100]}
-                yFormatter={v => `${v.toFixed(0)}%`} stats={cpuStats} chartId="cpu"
-                gcEvents={!gbm ? gcEvents : undefined} showGcLabels={windowMin <= 15} />
+                yFormatter={v => `${v.toFixed(0)}%`} stats={cpuStats} chartId="cpu" />
             )}
           </>
         )}

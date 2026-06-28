@@ -1,12 +1,12 @@
 /* ── Design system ──────────────────────────────────────────── */
 :root {
-  --void:        #07080c;
-  --surface:     #0c0d14;
-  --elevated:    #10111a;
-  --border:      #1c1d2a;
-  --border-hi:   #252638;
+  --void:        #0e1117;
+  --surface:     #161b22;
+  --elevated:    #1c2231;
+  --border:      #21283a;
+  --border-hi:   #2a3450;
 
-  --amber:       #e8952a;
+  --amber:       #f07a3a;
   /* Derived from --amber so all themes get correct tints by only overriding --amber */
   --amber-dim:   color-mix(in srgb, var(--amber) 12%, transparent);
   --amber-glow:  color-mix(in srgb, var(--amber) 25%, transparent);
@@ -20,9 +20,9 @@
   /* Live/connected status — teal, distinct from accent */
   --live:        #2dd4bf;
 
-  --ash:         #eceef5;
-  --mist:        #7c80a0;
-  --ghost:       #4a4d66;
+  --ash:         #d0d5e8;
+  --mist:        #6d7fa8;
+  --ghost:       #485275;
 
   --green:       #34d399;
   --red:         #f56565;
@@ -33,9 +33,9 @@
   --sans:    'Inter', system-ui, sans-serif;
   --mono:    'JetBrains Mono', monospace;
 
-  --r-sm: 6px;
-  --r-md: 10px;
-  --r-lg: 16px;
+  --r-sm: 4px;
+  --r-md: 6px;
+  --r-lg: 10px;
 
   /* Z-index scale */
   --z-base:         1;

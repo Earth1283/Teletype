@@ -105,11 +105,11 @@ body.mobile-nav-open {
 }
 
 .sidebar-logo-text {
-  font-family: var(--display);
-  font-size: 15px;
+  font-family: var(--mono);
+  font-size: 13px;
   font-weight: 600;
   color: var(--amber);
-  letter-spacing: -0.02em;
+  letter-spacing: 0.04em;
   white-space: nowrap;
 }
 
@@ -150,7 +150,7 @@ body.mobile-nav-open {
   border-left: 2px solid var(--amber);
   padding-left: 8px;
 }
-.nav-btn svg { flex-shrink: 0; opacity: 0.65; transition: opacity 120ms; }
+.nav-btn svg { flex-shrink: 0; opacity: 0.7; transition: opacity 120ms; }
 .nav-btn:hover svg { opacity: 0.9; }
 .nav-btn.active svg { opacity: 1; }
 
@@ -299,11 +299,11 @@ body.mobile-nav-open {
     flex-shrink: 0;
   }
   .mobile-brand-name {
-    font-family: var(--display);
-    font-size: 15px;
+    font-family: var(--mono);
+    font-size: 13px;
     font-weight: 600;
     color: var(--amber);
-    letter-spacing: -0.02em;
+    letter-spacing: 0.04em;
   }
 
   .mobile-status-chip {

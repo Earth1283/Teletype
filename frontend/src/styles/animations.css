@@ -58,8 +58,7 @@
   .modal-card { animation: none; }
   .palette-dialog { animation: none; }
   .glance-stat-card.incident::after { animation: none; }
-  .nav-btn, .nav-btn svg, .glance-stat-card,
-  .glance-chart-card, .player-row,
+  .nav-btn, .nav-btn svg, .player-row,
   .btn-primary, .btn-ghost { transform: none !important; }
   .page-content { animation: none; }
   .skeleton { animation: none; }
