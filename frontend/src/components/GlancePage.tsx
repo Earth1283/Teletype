@@ -8,7 +8,7 @@ import { useQuery } from '@tanstack/react-query'
 import { Virtuoso, type VirtuosoHandle } from 'react-virtuoso'
 import { api } from '../api/client'
 import { useLogs, type TimestampedLog } from '../LogContext'
-import { useSettings } from '../SettingsContext'
+import { useSettings, type TeletypeSettings } from '../SettingsContext'
 import { IconChevronRight, IconChevronLeft } from '../Icons'
 
 // ── Types ────────────────────────────────────────────────────────────────────
@@ -90,16 +90,11 @@ function memColor(pct: number): string {
   return 'var(--red)'
 }
 
-function tpsStatus(v: number): Status { return v >= 19 ? 'nominal' : v >= 15 ? 'degraded' : 'incident' }
-function tickStatus(v: number): Status { return v <= 50 ? 'nominal' : v <= 100 ? 'degraded' : 'incident' }
-function memStatus(pct: number): Status { return pct < 0.65 ? 'nominal' : pct < 0.85 ? 'degraded' : 'incident' }
 function cpuColor(pct: number): string {
   if (pct < 50) return 'var(--green)'
   if (pct < 80) return 'var(--amber)'
   return 'var(--red)'
 }
-function cpuStatus(pct: number): Status { return pct < 50 ? 'nominal' : pct < 80 ? 'degraded' : 'incident' }
-function diskStatus(pct: number): Status { return pct < 0.75 ? 'nominal' : pct < 0.9 ? 'degraded' : 'incident' }
 function globalStatus(snap: Snap): Status {
   const p = snap.memMaxMb > 0 ? snap.memUsedMb / snap.memMaxMb : 0
   if (snap.tps1 < 15 || snap.tickTimeMs > 100 || p > 0.9) return 'incident'
@@ -442,25 +437,144 @@ function GlanceChart({
   )
 }
 
-// ── Stat Card ─────────────────────────────────────────────────────────────────
+// ── Speedo Gauge ─────────────────────────────────────────────────────────────
 
-function StatCard({ label, value, sub, color, status, barPct, sigma }: {
-  label: string; value: string; sub?: string; color: string
-  status: Status; barPct?: number; sigma?: number | null
+const SP = { cx: 50, cy: 46, r: 32, start: 240, sweep: 240 } as const
+
+function g_xy(r: number, deg: number) {
+  const rad = (deg - 90) * (Math.PI / 180)
+  return { x: SP.cx + r * Math.cos(rad), y: SP.cy + r * Math.sin(rad) }
+}
+
+function g_arc(startDeg: number, sweepDeg: number, r = SP.r): string {
+  if (Math.abs(sweepDeg) < 0.01) return ''
+  const s = g_xy(r, startDeg), e = g_xy(r, startDeg + sweepDeg)
+  return `M ${s.x.toFixed(2)} ${s.y.toFixed(2)} A ${r} ${r} 0 ${sweepDeg > 180 ? 1 : 0} 1 ${e.x.toFixed(2)} ${e.y.toFixed(2)}`
+}
+
+interface GZone { from: number; to: number; color: string }
+
+const G = '#34d399', Y = '#eab308', O = '#f97316', R = '#ef4444'
+
+function buildZones(gs: TeletypeSettings['glance']) {
+  return {
+    tps: [
+      { from: 0,                          to: gs.tpsRedBelow / 20,    color: R },
+      { from: gs.tpsRedBelow / 20,        to: gs.tpsOrangeBelow / 20, color: O },
+      { from: gs.tpsOrangeBelow / 20,     to: gs.tpsYellowBelow / 20, color: Y },
+      { from: gs.tpsYellowBelow / 20,     to: 1,                      color: G },
+    ] as GZone[],
+    tick: [
+      { from: 0,                              to: gs.msptYellowAbove / 200, color: G },
+      { from: gs.msptYellowAbove / 200,       to: gs.msptOrangeAbove / 200, color: Y },
+      { from: gs.msptOrangeAbove / 200,       to: gs.msptRedAbove / 200,    color: O },
+      { from: gs.msptRedAbove / 200,          to: 1,                         color: R },
+    ] as GZone[],
+    mem: [
+      { from: 0,                        to: gs.memYellowAbove / 100, color: G },
+      { from: gs.memYellowAbove / 100,  to: gs.memOrangeAbove / 100, color: Y },
+      { from: gs.memOrangeAbove / 100,  to: gs.memRedAbove / 100,    color: O },
+      { from: gs.memRedAbove / 100,     to: 1,                        color: R },
+    ] as GZone[],
+    cpu: [
+      { from: 0,                        to: gs.cpuYellowAbove / 100, color: G },
+      { from: gs.cpuYellowAbove / 100,  to: gs.cpuOrangeAbove / 100, color: Y },
+      { from: gs.cpuOrangeAbove / 100,  to: gs.cpuRedAbove / 100,    color: O },
+      { from: gs.cpuRedAbove / 100,     to: 1,                        color: R },
+    ] as GZone[],
+    disk: [
+      { from: 0,                         to: gs.diskYellowAbove / 100, color: G },
+      { from: gs.diskYellowAbove / 100,  to: gs.diskOrangeAbove / 100, color: Y },
+      { from: gs.diskOrangeAbove / 100,  to: gs.diskRedAbove / 100,    color: O },
+      { from: gs.diskRedAbove / 100,     to: 1,                         color: R },
+    ] as GZone[],
+  }
+}
+
+function SpeedoGauge({ label, value, displayValue, subLine, min, max, zones, sigma }: {
+  label: string; value: number | null; displayValue: string; subLine?: string
+  min: number; max: number; zones: GZone[]; sigma?: number | null
 }) {
+  const t = value != null ? Math.max(0, Math.min(1, (value - min) / (max - min))) : null
+  const activeColor = t == null ? 'var(--ghost)'
+    : (zones.find(z => t >= z.from && t <= z.to + 0.001) ?? zones[zones.length - 1]).color
+  const hasSubLine = Boolean(subLine)
+
   return (
-    <div className={`glance-stat-card ${status}`}>
-      <div className="glance-stat-label">{label}</div>
-      <div className="glance-stat-value" style={{ color }}>{value}</div>
-      {sub && <div className="glance-stat-sub">{sub}</div>}
-      {barPct !== undefined && (
-        <div className="health-bar-track">
-          <div className="health-bar-fill" style={{ width: `${Math.max(0, Math.min(1, barPct)) * 100}%`, background: color }} />
-        </div>
-      )}
-      {sigma != null && Math.abs(sigma) > 0.1 && (
-        <div className="glance-stat-sigma">{sigma > 0 ? '+' : ''}{sigma.toFixed(1)}σ</div>
-      )}
+    <div className="speedo-wrap">
+      <svg viewBox="0 0 100 88" className="speedo-svg">
+        {/* Background track */}
+        <path d={g_arc(SP.start, SP.sweep)} fill="none"
+          stroke="var(--border-hi)" strokeWidth="9" strokeLinecap="round" />
+
+        {/* Zone arcs — VU-meter fill up to needle */}
+        {zones.flatMap((z, i) => {
+          const zs = SP.start + z.from * SP.sweep
+          const zsw = (z.to - z.from) * SP.sweep
+          if (t == null) {
+            return [<path key={i} d={g_arc(zs, zsw)} fill="none"
+              stroke={z.color} strokeWidth="9" strokeOpacity={0.13} strokeLinecap="butt" />]
+          }
+          if (t >= z.to) {
+            return [<path key={i} d={g_arc(zs, zsw)} fill="none"
+              stroke={z.color} strokeWidth="9" strokeLinecap="butt" />]
+          }
+          if (t <= z.from) {
+            return [<path key={i} d={g_arc(zs, zsw)} fill="none"
+              stroke={z.color} strokeWidth="9" strokeOpacity={0.13} strokeLinecap="butt" />]
+          }
+          const split = (t - z.from) / (z.to - z.from)
+          const activeSw = split * zsw
+          const inactiveSw = zsw - activeSw
+          return [
+            <path key={`${i}a`} d={g_arc(zs, activeSw)} fill="none"
+              stroke={z.color} strokeWidth="9" strokeLinecap="butt" />,
+            <path key={`${i}b`} d={g_arc(zs + activeSw, inactiveSw)} fill="none"
+              stroke={z.color} strokeWidth="9" strokeOpacity={0.13} strokeLinecap="butt" />,
+          ]
+        })}
+
+
+        {/* Value */}
+        <text x={SP.cx} y={SP.cy - 2} textAnchor="middle" dominantBaseline="middle"
+          fill={activeColor} fontSize="15" fontWeight="700"
+          style={{ fontFamily: 'var(--mono)', fontVariantNumeric: 'tabular-nums lining-nums' }}>
+          {displayValue}
+        </text>
+
+        {/* Sub line */}
+        {subLine && (
+          <text x={SP.cx} y={SP.cy + 10} textAnchor="middle" dominantBaseline="middle"
+            fill="var(--ghost)" fontSize="5.5"
+            style={{ fontFamily: 'var(--mono)' }}>
+            {subLine}
+          </text>
+        )}
+
+        {/* Label */}
+        <text x={SP.cx} y={SP.cy + (hasSubLine ? 20 : 12)} textAnchor="middle" dominantBaseline="middle"
+          fill="var(--mist)" fontSize="5.8" fontWeight="600" letterSpacing="0.08em"
+          style={{ fontFamily: 'var(--sans)' }}>
+          {label.toUpperCase()}
+        </text>
+
+        {/* Sigma */}
+        {sigma != null && Math.abs(sigma) > 0.1 && (
+          <text x={SP.cx} y={SP.cy + (hasSubLine ? 28 : 20)} textAnchor="middle" dominantBaseline="middle"
+            fill="var(--ghost)" fontSize="5" style={{ fontFamily: 'var(--sans)' }}>
+            {sigma > 0 ? '+' : ''}{sigma.toFixed(1)}σ
+          </text>
+        )}
+      </svg>
+    </div>
+  )
+}
+
+function UptimeDisplay({ uptimeStr }: { uptimeStr: string }) {
+  return (
+    <div className="speedo-uptime">
+      <div className="speedo-uptime-label">Uptime</div>
+      <div className="speedo-uptime-value">{uptimeStr}</div>
     </div>
   )
 }
@@ -674,6 +788,8 @@ export default function GlancePage() {
     logCorrelation: gs.logCorrelation,
   }
 
+  const zones = useMemo(() => buildZones(gs), [gs])
+
   // Badge animation class
   const badgeClass = !gbm && gs.statusBadgePulse
     ? `glance-status-badge ${status}`
@@ -714,49 +830,44 @@ export default function GlancePage() {
           )}
         </div>
 
-        {/* Stat rail */}
-        <div className="glance-stat-rail">
-          <StatCard label="TPS 1m" value={current ? current.tps1.toFixed(1) : '—'} sub="target 20.0"
-            color={tpsColor(current?.tps1 ?? 20)} status={tpsStatus(current?.tps1 ?? 20)}
-            barPct={current ? current.tps1 / 20 : undefined} sigma={tpsSigma} />
-          <StatCard label="Tick Time" value={current ? `${Math.round(current.tickTimeMs)}ms` : '—'} sub="healthy <50ms"
-            color={tickColor(current?.tickTimeMs ?? 0)} status={tickStatus(current?.tickTimeMs ?? 0)}
-            barPct={current ? 1 - Math.min(current.tickTimeMs / 200, 1) : undefined} sigma={tickSigma} />
-          <StatCard label="Memory" value={current ? `${Math.round(memP * 100)}%` : '—'}
-            sub={current ? `${current.memUsedMb} / ${current.memMaxMb} MB` : ''}
-            color={memColor(memP)} status={memStatus(memP)} barPct={memP} sigma={memSigma} />
-          <StatCard label="Uptime" value={uptimeStr} color="var(--ash)" status="nominal" />
-          {/* CPU */}
-          {current?.cpuPercent != null && current.cpuPercent >= 0 ? (
-            <StatCard label="CPU" value={`${current.cpuPercent.toFixed(1)}%`} sub="host load"
-              color={cpuColor(current.cpuPercent)} status={cpuStatus(current.cpuPercent)}
-              barPct={current.cpuPercent / 100} />
-          ) : (
-            <StatCard label="CPU" value={current?.cpuPercent === -1 ? '—' : '…'} sub={current?.cpuPercent === -1 ? 'unavailable' : undefined}
-              color="var(--ash)" status="nominal" />
-          )}
-          {/* System RAM */}
-          {current?.sysMemUsedMb != null && current.sysMemTotalMb != null ? (
-            <StatCard label="Sys RAM"
-              value={`${(current.sysMemUsedMb / 1024).toFixed(1)} GB`}
-              sub={`${current.sysMemUsedMb} / ${current.sysMemTotalMb} MB`}
-              color={memColor(current.sysMemUsedMb / current.sysMemTotalMb)}
-              status={memStatus(current.sysMemUsedMb / current.sysMemTotalMb)}
-              barPct={current.sysMemUsedMb / current.sysMemTotalMb} />
-          ) : (
-            <StatCard label="Sys RAM" value="…" color="var(--ash)" status="nominal" />
-          )}
-          {/* Disk */}
-          {current?.diskUsedGb != null && current.diskTotalGb != null && current.diskTotalGb > 0 ? (
-            <StatCard label="Disk"
-              value={`${current.diskUsedGb} / ${current.diskTotalGb} GB`}
-              sub={`${Math.round((current.diskUsedGb / current.diskTotalGb) * 100)}% used`}
-              color={diskStatus(current.diskUsedGb / current.diskTotalGb) === 'incident' ? 'var(--red)' : diskStatus(current.diskUsedGb / current.diskTotalGb) === 'degraded' ? 'var(--amber)' : 'var(--ash)'}
-              status={diskStatus(current.diskUsedGb / current.diskTotalGb)}
-              barPct={current.diskUsedGb / current.diskTotalGb} />
-          ) : (
-            <StatCard label="Disk" value="…" color="var(--ash)" status="nominal" />
-          )}
+        {/* Speedo rail */}
+        <div className="speedo-rail">
+          <SpeedoGauge label="TPS 1m"
+            value={current?.tps1 ?? null}
+            displayValue={current ? current.tps1.toFixed(2) : '—'}
+            subLine="/ 20"
+            min={0} max={20} zones={zones.tps} sigma={tpsSigma} />
+          <SpeedoGauge label="Tick Time"
+            value={current?.tickTimeMs ?? null}
+            displayValue={current ? `${Math.round(current.tickTimeMs)}ms` : '—'}
+            subLine={`< ${gs.msptYellowAbove}ms good`}
+            min={0} max={200} zones={zones.tick} sigma={tickSigma} />
+          <SpeedoGauge label="Memory"
+            value={current ? memP : null}
+            displayValue={current ? `${Math.round(memP * 100)}%` : '—'}
+            subLine={current ? `${fmtMem(current.memUsedMb)}/${fmtMem(current.memMaxMb)}` : undefined}
+            min={0} max={1} zones={zones.mem} sigma={memSigma} />
+          <SpeedoGauge label="CPU"
+            value={current?.cpuPercent != null && current.cpuPercent >= 0 ? current.cpuPercent : null}
+            displayValue={current?.cpuPercent != null && current.cpuPercent >= 0 ? `${current.cpuPercent.toFixed(1)}%` : '—'}
+            min={0} max={100} zones={zones.cpu} />
+          <SpeedoGauge label="Sys RAM"
+            value={current?.sysMemUsedMb != null && current.sysMemTotalMb
+              ? (current.sysMemUsedMb / current.sysMemTotalMb) * 100 : null}
+            displayValue={current?.sysMemUsedMb != null && current.sysMemTotalMb
+              ? `${Math.round((current.sysMemUsedMb / current.sysMemTotalMb) * 100)}%` : '—'}
+            subLine={current?.sysMemUsedMb != null && current.sysMemTotalMb
+              ? `${fmtMem(current.sysMemUsedMb)}/${fmtMem(current.sysMemTotalMb)}` : undefined}
+            min={0} max={100} zones={zones.mem} />
+          <SpeedoGauge label="Disk"
+            value={current?.diskUsedGb != null && current.diskTotalGb && current.diskTotalGb > 0
+              ? (current.diskUsedGb / current.diskTotalGb) * 100 : null}
+            displayValue={current?.diskUsedGb != null && current.diskTotalGb && current.diskTotalGb > 0
+              ? `${Math.round((current.diskUsedGb / current.diskTotalGb) * 100)}%` : '—'}
+            subLine={current?.diskUsedGb != null && current.diskTotalGb
+              ? `${current.diskUsedGb}/${current.diskTotalGb}G` : undefined}
+            min={0} max={100} zones={zones.disk} />
+          <UptimeDisplay uptimeStr={uptimeStr} />
         </div>
 
         {/* Window selector */}

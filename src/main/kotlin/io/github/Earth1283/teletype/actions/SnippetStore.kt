@@ -43,17 +43,18 @@ class SnippetStore(private val plugin: Teletype) {
     }
 
     private fun seedDefaults() {
+        val quickId = plugin.teletypeConfig.actionsQuickActionsCategoryId
         categories.clear()
         categories += listOf(
-            SnippetCategory("quick-actions", "Quick Actions", "#f59e0b", special = true),
-            SnippetCategory("maintenance",   "Maintenance",   "#a78bfa"),
-            SnippetCategory("player",        "Player",        "#f472b6"),
-            SnippetCategory("world",         "World",         "#60a5fa"),
+            SnippetCategory(quickId,       "Quick Actions", "#f59e0b", special = true),
+            SnippetCategory("maintenance", "Maintenance",   "#a78bfa"),
+            SnippetCategory("player",      "Player",        "#f472b6"),
+            SnippetCategory("world",       "World",         "#60a5fa"),
         )
         snippets.clear()
         snippets += listOf(
-            Snippet("default-1", "Force GC",           "quick-actions", listOf("/gc")),
-            Snippet("default-2", "Kill stale entities","quick-actions", listOf("/kill @e[type=!player]")),
+            Snippet("default-1", "Force GC",           quickId, listOf("/gc")),
+            Snippet("default-2", "Kill stale entities",quickId, listOf("/kill @e[type=!player]")),
             Snippet("default-3", "Save all worlds",    "maintenance",   listOf("/save-all")),
             Snippet("default-4", "Broadcast restart",  "maintenance",
                 listOf("/say §c[!] Server restart in {minutes} minutes", "/save-all"),

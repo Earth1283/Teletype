@@ -22,6 +22,22 @@ export interface TeletypeSettings {
     showChartCpu: boolean
     refreshIntervalMs: number
     statusBadgePulse: boolean
+    // Gauge zone thresholds
+    tpsYellowBelow: number
+    tpsOrangeBelow: number
+    tpsRedBelow: number
+    msptYellowAbove: number
+    msptOrangeAbove: number
+    msptRedAbove: number
+    memYellowAbove: number
+    memOrangeAbove: number
+    memRedAbove: number
+    cpuYellowAbove: number
+    cpuOrangeAbove: number
+    cpuRedAbove: number
+    diskYellowAbove: number
+    diskOrangeAbove: number
+    diskRedAbove: number
   }
 
   console: {
@@ -86,6 +102,21 @@ export const DEFAULT_SETTINGS: TeletypeSettings = {
     showChartCpu: true,
     refreshIntervalMs: 2000,
     statusBadgePulse: true,
+    tpsYellowBelow: 19,
+    tpsOrangeBelow: 15,
+    tpsRedBelow: 10,
+    msptYellowAbove: 35,
+    msptOrangeAbove: 45,
+    msptRedAbove: 55,
+    memYellowAbove: 65,
+    memOrangeAbove: 80,
+    memRedAbove: 90,
+    cpuYellowAbove: 50,
+    cpuOrangeAbove: 70,
+    cpuRedAbove: 85,
+    diskYellowAbove: 75,
+    diskOrangeAbove: 85,
+    diskRedAbove: 92,
   },
   console: {
     fontSize: 12.5,

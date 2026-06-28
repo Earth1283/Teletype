@@ -42,8 +42,16 @@ function Slider({ value, min, max, step, onChange, fmt, disabled }: {
   )
 }
 
+function ZoneDot({ color }: { color: string }) {
+  return (
+    <svg width="7" height="7" viewBox="0 0 7 7" style={{ display: 'inline-block', marginRight: 5, verticalAlign: 'middle', flexShrink: 0 }}>
+      <circle cx="3.5" cy="3.5" r="3.5" fill={color} />
+    </svg>
+  )
+}
+
 function Row({ label, sub, children }: {
-  label: string; sub?: string; children: React.ReactNode
+  label: React.ReactNode; sub?: string; children: React.ReactNode
 }) {
   return (
     <div className="s-row">
@@ -267,6 +275,78 @@ export default function SettingsPage() {
             <Slider value={settings.glance.refreshIntervalMs} min={500} max={10_000} step={500}
               fmt={v => `${(v / 1000).toFixed(1)}s`}
               onChange={v => setGlance({ refreshIntervalMs: v })} />
+          </Row>
+
+          <div className="s-divider" />
+          <div className="s-subsection-label">Gauge zone thresholds</div>
+          <div className="s-subsection-label" style={{ fontSize: 9, color: 'var(--ghost)', paddingLeft: 14, paddingTop: 0 }}>TPS — green above, yellow/orange/red below</div>
+          <Row label={<><ZoneDot color="#eab308" />TPS yellow below</>} sub="≤ this value triggers yellow">
+            <Slider value={settings.glance.tpsYellowBelow} min={10} max={20} step={0.5}
+              fmt={v => v.toFixed(1)} onChange={v => setGlance({ tpsYellowBelow: v })} />
+          </Row>
+          <Row label={<><ZoneDot color="#f97316" />TPS orange below</>}>
+            <Slider value={settings.glance.tpsOrangeBelow} min={5} max={19} step={0.5}
+              fmt={v => v.toFixed(1)} onChange={v => setGlance({ tpsOrangeBelow: v })} />
+          </Row>
+          <Row label={<><ZoneDot color="#ef4444" />TPS red below</>}>
+            <Slider value={settings.glance.tpsRedBelow} min={1} max={15} step={0.5}
+              fmt={v => v.toFixed(1)} onChange={v => setGlance({ tpsRedBelow: v })} />
+          </Row>
+
+          <div className="s-subsection-label" style={{ fontSize: 9, color: 'var(--ghost)', paddingLeft: 14, paddingTop: 4 }}>MSPT (tick time) — green below, yellow/orange/red above</div>
+          <Row label={<><ZoneDot color="#eab308" />MSPT yellow above</>}>
+            <Slider value={settings.glance.msptYellowAbove} min={10} max={100} step={1}
+              fmt={v => `${v}ms`} onChange={v => setGlance({ msptYellowAbove: v })} />
+          </Row>
+          <Row label={<><ZoneDot color="#f97316" />MSPT orange above</>}>
+            <Slider value={settings.glance.msptOrangeAbove} min={15} max={150} step={1}
+              fmt={v => `${v}ms`} onChange={v => setGlance({ msptOrangeAbove: v })} />
+          </Row>
+          <Row label={<><ZoneDot color="#ef4444" />MSPT red above</>}>
+            <Slider value={settings.glance.msptRedAbove} min={20} max={200} step={1}
+              fmt={v => `${v}ms`} onChange={v => setGlance({ msptRedAbove: v })} />
+          </Row>
+
+          <div className="s-subsection-label" style={{ fontSize: 9, color: 'var(--ghost)', paddingLeft: 14, paddingTop: 4 }}>Memory & Sys RAM (%)</div>
+          <Row label={<><ZoneDot color="#eab308" />Memory yellow above</>}>
+            <Slider value={settings.glance.memYellowAbove} min={30} max={90} step={1}
+              fmt={v => `${v}%`} onChange={v => setGlance({ memYellowAbove: v })} />
+          </Row>
+          <Row label={<><ZoneDot color="#f97316" />Memory orange above</>}>
+            <Slider value={settings.glance.memOrangeAbove} min={50} max={95} step={1}
+              fmt={v => `${v}%`} onChange={v => setGlance({ memOrangeAbove: v })} />
+          </Row>
+          <Row label={<><ZoneDot color="#ef4444" />Memory red above</>}>
+            <Slider value={settings.glance.memRedAbove} min={60} max={99} step={1}
+              fmt={v => `${v}%`} onChange={v => setGlance({ memRedAbove: v })} />
+          </Row>
+
+          <div className="s-subsection-label" style={{ fontSize: 9, color: 'var(--ghost)', paddingLeft: 14, paddingTop: 4 }}>CPU (%)</div>
+          <Row label={<><ZoneDot color="#eab308" />CPU yellow above</>}>
+            <Slider value={settings.glance.cpuYellowAbove} min={20} max={85} step={1}
+              fmt={v => `${v}%`} onChange={v => setGlance({ cpuYellowAbove: v })} />
+          </Row>
+          <Row label={<><ZoneDot color="#f97316" />CPU orange above</>}>
+            <Slider value={settings.glance.cpuOrangeAbove} min={30} max={90} step={1}
+              fmt={v => `${v}%`} onChange={v => setGlance({ cpuOrangeAbove: v })} />
+          </Row>
+          <Row label={<><ZoneDot color="#ef4444" />CPU red above</>}>
+            <Slider value={settings.glance.cpuRedAbove} min={50} max={99} step={1}
+              fmt={v => `${v}%`} onChange={v => setGlance({ cpuRedAbove: v })} />
+          </Row>
+
+          <div className="s-subsection-label" style={{ fontSize: 9, color: 'var(--ghost)', paddingLeft: 14, paddingTop: 4 }}>Disk (%)</div>
+          <Row label={<><ZoneDot color="#eab308" />Disk yellow above</>}>
+            <Slider value={settings.glance.diskYellowAbove} min={30} max={90} step={1}
+              fmt={v => `${v}%`} onChange={v => setGlance({ diskYellowAbove: v })} />
+          </Row>
+          <Row label={<><ZoneDot color="#f97316" />Disk orange above</>}>
+            <Slider value={settings.glance.diskOrangeAbove} min={50} max={95} step={1}
+              fmt={v => `${v}%`} onChange={v => setGlance({ diskOrangeAbove: v })} />
+          </Row>
+          <Row label={<><ZoneDot color="#ef4444" />Disk red above</>}>
+            <Slider value={settings.glance.diskRedAbove} min={60} max={99} step={1}
+              fmt={v => `${v}%`} onChange={v => setGlance({ diskRedAbove: v })} />
           </Row>
         </Section>
 

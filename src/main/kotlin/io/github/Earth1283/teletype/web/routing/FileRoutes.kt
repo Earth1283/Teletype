@@ -32,12 +32,12 @@ import kotlinx.coroutines.withContext
 import java.io.File
 import java.util.concurrent.ConcurrentHashMap
 
-private const val MAX_TEXT_SIZE = 2 * 1024 * 1024L // 2 MB
 private const val MAX_UPLOAD_CHUNKS = 100_000
 private val uploadAssemblyLocks = ConcurrentHashMap<String, Any>()
 
 fun Route.fileRoutes(plugin: Teletype) {
-    val root = plugin.teletypeConfig.filesRoot.canonicalFile
+    val cfg = plugin.teletypeConfig
+    val root = cfg.filesRoot.canonicalFile
     val rootPath = root.path
     val chunkRoot = File(plugin.dataFolder, "upload-chunks").canonicalFile
 
@@ -82,8 +82,12 @@ fun Route.fileRoutes(plugin: Teletype) {
             ?: return@get call.respond(HttpStatusCode.Forbidden, ErrorResponse("Path outside root"))
         if (!file.exists() || !file.isFile)
             return@get call.respond(HttpStatusCode.NotFound, ErrorResponse("File not found"))
-        if (file.length() > MAX_TEXT_SIZE)
-            return@get call.respond(HttpStatusCode.PayloadTooLarge, ErrorResponse("File too large for editor (max 2 MB)"))
+        val maxBytes = cfg.filesMaxEditSizeMb * 1024 * 1024L
+        if (file.length() > maxBytes)
+            return@get call.respond(HttpStatusCode.PayloadTooLarge, ErrorResponse("File too large for editor (max ${cfg.filesMaxEditSizeMb} MB)"))
+        val allowedExts = cfg.filesEditableExtensions
+        if (allowedExts.isNotEmpty() && file.extension.lowercase() !in allowedExts)
+            return@get call.respond(HttpStatusCode.UnsupportedMediaType, ErrorResponse("Extension not allowed for editing"))
         val content = withContext(Dispatchers.IO) {
             if (isBinary(file)) null else file.readText()
         }

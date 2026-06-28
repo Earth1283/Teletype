@@ -257,6 +257,9 @@ network:
   # Hard cap on the number of routes that can be created through the panel.
   max-routes: 50
 
+  # Hard cap on the number of port forwards that can be created through the panel.
+  max-port-forwards: 20
+
   # Default connections-per-IP-per-minute for new routes created in the panel.
   # Each route can override this individually. The window resets every 60 seconds.
   # Set 0 to disable rate limiting on proxied routes entirely (not recommended).
