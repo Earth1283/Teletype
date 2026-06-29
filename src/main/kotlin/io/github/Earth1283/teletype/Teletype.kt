@@ -20,6 +20,7 @@ import io.github.Earth1283.teletype.multiplex.PortForwardManager
 import io.github.Earth1283.teletype.multiplex.PortForwardStore
 import io.github.Earth1283.teletype.multiplex.PortMultiplexer
 import io.github.Earth1283.teletype.multiplex.RouteStore
+import io.github.Earth1283.teletype.profiling.JfrManager
 import io.github.Earth1283.teletype.web.WebServer
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -46,6 +47,7 @@ class Teletype : JavaPlugin() {
     lateinit var routeStore: RouteStore
     lateinit var portForwardStore: PortForwardStore
     lateinit var portForwardManager: PortForwardManager
+    lateinit var jfrManager: JfrManager
     lateinit var webServer: WebServer
     private var portMultiplexer: PortMultiplexer? = null
 
@@ -104,6 +106,13 @@ class Teletype : JavaPlugin() {
                 "multiplex=${enabled(teletypeConfig.multiplexGamePort)}, player-ip-forwarding=${enabled(teletypeConfig.forwardMinecraftPlayerAddresses)}"
         )
 
+        jfrManager = JfrManager(this).also { it.init() }
+        startupLine(
+            "JFR",
+            "JFR profiling initialized",
+            "available=${enabled(jfrManager.isAvailable)}, continuous=${enabled(teletypeConfig.profilingContinuousEnabled)}"
+        )
+
         if (teletypeConfig.consoleEnabled) ConsoleInterceptor.install(consoleBroadcaster)
         server.pluginManager.registerEvents(PlayerEventListener(metricsDatabase, pluginScope), this)
         startupLine("EVENTS", "Runtime hooks registered", "console-capture=${enabled(teletypeConfig.consoleEnabled)}, player-listener=on")
@@ -146,6 +155,7 @@ class Teletype : JavaPlugin() {
         webServer.stop()
         ConsoleInterceptor.uninstall()
         metricsCollector.close()
+        jfrManager.close()
         pluginScope.cancel()
         metricsDatabase.close()
         auditLog.close()

@@ -13,6 +13,7 @@ import io.github.Earth1283.teletype.web.routing.fileRoutes
 import io.github.Earth1283.teletype.web.routing.glanceRoutes
 import io.github.Earth1283.teletype.web.routing.networkRoutes
 import io.github.Earth1283.teletype.web.routing.statsRoutes
+import io.github.Earth1283.teletype.web.routing.profilingRoutes
 import io.github.Earth1283.teletype.web.routing.systemRoutes
 import io.ktor.http.ContentType
 import io.ktor.http.HttpHeaders
@@ -213,6 +214,7 @@ class WebServer(private val plugin: Teletype) {
                         file.endsWith(".svg") -> ContentType.Image.SVG
                         file.endsWith(".woff2") -> ContentType("font", "woff2")
                         file.endsWith(".woff")  -> ContentType("font", "woff")
+                        file.endsWith(".ttf")   -> ContentType("font", "ttf")
                         else -> ContentType.Application.OctetStream
                     })
                 }
@@ -238,6 +240,7 @@ class WebServer(private val plugin: Teletype) {
                             route("/stats")   { statsRoutes(plugin) }
                             route("/network") { networkRoutes(plugin) }
                             route("/system")  { systemRoutes(plugin) }
+                            route("/profiling") { profilingRoutes(plugin) }
                             auditRoutes(plugin)
                         }
                     }

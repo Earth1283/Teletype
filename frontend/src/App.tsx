@@ -18,6 +18,7 @@ import ActionsPage from './components/actions/ActionsPage'
 import SettingsPage from './components/SettingsPage'
 import AuditPage from './components/AuditPage'
 import NetworkPage from './components/NetworkPage'
+import ProfilingPage from './components/ProfilingPage'
 import CommandPalette from './CommandPalette'
 import MacOSDesktop from './components/MacOSDesktop'
 import AppleShell from './components/AppleShell'
@@ -28,7 +29,7 @@ import { useToast } from './ToastContext'
 import {
   TeletypeLogo, IconTerminal, IconUsers, IconCpu, IconFolder,
   IconLogOut, IconActivity, IconZap, IconSettings, IconList, IconNetwork,
-  IconChevronLeft, IconChevronRight, IconCommand, IconDots,
+  IconChevronLeft, IconChevronRight, IconCommand, IconDots, IconFlightRecorder,
 } from './Icons'
 
 function ThemeApplier() {
@@ -39,22 +40,23 @@ function ThemeApplier() {
   return null
 }
 
-type Tab = 'glance' | 'console' | 'players' | 'stats' | 'files' | 'actions' | 'audit' | 'network' | 'settings'
+type Tab = 'glance' | 'console' | 'players' | 'stats' | 'files' | 'actions' | 'audit' | 'network' | 'profiling' | 'settings'
 
 const TABS: { id: Tab; label: string; Icon: React.FC<{ size?: number }> }[] = [
-  { id: 'glance',   label: 'Glance',   Icon: IconActivity  },
-  { id: 'console',  label: 'Console',  Icon: IconTerminal  },
-  { id: 'players',  label: 'Players',  Icon: IconUsers     },
-  { id: 'stats',    label: 'Stats',    Icon: IconCpu       },
-  { id: 'files',    label: 'Files',    Icon: IconFolder    },
-  { id: 'actions',  label: 'Actions',  Icon: IconZap       },
-  { id: 'audit',    label: 'Audit',    Icon: IconList      },
-  { id: 'network',  label: 'Network',  Icon: IconNetwork   },
-  { id: 'settings', label: 'Settings', Icon: IconSettings  },
+  { id: 'glance',    label: 'Glance',    Icon: IconActivity        },
+  { id: 'console',   label: 'Console',   Icon: IconTerminal        },
+  { id: 'players',   label: 'Players',   Icon: IconUsers           },
+  { id: 'stats',     label: 'Stats',     Icon: IconCpu             },
+  { id: 'files',     label: 'Files',     Icon: IconFolder          },
+  { id: 'actions',   label: 'Actions',   Icon: IconZap             },
+  { id: 'audit',     label: 'Audit',     Icon: IconList            },
+  { id: 'network',   label: 'Network',   Icon: IconNetwork         },
+  { id: 'profiling', label: 'Profiling', Icon: IconFlightRecorder  },
+  { id: 'settings',  label: 'Settings',  Icon: IconSettings        },
 ]
 
 const PRIMARY_MOBILE_TABS: Tab[] = ['glance', 'console', 'players', 'actions']
-const SECONDARY_MOBILE_TABS: Tab[] = ['stats', 'files', 'audit', 'network', 'settings']
+const SECONDARY_MOBILE_TABS: Tab[] = ['stats', 'files', 'audit', 'network', 'profiling', 'settings']
 const PHONE_VIEWPORT_QUERY = '(max-width: 640px)'
 const COARSE_POINTER_QUERY = '(hover: none) and (pointer: coarse)'
 const MAX_PHONE_SCREEN_SIDE = 500
@@ -422,8 +424,9 @@ function MainApp({ onLogout }: { onLogout: () => void }) {
                 {id === 'files'    && <FileManager />}
                 {id === 'actions'  && <ActionsPage />}
                 {id === 'audit'    && <AuditPage />}
-                {id === 'network'  && <NetworkPage />}
-                {id === 'settings' && <SettingsPage />}
+                {id === 'network'   && <NetworkPage />}
+                {id === 'profiling' && <ProfilingPage />}
+                {id === 'settings'  && <SettingsPage />}
               </ErrorBoundary>
             </div>
           )

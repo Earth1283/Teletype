@@ -107,6 +107,17 @@ class TeletypeConfig(private val plugin: Teletype) {
     val networkDefaultRateLimitPerMinute: Int get() = config.getInt("network.default-rate-limit-per-minute", 120)
     val networkMaxPortForwards: Int get() = config.getInt("network.max-port-forwards", 20)
 
+    // ── Profiling / JFR ──────────────────────────────────────────────────────
+    val profilingEnabled: Boolean get() = bool("profiling.enabled", true)
+    val profilingContinuousEnabled: Boolean get() = bool("profiling.continuous.enabled", true)
+    val profilingContinuousMaxDiskMb: Long get() = config.getLong("profiling.continuous.max-disk-mb", 256)
+    val profilingContinuousMaxAgeSec: Long get() = config.getLong("profiling.continuous.max-age-sec", 3600)
+    val profilingContinuousTemplate: String get() = config.getString("profiling.continuous.template") ?: "default"
+    val profilingContinuousDumpOnExit: Boolean get() = bool("profiling.continuous.dump-on-exit", true)
+    val profilingContinuousOutputDir: String get() = config.getString("profiling.continuous.output-dir") ?: "profiling/dumps"
+    val profilingRecordingsOutputDir: String get() = config.getString("profiling.recordings.output-dir") ?: "profiling/recordings"
+    val profilingRecordingsMaxTotalDiskMb: Long get() = config.getLong("profiling.recordings.max-total-disk-mb", 512)
+
     // ── Glance thresholds ─────────────────────────────────────────────────────
     val tpsNominalMin: Double   get() = double("glance.tps.nominal-min", 19.0)
     val tpsDegradedMin: Double  get() = double("glance.tps.degraded-min", 15.0)

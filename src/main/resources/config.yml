@@ -211,6 +211,43 @@ files:
   # Example: ["yml", "json", "txt", "properties", "conf"]
   editable-extensions: []
 
+# ── Profiling / Java Flight Recorder ─────────────────────────────────────────
+# JFR is built into the JVM (JDK 9+) with no extra dependencies or commercial
+# flags. It adds < 1% overhead on the default template; ~2-5% on profile.
+profiling:
+  # Master switch. Set false to disable all JFR recording and /profiling/* endpoints.
+  enabled: true
+
+  continuous:
+    # Start an always-on rolling recording when the plugin loads.
+    # Oldest data is evicted automatically when max-disk-mb or max-age-sec is reached.
+    enabled: true
+
+    # Maximum bytes kept on disk for the rolling buffer (MB).
+    max-disk-mb: 256
+
+    # Maximum age of events in the rolling buffer (seconds). 3600 = 1 hour.
+    max-age-sec: 3600
+
+    # JFR template: "default" (<1% overhead) or "profile" (~2-5%, richer data).
+    # Use "profile" only for targeted diagnosis sessions, not permanently.
+    template: "default"
+
+    # Write a snapshot of the rolling buffer to disk when the JVM shuts down.
+    # The file appears in the output-dir as "exit-dump.jfr".
+    dump-on-exit: true
+
+    # Directory for continuous dumps, relative to the plugin data folder.
+    output-dir: "profiling/dumps"
+
+  recordings:
+    # Directory for manual (on-demand) recordings, relative to the plugin data folder.
+    output-dir: "profiling/recordings"
+
+    # Maximum total disk usage across all saved manual recordings (MB).
+    # Oldest recordings are deleted automatically when the cap is exceeded.
+    max-total-disk-mb: 512
+
 # ── Glance thresholds ─────────────────────────────────────────────────────────
 # Semantic color breakpoints for the dashboard status badge, stat card accents,
 # and anomaly chart dots. Served via /api/glance/config so the frontend can

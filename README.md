@@ -15,6 +15,8 @@ A real-time web administration panel for Paper/Spigot 1.21 Minecraft servers. Em
 | **Audit Log** | Persistent record of every admin action (command, file edit, snippet run, schedule) with actor + IP |
 | **Auth** | JWT-based login via in-game `/tty verify` — no shared passwords |
 | **TLS** | Optional HTTPS with auto-generated self-signed cert or bring-your-own keystore |
+| **Network** | HTTP reverse-proxy routing by URL prefix + raw TCP port forwarding, managed from the web panel |
+| **Profiling** | JFR-backed always-on rolling buffer (configurable disk/age limits), manual on-demand recordings, in-browser GC/CPU/lock event charts, `.jfr` download for JDK Mission Control |
 | **Port Multiplexer** | Share a single port between Minecraft game traffic and the web panel — optional, zero firewall changes |
 
 ## Quick Start
@@ -40,6 +42,7 @@ The web panel is now live. No further configuration required.
 | [API Reference](docs/api.md) | REST endpoints, WebSocket protocol, auth flow, error format |
 | [Actions & Scheduling](docs/actions.md) | Snippets, `{variables}`, categories, cron expressions |
 | [Port Multiplexer](docs/multiplexer.md) | How single-port sharing works, setup, limitations |
+| [Profiling](docs/profiling.md) | JFR config, API endpoints, event parsing, disk layout |
 | [Development](docs/development.md) | Dev setup, `testFrontend` mock server, architecture |
 
 ## Building from Source
