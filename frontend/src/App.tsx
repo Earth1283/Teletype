@@ -20,6 +20,7 @@ import AuditPage from './components/AuditPage'
 import NetworkPage from './components/NetworkPage'
 import ProfilingPage from './components/ProfilingPage'
 import CommandPalette from './CommandPalette'
+import KeyboardHelp from './components/KeyboardHelp'
 import MacOSDesktop from './components/MacOSDesktop'
 import AppleShell from './components/AppleShell'
 import InsecureHttpBanner from './components/InsecureHttpBanner'
@@ -213,6 +214,7 @@ function MainApp({ onLogout }: { onLogout: () => void }) {
   const [tab, setTab] = useState<Tab>('glance')
   const [visitedTabs, setVisitedTabs] = useState<Set<Tab>>(() => new Set<Tab>(['glance']))
   const [paletteOpen, setPaletteOpen] = useState(false)
+  const [helpOpen, setHelpOpen] = useState(false)
   const [sidebarOpen, setSidebarOpen] = useState(true)
   const [mobileMoreOpen, setMobileMoreOpen] = useState(false)
   const [tpsHistory, setTpsHistory] = useState<number[]>([])
@@ -238,6 +240,13 @@ function MainApp({ onLogout }: { onLogout: () => void }) {
       if ((e.metaKey || e.ctrlKey) && e.key === 'k') {
         e.preventDefault()
         if (settings.palette.enabled) setPaletteOpen(p => !p)
+        return
+      }
+      if (e.key === '?' && !e.metaKey && !e.ctrlKey && !e.altKey) {
+        const tag = (e.target as HTMLElement).tagName
+        if (tag === 'INPUT' || tag === 'TEXTAREA' || (e.target as HTMLElement).isContentEditable) return
+        e.preventDefault()
+        setHelpOpen(p => !p)
       }
     }
     window.addEventListener('keydown', handler)
@@ -502,6 +511,7 @@ function MainApp({ onLogout }: { onLogout: () => void }) {
         onClose={() => setPaletteOpen(false)}
         onNavigate={(t) => setTab(t as Tab)}
       />
+      <KeyboardHelp open={helpOpen} onClose={() => setHelpOpen(false)} />
     </div>
   )
 }

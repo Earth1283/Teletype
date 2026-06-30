@@ -526,3 +526,52 @@
     padding: 0 14px 14px;
   }
 }
+
+/* ── Player sort bar ─────────────────────────────────────────── */
+.player-sort-bar {
+  display: flex;
+  gap: 4px;
+  flex-wrap: wrap;
+}
+
+.player-sort-btn {
+  font-family: var(--mono);
+  font-size: 10px;
+  padding: 2px 7px;
+  background: var(--elevated);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  color: var(--ghost);
+  cursor: pointer;
+  transition: color 100ms, border-color 100ms, background 100ms;
+}
+
+.player-sort-btn:hover { color: var(--mist); border-color: var(--border-hi); }
+.player-sort-btn.active { color: var(--amber); border-color: var(--amber-glow); background: var(--amber-dim); }
+
+/* ── Player empty state ──────────────────────────────────────── */
+.player-empty-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 32px 16px;
+  text-align: center;
+}
+
+.player-empty-icon {
+  color: var(--ghost);
+  margin-bottom: 10px;
+}
+
+.player-empty-title {
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--mist);
+}
+
+.player-empty-sub {
+  font-size: 11.5px;
+  color: var(--ghost);
+  margin-top: 3px;
+}

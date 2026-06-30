@@ -1,10 +1,11 @@
-import { useState } from 'react'
+import { useState, useMemo } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { api } from '../api/client'
 import { useContextMenu } from '../ContextMenu'
 import { useToast } from '../ToastContext'
 import { IconRefresh } from '../Icons'
 import PromptModal, { type PromptVariant } from './PromptModal'
+import { Skeleton } from '../Skeleton'
 
 interface Player {
   name: string
@@ -61,6 +62,8 @@ function PlayerAvatar({ player, large = false }: { player: Player; large?: boole
   )
 }
 
+type SortKey = 'name' | 'health' | 'ping' | 'level'
+
 export default function PlayerList() {
   const toast = useToast()
   const { data, isLoading, error, refetch, isFetching } = useQuery<Player[]>({
@@ -69,6 +72,8 @@ export default function PlayerList() {
     refetchInterval: 5000,
   })
   const [selected, setSelected] = useState<string | null>(null)
+  const [sortBy, setSortBy] = useState<SortKey>('name')
+  const [sortDir, setSortDir] = useState<1 | -1>(1)
   const [prompt, setPrompt] = useState<PromptState>(null)
   const [customActionPlayer, setCustomActionPlayer] = useState<Player | null>(null)
   // Persists between player selections so the command isn't reset each time
@@ -147,6 +152,27 @@ export default function PlayerList() {
     ], { kind: 'player', name: player.name, uuid: player.uuid })
   }
 
+  function toggleSort(key: SortKey) {
+    if (sortBy === key) setSortDir(d => d === 1 ? -1 : 1)
+    else { setSortBy(key); setSortDir(1) }
+  }
+
+  const sortedPlayers = useMemo(() => {
+    if (!data) return []
+    return [...data].sort((a, b) => {
+      let av: number | string, bv: number | string
+      switch (sortBy) {
+        case 'name':   av = a.name.toLowerCase(); bv = b.name.toLowerCase(); break
+        case 'health': av = a.health;             bv = b.health;             break
+        case 'ping':   av = a.ping ?? 9999;       bv = b.ping ?? 9999;       break
+        case 'level':  av = a.level ?? 0;         bv = b.level ?? 0;         break
+      }
+      if (av < bv) return -sortDir
+      if (av > bv) return sortDir
+      return 0
+    })
+  }, [data, sortBy, sortDir])
+
   const count = data?.length ?? 0
   const sel = data?.find(p => p.uuid === selected) ?? null
 
@@ -172,14 +198,33 @@ export default function PlayerList() {
 
       <div className="mac-master-detail">
         <div className="mac-master-list">
-          <div className="mac-master-header">
-            {count} Online
+          <div className="mac-master-header" style={{ flexDirection: 'column', gap: 6, padding: '8px 10px' }}>
+            <span>{count} Online</span>
+            <div className="player-sort-bar">
+              {(['name', 'health', 'ping', 'level'] as SortKey[]).map(k => (
+                <button
+                  key={k}
+                  className={`player-sort-btn${sortBy === k ? ' active' : ''}`}
+                  onClick={() => toggleSort(k)}
+                >
+                  {k}{sortBy === k ? (sortDir === 1 ? ' ↑' : ' ↓') : ''}
+                </button>
+              ))}
+            </div>
           </div>
 
-          {isLoading && <div style={{ padding: '12px 14px', fontSize: 12, color: 'var(--mist)' }}>Loading…</div>}
+          {isLoading && Array.from({ length: 5 }).map((_, i) => (
+            <div key={i} className="mac-master-row" style={{ gap: 10, pointerEvents: 'none' }}>
+              <Skeleton width={32} height={32} radius={6} style={{ flexShrink: 0 }} />
+              <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 5 }}>
+                <Skeleton width="55%" height={11} />
+                <Skeleton width="35%" height={9} />
+              </div>
+            </div>
+          ))}
           {error && <div style={{ padding: '12px 14px', fontSize: 12, color: 'var(--red)' }}>Failed to load players</div>}
 
-          {data?.map(p => (
+          {sortedPlayers.map(p => (
             <div
               key={p.uuid}
               className={`mac-master-row${selected === p.uuid ? ' active' : ''}`}
@@ -195,8 +240,15 @@ export default function PlayerList() {
           ))}
 
           {data && count === 0 && (
-            <div style={{ padding: '20px 14px', textAlign: 'center', fontSize: 12, color: 'var(--ghost)' }}>
-              No players online
+            <div className="player-empty-state">
+              <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1" className="player-empty-icon">
+                <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" />
+                <circle cx="9" cy="7" r="4" />
+                <path d="M23 21v-2a4 4 0 0 0-3-3.87" />
+                <path d="M16 3.13a4 4 0 0 1 0 7.75" />
+              </svg>
+              <div className="player-empty-title">Server is empty</div>
+              <div className="player-empty-sub">No players online right now</div>
             </div>
           )}
         </div>

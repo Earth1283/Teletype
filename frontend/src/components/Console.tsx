@@ -48,6 +48,11 @@ export default function Console() {
   const virtuosoRef = useRef<VirtuosoHandle>(null)
   const inputRef = useRef<HTMLInputElement>(null)
   const completionListRef = useRef<HTMLDivElement>(null)
+  const historyRef = useRef<string[]>((() => {
+    try { return JSON.parse(localStorage.getItem('teletype_console_history') ?? '[]') } catch { return [] }
+  })())
+  const histCursorRef = useRef<number>(-1)
+  const draftRef = useRef<string>('')
   const { openContextMenu } = useContextMenu()
 
   const clearCompletions = () => { setCompletions([]); setCompletionIdx(0) }
@@ -100,6 +105,13 @@ export default function Console() {
     const cmd = input.trim()
     if (!cmd) return
     clearCompletions()
+    const h = historyRef.current
+    if (h[h.length - 1] !== cmd) {
+      const next = [...h.slice(-99), cmd]
+      historyRef.current = next
+      try { localStorage.setItem('teletype_console_history', JSON.stringify(next)) } catch {}
+    }
+    histCursorRef.current = -1
     try {
       socketSend(cmd)
       setInput('')
@@ -137,18 +149,34 @@ export default function Console() {
       }
       return
     }
-    if (e.key === 'ArrowUp' && completions.length > 0) {
+    if (e.key === 'ArrowUp') {
       e.preventDefault()
-      const prev = (completionIdx - 1 + completions.length) % completions.length
-      setCompletionIdx(prev)
-      setInput(completions[prev])
+      if (completions.length > 0) {
+        const prev = (completionIdx - 1 + completions.length) % completions.length
+        setCompletionIdx(prev)
+        setInput(completions[prev])
+      } else {
+        const h = historyRef.current
+        if (h.length === 0) return
+        if (histCursorRef.current === -1) draftRef.current = input
+        const next = Math.min(histCursorRef.current + 1, h.length - 1)
+        histCursorRef.current = next
+        setInput(h[h.length - 1 - next])
+      }
       return
     }
-    if (e.key === 'ArrowDown' && completions.length > 0) {
+    if (e.key === 'ArrowDown') {
       e.preventDefault()
-      const next = (completionIdx + 1) % completions.length
-      setCompletionIdx(next)
-      setInput(completions[next])
+      if (completions.length > 0) {
+        const next = (completionIdx + 1) % completions.length
+        setCompletionIdx(next)
+        setInput(completions[next])
+      } else {
+        if (histCursorRef.current === -1) return
+        const next = histCursorRef.current - 1
+        histCursorRef.current = next
+        setInput(next === -1 ? draftRef.current : historyRef.current[historyRef.current.length - 1 - next])
+      }
       return
     }
   }, [input, completions, completionIdx, send, tabComplete])

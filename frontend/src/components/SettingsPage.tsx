@@ -1,5 +1,6 @@
 import { useRef } from 'react'
 import { useSettings } from '../SettingsContext'
+import { DEFAULT_THEME_ID } from '../themes'
 import {
   IconEyeOff, IconSliders, IconTerminal, IconCommand, IconCode, IconPalette,
   IconActivity, IconSettings, IconRefresh, IconMonitor, IconApple,
@@ -112,6 +113,19 @@ export default function SettingsPage() {
   const refWheel      = useRef<HTMLDivElement>(null)
   const refEditor     = useRef<HTMLDivElement>(null)
   const refReset      = useRef<HTMLDivElement>(null)
+  const hoverTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+
+  function startThemePreview(themeId: string) {
+    if (hoverTimerRef.current) clearTimeout(hoverTimerRef.current)
+    hoverTimerRef.current = setTimeout(() => {
+      document.documentElement.dataset.theme = themeId
+    }, 200)
+  }
+
+  function endThemePreview() {
+    if (hoverTimerRef.current) { clearTimeout(hoverTimerRef.current); hoverTimerRef.current = null }
+    document.documentElement.dataset.theme = settings.theme ?? DEFAULT_THEME_ID
+  }
 
   const scrollTo = (ref: React.RefObject<HTMLDivElement | null>) => {
     ref.current?.scrollIntoView({ behavior: 'smooth', block: 'nearest' })
@@ -176,7 +190,9 @@ export default function SettingsPage() {
                   <button
                     key={t.id}
                     className={`s-theme-swatch${active ? ' active' : ''}`}
-                    onClick={() => update({ theme: t.id })}
+                    onClick={() => { endThemePreview(); update({ theme: t.id }) }}
+                    onMouseEnter={() => startThemePreview(t.id)}
+                    onMouseLeave={endThemePreview}
                     title={t.name}
                   >
                     <span className="s-theme-preview" style={{ background: t.bg }}>
