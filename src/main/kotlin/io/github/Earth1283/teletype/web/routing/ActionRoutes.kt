@@ -23,6 +23,9 @@ import io.ktor.server.routing.put
 import io.ktor.server.routing.route
 import java.util.UUID
 
+private val CATEGORY_ID_SANITIZER = Regex("[^a-z0-9]+")
+private val SNIPPET_VAR_PATTERN = Regex("\\{(\\w+)\\}")
+
 fun Route.actionRoutes(plugin: Teletype) {
     val store = plugin.snippetStore
     val scheduler = plugin.snippetScheduler
@@ -35,7 +38,7 @@ fun Route.actionRoutes(plugin: Teletype) {
             if (req.name.isBlank()) {
                 call.respond(HttpStatusCode.BadRequest, ErrorResponse("Name required")); return@post
             }
-            val id = req.name.trim().lowercase().replace(Regex("[^a-z0-9]+"), "-")
+            val id = req.name.trim().lowercase().replace(CATEGORY_ID_SANITIZER, "-")
             val cat = SnippetCategory(id, req.name.trim(), req.color.ifBlank { "#6e6e80" })
             if (!store.addCategory(cat)) {
                 call.respond(HttpStatusCode.Conflict, ErrorResponse("Category already exists")); return@post
@@ -71,7 +74,7 @@ fun Route.actionRoutes(plugin: Teletype) {
             if (cmds.isEmpty()) {
                 call.respond(HttpStatusCode.BadRequest, ErrorResponse("At least one command required")); return@post
             }
-            val vars = cmds.flatMap { Regex("\\{(\\w+)\\}").findAll(it).map { m -> m.groupValues[1] }.toList() }.distinct()
+            val vars = cmds.flatMap { SNIPPET_VAR_PATTERN.findAll(it).map { m -> m.groupValues[1] }.toList() }.distinct()
             val snippet = Snippet(UUID.randomUUID().toString(), req.name.trim(), req.categoryId, cmds, vars)
             store.addSnippet(snippet)
             call.respond(HttpStatusCode.Created, snippet)
@@ -84,7 +87,7 @@ fun Route.actionRoutes(plugin: Teletype) {
                 ?: return@put call.respond(HttpStatusCode.NotFound, ErrorResponse("Not found"))
             val req = call.receive<UpdateSnippetRequest>()
             val cmds = req.cmds?.filter { it.isNotBlank() } ?: existing.cmds
-            val vars = cmds.flatMap { Regex("\\{(\\w+)\\}").findAll(it).map { m -> m.groupValues[1] }.toList() }.distinct()
+            val vars = cmds.flatMap { SNIPPET_VAR_PATTERN.findAll(it).map { m -> m.groupValues[1] }.toList() }.distinct()
             val updated = existing.copy(
                 name       = req.name?.trim()    ?: existing.name,
                 categoryId = req.categoryId      ?: existing.categoryId,

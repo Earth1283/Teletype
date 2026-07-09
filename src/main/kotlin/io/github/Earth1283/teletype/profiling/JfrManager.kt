@@ -15,6 +15,8 @@ import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.locks.ReentrantLock
 import kotlin.concurrent.withLock
 
+private val UNSAFE_NAME_CHARS = Regex("[^a-zA-Z0-9._-]")
+
 class JfrManager(private val plugin: Teletype) {
 
     private val lock = ReentrantLock()
@@ -52,7 +54,7 @@ class JfrManager(private val plugin: Teletype) {
     }
 
     private fun safeName(raw: String): String =
-        raw.replace(Regex("[^a-zA-Z0-9._-]"), "_").take(128)
+        raw.replace(UNSAFE_NAME_CHARS, "_").take(128)
 
     private fun scanExistingRecordings() {
         val cfg = plugin.teletypeConfig

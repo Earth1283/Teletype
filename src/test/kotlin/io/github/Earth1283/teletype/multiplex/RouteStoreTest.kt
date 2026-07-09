@@ -1,5 +1,6 @@
 package io.github.Earth1283.teletype.multiplex
 
+import kotlinx.coroutines.runBlocking
 import org.junit.jupiter.api.io.TempDir
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -13,7 +14,7 @@ class RouteStoreTest {
     lateinit var tempDir: Path
 
     @Test
-    fun `persists routes and reloads them`() {
+    fun `persists routes and reloads them`() = runBlocking {
         val store = RouteStore(tempDir.toFile())
         val route = RouteMapping(
             id = "console",
@@ -33,7 +34,7 @@ class RouteStoreTest {
     }
 
     @Test
-    fun `finds the longest enabled prefix match`() {
+    fun `finds the longest enabled prefix match`() = runBlocking {
         val store = RouteStore(tempDir.toFile())
         val broad = RouteMapping(id = "api", prefix = "/api", targetPort = 8080)
         val specific = RouteMapping(id = "files", prefix = "/api/files", targetPort = 8082)
@@ -46,7 +47,7 @@ class RouteStoreTest {
     }
 
     @Test
-    fun `updates and removes routes by id`() {
+    fun `updates and removes routes by id`() = runBlocking {
         val store = RouteStore(tempDir.toFile())
         store.addRoute(RouteMapping(id = "api", prefix = "/api", targetPort = 8080))
 

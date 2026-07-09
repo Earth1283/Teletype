@@ -34,6 +34,7 @@ import java.util.concurrent.ConcurrentHashMap
 
 private const val MAX_UPLOAD_CHUNKS = 100_000
 private val uploadAssemblyLocks = ConcurrentHashMap<String, Any>()
+private val UPLOAD_ID_PATTERN = Regex("[A-Za-z0-9._-]{8,120}")
 
 fun Route.fileRoutes(plugin: Teletype) {
     val cfg = plugin.teletypeConfig
@@ -159,7 +160,7 @@ fun Route.fileRoutes(plugin: Teletype) {
             return@post call.respond(HttpStatusCode.NotFound, ErrorResponse("Directory not found"))
 
         val params = call.request.queryParameters
-        val uploadId = params["uploadId"]?.takeIf { it.matches(Regex("[A-Za-z0-9._-]{8,120}")) }
+        val uploadId = params["uploadId"]?.takeIf { it.matches(UPLOAD_ID_PATTERN) }
             ?: return@post call.respond(HttpStatusCode.BadRequest, ErrorResponse("Invalid upload id"))
         val filename = params["filename"] ?: return@post call.respond(HttpStatusCode.BadRequest, ErrorResponse("Missing filename"))
         val chunkIndex = params["chunkIndex"]?.toIntOrNull()

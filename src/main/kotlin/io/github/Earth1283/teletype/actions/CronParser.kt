@@ -4,6 +4,7 @@ import java.time.ZonedDateTime
 import java.time.temporal.ChronoUnit
 
 object CronParser {
+    private val WHITESPACE = Regex("\\s+")
     private data class FieldRange(val min: Int, val max: Int)
     private val RANGES = arrayOf(
         FieldRange(0, 59),  // minute
@@ -16,7 +17,7 @@ object CronParser {
     fun isValid(expr: String): Boolean = parse(expr) != null
 
     private fun parse(expr: String): Array<Set<Int>>? {
-        val parts = expr.trim().split(Regex("\\s+"))
+        val parts = expr.trim().split(WHITESPACE)
         if (parts.size != 5) return null
         return try {
             Array(5) { i -> parseField(parts[i], RANGES[i]) ?: return null }

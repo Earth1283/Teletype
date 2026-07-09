@@ -1,5 +1,6 @@
 package io.github.Earth1283.teletype.multiplex
 
+import kotlinx.coroutines.runBlocking
 import org.junit.jupiter.api.io.TempDir
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -13,7 +14,7 @@ class PortForwardStoreTest {
     lateinit var tempDir: Path
 
     @Test
-    fun `persists port forwards and reloads them`() {
+    fun `persists port forwards and reloads them`() = runBlocking {
         val store = PortForwardStore(tempDir.toFile())
         val forward = PortForward(
             id = "query",
@@ -32,7 +33,7 @@ class PortForwardStoreTest {
     }
 
     @Test
-    fun `updates and removes port forwards by id`() {
+    fun `updates and removes port forwards by id`() = runBlocking {
         val store = PortForwardStore(tempDir.toFile())
         store.addForward(PortForward(id = "query", externalPort = 25565, targetPort = 25566))
 

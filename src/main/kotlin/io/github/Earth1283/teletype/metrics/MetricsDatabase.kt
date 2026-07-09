@@ -13,14 +13,21 @@ import java.sql.Connection
 
 class MetricsDatabase(dataFolder: File) {
 
-    private val mutex = Mutex()
+    // Two connections so dashboard reads (history/gcEvents/playerEvents) never queue
+    // behind the periodic write flush or nightly retention downsampling — WAL mode
+    // (enabled below) allows one writer and readers to proceed concurrently at the
+    // SQLite level, but a single shared JDBC Connection would still serialize them.
+    private val writeMutex = Mutex()
+    private val readMutex = Mutex()
     private val conn: Connection
+    private val readConn: Connection
 
     init {
         dataFolder.mkdirs()
         val ds = SQLiteDataSource()
         ds.url = "jdbc:sqlite:${File(dataFolder, "teletype-metrics.db").absolutePath}"
         conn = ds.connection
+        readConn = ds.connection
         conn.createStatement().use { stmt ->
             stmt.executeUpdate("PRAGMA journal_mode=WAL")
             stmt.executeUpdate("PRAGMA synchronous=NORMAL")
@@ -86,7 +93,7 @@ class MetricsDatabase(dataFolder: File) {
 
     suspend fun insert(samples: List<MetricSnapshot>) {
         if (samples.isEmpty()) return
-        mutex.withLock {
+        writeMutex.withLock {
             withContext(Dispatchers.IO) {
                 val sql = """
                     INSERT OR IGNORE INTO metrics_1s
@@ -135,7 +142,7 @@ class MetricsDatabase(dataFolder: File) {
 
     suspend fun insertGcEvents(events: List<GcEvent>) {
         if (events.isEmpty()) return
-        mutex.withLock {
+        writeMutex.withLock {
             withContext(Dispatchers.IO) {
                 conn.prepareStatement(
                     "INSERT INTO gc_events (ts, name, action, cause, duration_ms) VALUES (?,?,?,?,?)"
@@ -165,7 +172,7 @@ class MetricsDatabase(dataFolder: File) {
      * Retention only creates 1-minute rows once raw samples are older than 24h,
      * so recent multi-hour windows must not read metrics_1m exclusively.
      */
-    suspend fun history(windowMinutes: Int): List<MetricSnapshot> = mutex.withLock {
+    suspend fun history(windowMinutes: Int): List<MetricSnapshot> = readMutex.withLock {
         withContext(Dispatchers.IO) {
             val now  = System.currentTimeMillis()
             val from = now - windowMinutes * 60_000L
@@ -190,7 +197,7 @@ class MetricsDatabase(dataFolder: File) {
      * Averages 60 one-second rows into one-minute rows for [from, to),
      * then deletes the raw rows.
      */
-    suspend fun downsampleToMinute(from: Long, to: Long) = mutex.withLock {
+    suspend fun downsampleToMinute(from: Long, to: Long) = writeMutex.withLock {
         withContext(Dispatchers.IO) {
             conn.autoCommit = false
             try {
@@ -240,7 +247,7 @@ class MetricsDatabase(dataFolder: File) {
      * Averages 15 one-minute rows into one 15-minute row for [from, to),
      * then deletes the minute rows.
      */
-    suspend fun downsampleTo15Min(from: Long, to: Long) = mutex.withLock {
+    suspend fun downsampleTo15Min(from: Long, to: Long) = writeMutex.withLock {
         withContext(Dispatchers.IO) {
             conn.autoCommit = false
             try {
@@ -286,7 +293,7 @@ class MetricsDatabase(dataFolder: File) {
         }
     }
 
-    suspend fun insertPlayerEvent(ts: Long, uuid: String, name: String, action: String) = mutex.withLock {
+    suspend fun insertPlayerEvent(ts: Long, uuid: String, name: String, action: String) = writeMutex.withLock {
         withContext(Dispatchers.IO) {
             conn.prepareStatement(
                 "INSERT INTO player_events (ts, uuid, name, action) VALUES (?,?,?,?)"
@@ -298,10 +305,10 @@ class MetricsDatabase(dataFolder: File) {
         }
     }
 
-    suspend fun playerEvents(from: Long, to: Long): List<PlayerEvent> = mutex.withLock {
+    suspend fun playerEvents(from: Long, to: Long): List<PlayerEvent> = readMutex.withLock {
         withContext(Dispatchers.IO) {
             val result = mutableListOf<PlayerEvent>()
-            conn.prepareStatement(
+            readConn.prepareStatement(
                 "SELECT ts, uuid, name, action FROM player_events WHERE ts >= ? AND ts <= ? ORDER BY ts"
             ).use { ps ->
                 ps.setLong(1, from); ps.setLong(2, to)
@@ -318,10 +325,10 @@ class MetricsDatabase(dataFolder: File) {
         }
     }
 
-    suspend fun gcEvents(from: Long, to: Long): List<GcEvent> = mutex.withLock {
+    suspend fun gcEvents(from: Long, to: Long): List<GcEvent> = readMutex.withLock {
         withContext(Dispatchers.IO) {
             val result = mutableListOf<GcEvent>()
-            conn.prepareStatement(
+            readConn.prepareStatement(
                 "SELECT ts, name, action, cause, duration_ms FROM gc_events WHERE ts >= ? AND ts <= ? ORDER BY ts"
             ).use { ps ->
                 ps.setLong(1, from); ps.setLong(2, to)
@@ -339,7 +346,7 @@ class MetricsDatabase(dataFolder: File) {
         }
     }
 
-    suspend fun prunePlayerEvents(before: Long) = mutex.withLock {
+    suspend fun prunePlayerEvents(before: Long) = writeMutex.withLock {
         withContext(Dispatchers.IO) {
             conn.prepareStatement("DELETE FROM player_events WHERE ts < ?").use { ps ->
                 ps.setLong(1, before); ps.executeUpdate()
@@ -347,7 +354,7 @@ class MetricsDatabase(dataFolder: File) {
         }
     }
 
-    suspend fun pruneGcEvents(before: Long) = mutex.withLock {
+    suspend fun pruneGcEvents(before: Long) = writeMutex.withLock {
         withContext(Dispatchers.IO) {
             conn.prepareStatement("DELETE FROM gc_events WHERE ts < ?").use { ps ->
                 ps.setLong(1, before); ps.executeUpdate()
@@ -357,7 +364,7 @@ class MetricsDatabase(dataFolder: File) {
 
     private fun queryTable(table: String, from: Long, to: Long): List<MetricSnapshot> {
         val result = mutableListOf<MetricSnapshot>()
-        conn.prepareStatement(
+        readConn.prepareStatement(
             """SELECT ts, tps1, tps5, tps15, tick_ms, mem_used, mem_total, mem_max, uptime_ms,
                cpu_pct, sys_mem_used, sys_mem_total, disk_used_gb, disk_total_gb,
                player_count, entity_count, loaded_chunks, ping_p50, ping_p95
@@ -438,7 +445,7 @@ class MetricsDatabase(dataFolder: File) {
         """.trimIndent()
 
         val result = mutableListOf<MetricSnapshot>()
-        conn.prepareStatement(sql).use { ps ->
+        readConn.prepareStatement(sql).use { ps ->
             var idx = 1
             ps.setLong(idx++, origin)
             ps.setLong(idx++, bucketMs)
@@ -479,5 +486,6 @@ class MetricsDatabase(dataFolder: File) {
 
     fun close() {
         try { conn.close() } catch (_: Exception) {}
+        try { readConn.close() } catch (_: Exception) {}
     }
 }

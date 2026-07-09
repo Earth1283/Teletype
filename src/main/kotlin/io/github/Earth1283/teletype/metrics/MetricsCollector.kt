@@ -19,6 +19,16 @@ import javax.management.NotificationEmitter
 import javax.management.NotificationListener
 import javax.management.openmbean.CompositeData
 
+// Avoids the boxing/sublist allocation that LongArray.takeLast(n).average() would
+// incur on every sample tick.
+private fun averageTailNanos(times: LongArray, tailSize: Int): Double {
+    if (times.isEmpty()) return 0.0
+    val start = (times.size - tailSize).coerceAtLeast(0)
+    var sum = 0.0
+    for (i in start until times.size) sum += times[i]
+    return sum / (times.size - start)
+}
+
 private data class SystemMetricSnapshot(
     val memUsedMb: Long,
     val memTotalMb: Long,
@@ -120,7 +130,7 @@ class MetricsCollector(private val plugin: Teletype, private val db: MetricsData
                         tps1          = tps1,
                         tps5          = tps[1].coerceIn(0.0, 20.0),
                         tps15         = tps[2].coerceIn(0.0, 20.0),
-                        tickTimeMs    = Bukkit.getServer().tickTimes.takeLast(20).average() / 1_000_000.0,
+                        tickTimeMs    = averageTailNanos(Bukkit.getServer().tickTimes, 20) / 1_000_000.0,
                         memUsedMb     = system.memUsedMb,
                         memTotalMb    = system.memTotalMb,
                         memMaxMb      = system.memMaxMb,

@@ -1,5 +1,7 @@
 package io.github.Earth1283.teletype.multiplex
 
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
 import java.io.File
@@ -23,12 +25,12 @@ class PortForwardStore(private val dataFolder: File) {
 
     fun getForward(id: String): PortForward? = forwards.find { it.id == id }
 
-    fun addForward(forward: PortForward) {
+    suspend fun addForward(forward: PortForward) {
         forwards.add(forward)
         save()
     }
 
-    fun updateForward(forward: PortForward): Boolean {
+    suspend fun updateForward(forward: PortForward): Boolean {
         val idx = forwards.indexOfFirst { it.id == forward.id }
         if (idx == -1) return false
         forwards[idx] = forward
@@ -36,13 +38,14 @@ class PortForwardStore(private val dataFolder: File) {
         return true
     }
 
-    fun removeForward(id: String): Boolean {
+    suspend fun removeForward(id: String): Boolean {
         val removed = forwards.removeIf { it.id == id }
         if (removed) save()
         return removed
     }
 
-    private fun save() {
+    // Off the Ktor request thread — every forward mutation rewrites the whole file.
+    private suspend fun save() = withContext(Dispatchers.IO) {
         dataFolder.mkdirs()
         file.writeText(json.encodeToString(forwards.toList()))
     }

@@ -1,5 +1,7 @@
 package io.github.Earth1283.teletype.multiplex
 
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
 import java.io.File
@@ -23,12 +25,12 @@ class RouteStore(private val dataFolder: File) {
 
     fun getRoute(id: String): RouteMapping? = routes.find { it.id == id }
 
-    fun addRoute(route: RouteMapping) {
+    suspend fun addRoute(route: RouteMapping) {
         routes.add(route)
         save()
     }
 
-    fun updateRoute(route: RouteMapping): Boolean {
+    suspend fun updateRoute(route: RouteMapping): Boolean {
         val idx = routes.indexOfFirst { it.id == route.id }
         if (idx == -1) return false
         routes[idx] = route
@@ -36,7 +38,7 @@ class RouteStore(private val dataFolder: File) {
         return true
     }
 
-    fun removeRoute(id: String): Boolean {
+    suspend fun removeRoute(id: String): Boolean {
         val removed = routes.removeIf { it.id == id }
         if (removed) save()
         return removed
@@ -47,7 +49,8 @@ class RouteStore(private val dataFolder: File) {
             .filter { it.enabled && path.startsWith(it.prefix) }
             .maxByOrNull { it.prefix.length }
 
-    private fun save() {
+    // Off the Ktor request thread — every route mutation rewrites the whole file.
+    private suspend fun save() = withContext(Dispatchers.IO) {
         dataFolder.mkdirs()
         file.writeText(json.encodeToString(routes.toList()))
     }

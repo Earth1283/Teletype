@@ -3,6 +3,8 @@ package io.github.Earth1283.teletype.actions
 import io.github.Earth1283.teletype.Teletype
 import io.github.Earth1283.teletype.web.model.Snippet
 import io.github.Earth1283.teletype.web.model.SnippetCategory
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
@@ -26,21 +28,24 @@ class SnippetStore(private val plugin: Teletype) {
     @Synchronized fun findSnippet(id: String): Snippet? = snippets.find { it.id == id }
 
     @Synchronized fun load() {
-        if (!file.exists()) { seedDefaults(); save(); return }
+        if (!file.exists()) { seedDefaults(); saveNow(); return }
         try {
             val data = json.decodeFromString<StoreData>(file.readText())
             categories.clear(); categories.addAll(data.categories)
             snippets.clear(); snippets.addAll(data.snippets)
         } catch (e: Exception) {
             plugin.messages.console("data.snippets-load-failed", "error" to (e.message ?: "unknown"))
-            seedDefaults(); save()
+            seedDefaults(); saveNow()
         }
     }
 
-    @Synchronized fun save() {
+    private fun saveNow() {
         plugin.dataFolder.mkdirs()
         file.writeText(json.encodeToString(StoreData(categories.toList(), snippets.toList())))
     }
+
+    // Off the Ktor request thread — saveNow() does a full-file rewrite on every mutation.
+    private suspend fun save() = withContext(Dispatchers.IO) { saveNow() }
 
     private fun seedDefaults() {
         val quickId = plugin.teletypeConfig.actionsQuickActionsCategoryId
@@ -66,33 +71,54 @@ class SnippetStore(private val plugin: Teletype) {
         )
     }
 
-    @Synchronized fun addCategory(cat: SnippetCategory): Boolean {
-        if (categories.any { it.id == cat.id || it.name.equals(cat.name, ignoreCase = true) }) return false
-        categories += cat; save(); return true
+    suspend fun addCategory(cat: SnippetCategory): Boolean {
+        val added = synchronized(this) {
+            if (categories.any { it.id == cat.id || it.name.equals(cat.name, ignoreCase = true) }) false
+            else { categories += cat; true }
+        }
+        if (added) save()
+        return added
     }
 
-    @Synchronized fun removeCategory(id: String): Boolean {
-        if (categories.none { it.id == id }) return false
-        categories.removeIf { it.id == id }
-        val fallback = categories.firstOrNull { !it.special }?.id ?: return true
-        val indices = snippets.indices.filter { snippets[it].categoryId == id }
-        indices.forEach { i -> snippets[i] = snippets[i].copy(categoryId = fallback) }
-        save(); return true
+    suspend fun removeCategory(id: String): Boolean {
+        var shouldSave = false
+        val removed = synchronized(this) {
+            if (categories.none { it.id == id }) return@synchronized false
+            categories.removeIf { it.id == id }
+            val fallback = categories.firstOrNull { !it.special }?.id ?: return@synchronized true
+            val indices = snippets.indices.filter { snippets[it].categoryId == id }
+            indices.forEach { i -> snippets[i] = snippets[i].copy(categoryId = fallback) }
+            shouldSave = true
+            true
+        }
+        if (shouldSave) save()
+        return removed
     }
 
-    @Synchronized fun addSnippet(snippet: Snippet): Boolean {
-        if (snippets.any { it.id == snippet.id }) return false
-        snippets += snippet; save(); return true
+    suspend fun addSnippet(snippet: Snippet): Boolean {
+        val added = synchronized(this) {
+            if (snippets.any { it.id == snippet.id }) false
+            else { snippets += snippet; true }
+        }
+        if (added) save()
+        return added
     }
 
-    @Synchronized fun updateSnippet(updated: Snippet): Boolean {
-        val idx = snippets.indexOfFirst { it.id == updated.id }
-        if (idx < 0) return false
-        snippets[idx] = updated; save(); return true
+    suspend fun updateSnippet(updated: Snippet): Boolean {
+        val didUpdate = synchronized(this) {
+            val idx = snippets.indexOfFirst { it.id == updated.id }
+            if (idx < 0) false else { snippets[idx] = updated; true }
+        }
+        if (didUpdate) save()
+        return didUpdate
     }
 
-    @Synchronized fun removeSnippet(id: String): Boolean {
-        if (snippets.none { it.id == id }) return false
-        snippets.removeIf { it.id == id }; save(); return true
+    suspend fun removeSnippet(id: String): Boolean {
+        val removed = synchronized(this) {
+            if (snippets.none { it.id == id }) false
+            else { snippets.removeIf { it.id == id }; true }
+        }
+        if (removed) save()
+        return removed
     }
 }
