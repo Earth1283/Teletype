@@ -43,7 +43,7 @@
 .tty-display {
   display: block;
   width: 100%;
-  background: #000;
+  background: var(--void);
   border: 1px solid var(--border);
   border-radius: var(--r-md);
   padding: 16px 18px;
@@ -61,7 +61,7 @@
 .tty-copy:not(:disabled):hover,
 .tty-copy:not(:disabled):focus-visible {
   border-color: var(--amber-glow);
-  background: rgba(0, 0, 0, 0.84);
+  background: color-mix(in srgb, var(--void) 88%, transparent);
 }
 .tty-copy:disabled {
   cursor: wait;
@@ -95,12 +95,12 @@
 }
 .tty-expiry {
   margin-top: 8px;
-  color: #52525e;
+  color: var(--text-muted);
   font-size: 11px;
 }
 .tty-prompt { color: var(--green); }
 .tty-cmd {
-  color: #c4c0b6;
+  color: var(--text-secondary);
   overflow-wrap: anywhere;
   word-break: break-word;
 }
@@ -203,7 +203,7 @@
     justify-content: center;
     min-height: 34px;
     margin: 8px 0 0;
-    border-top: 1px solid rgba(255,255,255,0.08);
+    border-top: 1px solid color-mix(in srgb, var(--text-primary) 8%, transparent);
     padding-top: 9px;
   }
   .auth-challenge-value {

@@ -8,7 +8,7 @@
   border: 1px solid var(--border-hi);
   border-radius: var(--r-md);
   padding: 4px;
-  box-shadow: 0 8px 32px rgba(0,0,0,.5);
+  box-shadow: var(--shadow-md);
 }
 .ctx-item {
   display: flex;

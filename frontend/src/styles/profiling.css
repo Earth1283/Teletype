@@ -245,7 +245,7 @@
   white-space: nowrap;
 }
 .prof-table td {
-  padding: 10px 14px;
+  padding: calc(10px * var(--density)) 14px;
   border-bottom: 1px solid var(--border);
   color: var(--ash);
   vertical-align: middle;

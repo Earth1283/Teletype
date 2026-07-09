@@ -2,13 +2,10 @@ import { useEffect, useRef, useState, useMemo } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { api } from './api/client'
 import { useLogs } from './LogContext'
-import {
-  IconActivity, IconTerminal, IconUsers, IconCpu,
-  IconFolder, IconZap, IconSettings, IconPlay, IconSearch, IconCommand,
-} from './Icons'
+import { IconTerminal, IconZap, IconPlay, IconSearch, IconCommand } from './Icons'
+import { TABS, type Tab } from './shell/tabs'
+import { cx } from './design'
 import type { Snippet } from './components/actions/actionTypes'
-
-type Tab = 'glance' | 'console' | 'players' | 'stats' | 'files' | 'actions' | 'settings'
 
 interface PaletteItem {
   id: string
@@ -19,15 +16,33 @@ interface PaletteItem {
   run: () => void
 }
 
-const NAV_ITEMS: Array<{ tab: Tab; label: string; icon: React.ReactNode }> = [
-  { tab: 'glance',   label: 'Glance',   icon: <IconActivity size={14} /> },
-  { tab: 'console',  label: 'Console',  icon: <IconTerminal size={14} /> },
-  { tab: 'players',  label: 'Players',  icon: <IconUsers size={14} /> },
-  { tab: 'stats',    label: 'Stats',    icon: <IconCpu size={14} /> },
-  { tab: 'files',    label: 'Files',    icon: <IconFolder size={14} /> },
-  { tab: 'actions',  label: 'Actions',  icon: <IconZap size={14} /> },
-  { tab: 'settings', label: 'Settings', icon: <IconSettings size={14} /> },
-]
+type Recent =
+  | { kind: 'console'; cmd: string }
+  | { kind: 'snippet'; id: string; name: string }
+
+const RECENTS_KEY = 'teletype-palette-recents-v1'
+const RECENTS_MAX = 6
+
+function loadRecents(): Recent[] {
+  try {
+    const parsed = JSON.parse(localStorage.getItem(RECENTS_KEY) ?? '[]')
+    return Array.isArray(parsed) ? parsed : []
+  } catch {
+    return []
+  }
+}
+
+function sameRecent(a: Recent, b: Recent): boolean {
+  if (a.kind !== b.kind) return false
+  return a.kind === 'console'
+    ? a.cmd === (b as { cmd: string }).cmd
+    : a.id === (b as { id: string }).id
+}
+
+function pushRecent(r: Recent) {
+  const next = [r, ...loadRecents().filter(x => !sameRecent(x, r))].slice(0, RECENTS_MAX)
+  localStorage.setItem(RECENTS_KEY, JSON.stringify(next))
+}
 
 function scoreMatch(text: string, query: string): number {
   if (!query) return 1
@@ -57,6 +72,7 @@ interface Props {
 export default function CommandPalette({ open, onClose, onNavigate }: Props) {
   const [query, setQuery] = useState('')
   const [selectedIndex, setSelectedIndex] = useState(0)
+  const [recents, setRecents] = useState<Recent[]>([])
   const inputRef = useRef<HTMLInputElement>(null)
   const listRef = useRef<HTMLDivElement>(null)
   const { send } = useLogs()
@@ -83,16 +99,51 @@ export default function CommandPalette({ open, onClose, onNavigate }: Props) {
         sub: 'send to server console',
         category: 'Console',
         icon: <IconTerminal size={14} />,
-        run: () => { send(consoleCmd); onClose() },
+        run: () => {
+          send(consoleCmd)
+          pushRecent({ kind: 'console', cmd: consoleCmd })
+          onClose()
+        },
       }]
     }
 
-    const nav: PaletteItem[] = NAV_ITEMS.map(n => ({
-      id: `nav-${n.tab}`,
-      label: n.label,
+    const recent: PaletteItem[] = recents.flatMap(r => {
+      if (r.kind === 'console') {
+        return [{
+          id: `recent-cmd-${r.cmd}`,
+          label: r.cmd,
+          sub: 'run again',
+          category: 'Recent',
+          icon: <IconTerminal size={14} />,
+          run: () => {
+            send(r.cmd)
+            pushRecent(r)
+            onClose()
+          },
+        }]
+      }
+      const s = snippets.find(x => x.id === r.id)
+      if (!s) return []
+      return [{
+        id: `recent-snip-${s.id}`,
+        label: s.name,
+        sub: s.cmds[0],
+        category: 'Recent',
+        icon: <IconZap size={14} />,
+        run: () => {
+          api.post(`/actions/execute/${s.id}`, { vars: {} }).catch(() => {})
+          pushRecent(r)
+          onClose()
+        },
+      }]
+    })
+
+    const nav: PaletteItem[] = TABS.map(t => ({
+      id: `nav-${t.id}`,
+      label: t.label,
       category: 'Navigate',
-      icon: n.icon,
-      run: () => { onNavigate(n.tab); onClose() },
+      icon: <t.Icon size={14} />,
+      run: () => { onNavigate(t.id); onClose() },
     }))
 
     const qa = snippets
@@ -108,6 +159,7 @@ export default function CommandPalette({ open, onClose, onNavigate }: Props) {
             onNavigate('actions')
           } else {
             api.post(`/actions/execute/${s.id}`, { vars: {} }).catch(() => {})
+            pushRecent({ kind: 'snippet', id: s.id, name: s.name })
           }
           onClose()
         },
@@ -126,13 +178,14 @@ export default function CommandPalette({ open, onClose, onNavigate }: Props) {
             onNavigate('actions')
           } else {
             api.post(`/actions/execute/${s.id}`, { vars: {} }).catch(() => {})
+            pushRecent({ kind: 'snippet', id: s.id, name: s.name })
           }
           onClose()
         },
       }))
 
-    return [...nav, ...qa, ...other]
-  }, [snippets, consoleCmd, onNavigate, onClose, send])
+    return [...recent, ...nav, ...qa, ...other]
+  }, [snippets, recents, consoleCmd, onNavigate, onClose, send])
 
   const filtered = useMemo(() => {
     if (consoleCmd) return allItems
@@ -159,6 +212,7 @@ export default function CommandPalette({ open, onClose, onNavigate }: Props) {
     if (open) {
       setQuery('')
       setSelectedIndex(0)
+      setRecents(loadRecents())
       setTimeout(() => inputRef.current?.focus(), 30)
     }
   }, [open])
@@ -193,30 +247,32 @@ export default function CommandPalette({ open, onClose, onNavigate }: Props) {
   let flatIdx = 0
 
   return (
-    <div className="palette-overlay" onClick={onClose}>
-      <div className="palette-dialog" onClick={e => e.stopPropagation()}>
-
-        <div className="palette-search-row">
-          <IconSearch size={15} className="palette-search-icon" />
+    <div className="fixed inset-0 z-palette flex items-start justify-center bg-scrim pt-[12vh] backdrop-blur-[2px]" onClick={onClose}>
+      <div
+        className="animate-[palette-in_180ms_cubic-bezier(0.16,1,0.3,1)] w-[90vw] max-w-[560px] overflow-hidden rounded-lg border border-border-hi bg-surface shadow-2xl"
+        onClick={e => e.stopPropagation()}
+      >
+        <div className="flex items-center gap-2.5 border-b border-border px-4 py-3">
+          <IconSearch size={15} className="shrink-0 text-text-muted" />
           <input
             ref={inputRef}
-            className="palette-input"
+            className="min-w-0 flex-1 bg-transparent font-sans text-[13.5px] text-text-primary placeholder:text-text-muted focus:outline-none"
             placeholder="Search commands, snippets, or type run <cmd>…"
             value={query}
             onChange={e => setQuery(e.target.value)}
             spellCheck={false}
             autoComplete="off"
           />
-          <kbd className="palette-esc-hint">Esc</kbd>
+          <kbd className="rounded-sm border border-border px-1.5 py-0.5 font-mono text-[10px] text-text-muted">Esc</kbd>
         </div>
 
-        <div className="palette-results" ref={listRef}>
+        <div className="max-h-[360px] overflow-y-auto p-2" ref={listRef}>
           {flatItems.length === 0 ? (
-            <div className="palette-empty">No results for "{query}"</div>
+            <div className="px-3 py-6 text-center font-sans text-[13px] text-text-muted">No results for &ldquo;{query}&rdquo;</div>
           ) : (
             Array.from(grouped.entries()).map(([category, items]) => (
               <div key={category}>
-                <div className="palette-group-label">{category}</div>
+                <div className="px-2.5 pb-1 pt-2.5 font-mono text-[10px] uppercase tracking-[0.1em] text-text-muted">{category}</div>
                 {items.map(item => {
                   const idx = flatIdx++
                   const active = idx === selectedIndex
@@ -224,14 +280,17 @@ export default function CommandPalette({ open, onClose, onNavigate }: Props) {
                     <button
                       key={item.id}
                       data-idx={idx}
-                      className={`palette-item${active ? ' active' : ''}`}
+                      className={cx(
+                        'flex w-full items-center gap-2.5 rounded-sm px-2.5 py-2 text-left font-sans text-[13px]',
+                        active ? 'bg-accent/10 text-text-primary' : 'text-text-secondary',
+                      )}
                       onMouseEnter={() => setSelectedIndex(idx)}
                       onClick={() => item.run()}
                     >
-                      <span className="palette-item-icon">{item.icon}</span>
-                      <span className="palette-item-label">{item.label}</span>
-                      {item.sub && <span className="palette-item-sub">{item.sub}</span>}
-                      {active && <span className="palette-item-enter">↵</span>}
+                      <span className={cx('shrink-0', active ? 'text-accent' : 'text-text-muted')}>{item.icon}</span>
+                      <span className="min-w-0 flex-1 truncate">{item.label}</span>
+                      {item.sub && <span className="truncate font-mono text-[11px] text-text-muted">{item.sub}</span>}
+                      {active && <span className="shrink-0 text-accent">↵</span>}
                     </button>
                   )
                 })}
@@ -240,11 +299,11 @@ export default function CommandPalette({ open, onClose, onNavigate }: Props) {
           )}
         </div>
 
-        <div className="palette-footer">
-          <span><kbd>↑↓</kbd> navigate</span>
-          <span><kbd>↵</kbd> run</span>
-          <span><kbd>Esc</kbd> close</span>
-          <span style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 4 }}>
+        <div className="flex items-center gap-4 border-t border-border px-4 py-2 font-mono text-[10px] text-text-muted">
+          <span className="flex items-center gap-1"><kbd className="rounded-sm border border-border px-1">↑↓</kbd> navigate</span>
+          <span className="flex items-center gap-1"><kbd className="rounded-sm border border-border px-1">↵</kbd> run</span>
+          <span className="flex items-center gap-1"><kbd className="rounded-sm border border-border px-1">Esc</kbd> close</span>
+          <span className="ml-auto flex items-center gap-1">
             <IconCommand size={11} />
             <span>K</span>
           </span>

@@ -1,8 +1,11 @@
 import { useEffect } from 'react'
+import { Modal, Eyebrow, Button } from '../design'
 
 const SHORTCUTS: { group: string; keys: string[]; label: string }[] = [
   { group: 'Global',  keys: ['?'],          label: 'Show keyboard shortcuts' },
   { group: 'Global',  keys: ['⌘', 'K'],     label: 'Open command palette' },
+  { group: 'Global',  keys: ['Alt', '1–9'], label: 'Jump to tab (sidebar order)' },
+  { group: 'Global',  keys: ['Alt', '0'],   label: 'Jump to Settings' },
   { group: 'Global',  keys: ['Esc'],         label: 'Close dialog / overlay' },
   { group: 'Console', keys: ['↑', '↓'],      label: 'Navigate command history' },
   { group: 'Console', keys: ['Tab'],          label: 'Tab-complete command' },
@@ -23,26 +26,30 @@ export default function KeyboardHelp({ open, onClose }: { open: boolean; onClose
     return () => window.removeEventListener('keydown', handler)
   }, [open, onClose])
 
-  if (!open) return null
-
   return (
-    <div className="modal-overlay" onClick={e => { if (e.target === e.currentTarget) onClose() }}>
-      <div className="kbd-help-card">
-        <div className="kbd-help-header">
-          <span className="kbd-help-title">Keyboard Shortcuts</span>
-          <button className="btn-ghost btn-xs" onClick={onClose}>Close</button>
-        </div>
+    <Modal
+      open={open}
+      onClose={onClose}
+      title={
+        <>
+          <span>Keyboard Shortcuts</span>
+          <Button variant="ghost" size="xs" onClick={onClose}>Close</Button>
+        </>
+      }
+      className="max-w-[420px]"
+    >
+      <div className="flex flex-col gap-4">
         {GROUPS.map(group => (
-          <div key={group} className="kbd-help-group">
-            <div className="kbd-help-group-label">{group}</div>
+          <div key={group}>
+            <Eyebrow className="mb-1.5 block">{group}</Eyebrow>
             {SHORTCUTS.filter(s => s.group === group).map(s => (
-              <div key={s.label} className="kbd-help-row">
-                <span className="kbd-help-desc">{s.label}</span>
-                <span className="kbd-help-keys">
+              <div key={s.label} className="flex items-center justify-between py-1.5">
+                <span className="font-sans text-[12.5px] text-text-secondary">{s.label}</span>
+                <span className="flex items-center gap-1">
                   {s.keys.map((k, i) => (
-                    <span key={i}>
-                      <kbd className="kbd-key">{k}</kbd>
-                      {i < s.keys.length - 1 && <span className="kbd-plus">+</span>}
+                    <span key={i} className="flex items-center gap-1">
+                      <kbd className="rounded-sm border border-border-hi bg-surface-raised px-1.5 py-0.5 font-mono text-[11px] text-text-primary">{k}</kbd>
+                      {i < s.keys.length - 1 && <span className="text-text-muted">+</span>}
                     </span>
                   ))}
                 </span>
@@ -51,6 +58,6 @@ export default function KeyboardHelp({ open, onClose }: { open: boolean; onClose
           </div>
         ))}
       </div>
-    </div>
+    </Modal>
   )
 }

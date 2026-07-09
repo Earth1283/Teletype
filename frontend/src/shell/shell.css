@@ -1,0 +1,6 @@
+/* Runtime "force mobile view" toggle — overrides the sm: breakpoint regardless
+   of actual viewport width, so it can't be expressed as pure Tailwind variants. */
+.shell.force-mobile .sidebar { display: none !important; }
+.shell.force-mobile .mobile-header { display: flex !important; }
+.shell.force-mobile .mobile-bottom-nav { display: flex !important; }
+.shell.force-mobile .main { margin-top: 3rem !important; }

@@ -122,7 +122,7 @@
   padding: 8px 14px;
   min-height: 36px;
 }
-.s-row:hover { background: rgba(255,255,255,0.015); }
+.s-row:hover { background: color-mix(in srgb, var(--text-primary) 2%, transparent); }
 .s-row-labels { flex: 1; min-width: 0; }
 .s-row-label {
   font-family: var(--sans);
@@ -159,7 +159,8 @@
   left: 3px;
   width: 14px;
   height: 14px;
-  background: var(--ash);
+  background: #fff;
+  box-shadow: var(--shadow-sm);
   border-radius: 50%;
   transition: transform 180ms;
   pointer-events: none;
@@ -406,12 +407,12 @@
 .s-sidebar {
   width: 190px;
   flex-shrink: 0;
-  border-right: 0.5px solid rgba(255,255,255,0.07);
+  border-right: 0.5px solid color-mix(in srgb, var(--text-primary) 7%, transparent);
   padding: 14px 8px;
   display: flex;
   flex-direction: column;
   gap: 1px;
-  background: rgba(255,255,255,0.012);
+  background: color-mix(in srgb, var(--text-primary) 1.5%, transparent);
   overflow-y: auto;
   scrollbar-width: thin;
 }
@@ -420,7 +421,7 @@
   font-family: -apple-system, var(--sans), sans-serif;
   font-size: 10.5px;
   font-weight: 600;
-  color: rgba(180,180,200,0.42);
+  color: var(--text-muted);
   letter-spacing: 0.07em;
   text-transform: uppercase;
   padding: 4px 8px 8px;
@@ -428,7 +429,7 @@
 
 .s-sidebar-sep {
   height: 0.5px;
-  background: rgba(255,255,255,0.06);
+  background: color-mix(in srgb, var(--text-primary) 6%, transparent);
   margin: 4px 8px;
 }
 
@@ -441,7 +442,7 @@
   cursor: default;
   border: none;
   background: none;
-  color: rgba(210,210,230,0.72);
+  color: var(--text-secondary);
   font-family: -apple-system, var(--sans), sans-serif;
   font-size: 12.5px;
   text-align: left;
@@ -449,7 +450,7 @@
   transition: background 60ms;
 }
 
-.s-nav-item:hover { background: rgba(255,255,255,0.06); }
+.s-nav-item:hover { background: color-mix(in srgb, var(--text-primary) 6%, transparent); }
 
 .s-nav-icon { width: 18px; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
 .s-nav-label { flex: 1; }
@@ -476,7 +477,7 @@
     overflow-x: auto;
     padding: 8px;
     border-right: none;
-    border-bottom: 0.5px solid rgba(255,255,255,0.07);
+    border-bottom: 0.5px solid color-mix(in srgb, var(--text-primary) 7%, transparent);
     flex-wrap: nowrap;
     gap: 4px;
     scrollbar-width: none;

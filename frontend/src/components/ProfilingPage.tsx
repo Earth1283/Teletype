@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import {
-  BarChart, Bar, LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid,
+  BarChart, Bar, LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid, LabelList,
 } from 'recharts'
 import { api, TOKEN_KEY } from '../api/client'
 import { useToast } from '../ToastContext'
@@ -228,29 +228,71 @@ function EventSummaryModal({ recording, onClose }: { recording: JfrRecording; on
               </div>
             )}
 
-            {profile.topLocks.length > 0 && (
-              <div className="prof-event-section">
-                <div className="prof-event-section-title">Top Lock Contention</div>
-                <table className="prof-lock-table">
-                  <thead>
-                    <tr>
-                      <th>Class</th>
-                      <th>Total Blocked</th>
-                      <th>Count</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {profile.topLocks.slice(0, 10).map((lock, i) => (
-                      <tr key={i}>
-                        <td className="prof-lock-class" title={lock.className}>{shortClass(lock.className)}</td>
-                        <td>{fmtMs(lock.totalBlockedMs)}</td>
-                        <td>{lock.count.toLocaleString()}</td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            )}
+            {profile.topLocks.length > 0 && (() => {
+              const topLocks = profile.topLocks.slice(0, 10).map(l => ({ ...l, shortName: shortClass(l.className) }))
+              return (
+                <div className="prof-event-section">
+                  <div className="prof-event-section-title">Top Lock Contention</div>
+                  <ResponsiveContainer width="100%" height={Math.max(90, topLocks.length * 26)}>
+                    <BarChart layout="vertical" data={topLocks} margin={{ top: 4, right: 52, bottom: 4, left: 4 }}>
+                      <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" horizontal={false} />
+                      <XAxis type="number" hide />
+                      <YAxis
+                        type="category"
+                        dataKey="shortName"
+                        width={130}
+                        tick={{ fontSize: 10, fill: 'var(--mist)', fontFamily: 'var(--mono)' }}
+                        tickLine={false}
+                        axisLine={false}
+                      />
+                      <Tooltip
+                        content={({ active, payload }: any) => {
+                          if (!active || !payload?.length) return null
+                          const d = payload[0].payload
+                          return (
+                            <div className="rounded-sm border border-border bg-surface px-2.5 py-1.5 font-mono text-[11px] text-text-primary">
+                              <div className="mb-0.5" title={d.className}>{d.shortName}</div>
+                              <div className="text-text-muted">{fmtMs(d.totalBlockedMs)} · {d.count.toLocaleString()} events</div>
+                            </div>
+                          )
+                        }}
+                      />
+                      <Bar dataKey="totalBlockedMs" fill="var(--chart-seq-400)" radius={[0, 4, 4, 0]} barSize={14}>
+                        <LabelList
+                          dataKey="totalBlockedMs"
+                          position="right"
+                          formatter={(v: unknown) => fmtMs(Number(v))}
+                          style={{ fontFamily: 'var(--mono)', fontSize: 10, fill: 'var(--mist)' }}
+                        />
+                      </Bar>
+                    </BarChart>
+                  </ResponsiveContainer>
+                  <details className="mt-2">
+                    <summary className="cursor-pointer font-mono text-[10px] uppercase tracking-wide text-text-muted hover:text-text-secondary">
+                      View exact counts
+                    </summary>
+                    <table className="prof-lock-table mt-1.5">
+                      <thead>
+                        <tr>
+                          <th>Class</th>
+                          <th>Total Blocked</th>
+                          <th>Count</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {topLocks.map((lock, i) => (
+                          <tr key={i}>
+                            <td className="prof-lock-class" title={lock.className}>{lock.shortName}</td>
+                            <td>{fmtMs(lock.totalBlockedMs)}</td>
+                            <td>{lock.count.toLocaleString()}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </details>
+                </div>
+              )
+            })()}
 
             {profile.gcPauses.length === 0 && profile.cpuSamples.length === 0 && profile.topLocks.length === 0 && (
               <div style={{ color: 'var(--ghost)', fontSize: 13, padding: '16px 0', textAlign: 'center' }}>
@@ -585,12 +627,20 @@ export default function ProfilingPage() {
               <span className="prof-cfg-label">Dump on Exit</span>
               <span className="prof-cfg-val">{cfg.dumpOnExit ? 'yes' : 'no'}</span>
             </div>
-            {recInfo && (
-              <div className="prof-cfg-item">
-                <span className="prof-cfg-label">Total Saved</span>
-                <span className="prof-cfg-val">{fmtBytes(recInfo.totalSizeBytes)} / {recInfo.maxTotalDiskMb} MB</span>
-              </div>
-            )}
+            {recInfo && (() => {
+              const usedMb = recInfo.totalSizeBytes / 1_048_576
+              const pct = recInfo.maxTotalDiskMb > 0 ? Math.min(1, usedMb / recInfo.maxTotalDiskMb) : 0
+              const color = pct > 0.9 ? 'var(--status-critical)' : pct > 0.75 ? 'var(--status-serious)' : pct > 0.5 ? 'var(--status-warning)' : 'var(--status-good)'
+              return (
+                <div className="prof-cfg-item">
+                  <span className="prof-cfg-label">Total Saved</span>
+                  <span className="prof-cfg-val">{fmtBytes(recInfo.totalSizeBytes)} / {recInfo.maxTotalDiskMb} MB</span>
+                  <div className="mt-1.5 h-1 w-full overflow-hidden rounded-full bg-border/50">
+                    <div className="h-full rounded-full" style={{ width: `${pct * 100}%`, background: color }} />
+                  </div>
+                </div>
+              )
+            })()}
           </div>
         )}
 
@@ -707,6 +757,26 @@ export default function ProfilingPage() {
           </div>
         ) : (
           <div className="prof-table-wrap">
+            {(() => {
+              const dumpBytes = savedRecordings.filter(r => r.type === 'CONTINUOUS_DUMP').reduce((s, r) => s + (r.sizeBytes ?? 0), 0)
+              const manualBytes = savedRecordings.filter(r => r.type !== 'CONTINUOUS_DUMP').reduce((s, r) => s + (r.sizeBytes ?? 0), 0)
+              const total = dumpBytes + manualBytes
+              if (total <= 0) return null
+              const dumpPct = (dumpBytes / total) * 100
+              return (
+                <div className="mb-3 flex items-center gap-3">
+                  <div className="flex h-2 flex-1 overflow-hidden rounded-full">
+                    {dumpBytes > 0 && <div className="rounded-l-full" style={{ width: `${dumpPct}%`, background: 'var(--chart-cat-1)' }} />}
+                    {dumpBytes > 0 && manualBytes > 0 && <div className="w-0.5 shrink-0 bg-surface" />}
+                    {manualBytes > 0 && <div className="rounded-r-full" style={{ width: `${100 - dumpPct}%`, background: 'var(--chart-cat-2)' }} />}
+                  </div>
+                  <span className="flex shrink-0 items-center gap-3 whitespace-nowrap font-mono text-[10px] text-text-muted">
+                    <span className="flex items-center gap-1.5"><span className="h-2 w-2 rounded-full" style={{ background: 'var(--chart-cat-1)' }} />dump {fmtBytes(dumpBytes)}</span>
+                    <span className="flex items-center gap-1.5"><span className="h-2 w-2 rounded-full" style={{ background: 'var(--chart-cat-2)' }} />manual {fmtBytes(manualBytes)}</span>
+                  </span>
+                </div>
+              )
+            })()}
             <table className="prof-table">
               <thead>
                 <tr>

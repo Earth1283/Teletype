@@ -1,11 +1,9 @@
 import { useRef } from 'react'
-import { useSettings } from '../SettingsContext'
-import { DEFAULT_THEME_ID } from '../themes'
+import { useSettings, type ThemePalette } from '../SettingsContext'
 import {
-  IconEyeOff, IconSliders, IconTerminal, IconCommand, IconCode, IconPalette,
+  IconEyeOff, IconSliders, IconTerminal, IconCommand, IconCode,
   IconActivity, IconSettings, IconRefresh, IconMonitor, IconApple,
 } from '../Icons'
-import { THEMES, getTheme } from '../themes'
 import { CONTEXT_WHEEL_ACTIONS } from '../contextWheelActions'
 
 // ── Primitive controls ────────────────────────────────────────────────────────
@@ -80,6 +78,18 @@ function Section({ title, icon, dimmed, children, sectionRef }: {
   )
 }
 
+// ── Theme palettes (preview colors are intentionally literal: a swatch must
+//    show its own palette regardless of the active theme) ─────────────────────
+
+const THEME_SWATCHES: { id: ThemePalette; name: string; accent: string; bg: string; surface: string }[] = [
+  { id: 'cobalt',  name: 'Cobalt',  accent: '#4C82F7', bg: '#0D0F13', surface: '#1B1E25' },
+  { id: 'signal',  name: 'Signal',  accent: '#F5A524', bg: '#0A0A0C', surface: '#1B1B1F' },
+  { id: 'verdant', name: 'Verdant', accent: '#3FB380', bg: '#0D0F13', surface: '#1B1E25' },
+  { id: 'iris',    name: 'Iris',    accent: '#9089F5', bg: '#0D0F13', surface: '#1B1E25' },
+  { id: 'ocean',   name: 'Ocean',   accent: '#3EB8CE', bg: '#0D0F13', surface: '#1B1E25' },
+  { id: 'rose',    name: 'Rose',    accent: '#E5729A', bg: '#0D0F13', surface: '#1B1E25' },
+]
+
 // ── Sidebar nav item ──────────────────────────────────────────────────────────
 
 function NavItem({ label, icon, onClick }: { label: string; icon: React.ReactNode; onClick: () => void }) {
@@ -103,8 +113,8 @@ export default function SettingsPage() {
   const setStats   = (patch: Partial<typeof settings.stats>)  => update({ stats: patch })
   const setContextWheel = (patch: Partial<typeof settings.contextWheel>) => update({ contextWheel: patch })
 
+  const refAppearance = useRef<HTMLDivElement>(null)
   const refFunMode    = useRef<HTMLDivElement>(null)
-  const refTheme      = useRef<HTMLDivElement>(null)
   const refGreyBeard  = useRef<HTMLDivElement>(null)
   const refGlance     = useRef<HTMLDivElement>(null)
   const refConsole    = useRef<HTMLDivElement>(null)
@@ -113,19 +123,6 @@ export default function SettingsPage() {
   const refWheel      = useRef<HTMLDivElement>(null)
   const refEditor     = useRef<HTMLDivElement>(null)
   const refReset      = useRef<HTMLDivElement>(null)
-  const hoverTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
-
-  function startThemePreview(themeId: string) {
-    if (hoverTimerRef.current) clearTimeout(hoverTimerRef.current)
-    hoverTimerRef.current = setTimeout(() => {
-      document.documentElement.dataset.theme = themeId
-    }, 200)
-  }
-
-  function endThemePreview() {
-    if (hoverTimerRef.current) { clearTimeout(hoverTimerRef.current); hoverTimerRef.current = null }
-    document.documentElement.dataset.theme = settings.theme ?? DEFAULT_THEME_ID
-  }
 
   const scrollTo = (ref: React.RefObject<HTMLDivElement | null>) => {
     ref.current?.scrollIntoView({ behavior: 'smooth', block: 'nearest' })
@@ -136,8 +133,8 @@ export default function SettingsPage() {
       {/* Sidebar */}
       <div className="s-sidebar">
         <div className="s-sidebar-header">Preferences</div>
+        <NavItem label="Appearance"    icon={<IconSliders size={13} />}  onClick={() => scrollTo(refAppearance)} />
         <NavItem label="Fun Mode"      icon={<IconMonitor size={13} />}  onClick={() => scrollTo(refFunMode)} />
-        <NavItem label="Appearance"    icon={<IconPalette size={13} />}  onClick={() => scrollTo(refTheme)} />
         <NavItem label="Grey Beard"    icon={<IconEyeOff size={13} />}   onClick={() => scrollTo(refGreyBeard)} />
         <div className="s-sidebar-sep" />
         <NavItem label="Glance"        icon={<IconActivity size={13} />} onClick={() => scrollTo(refGlance)} />
@@ -153,6 +150,51 @@ export default function SettingsPage() {
 
       {/* Content */}
       <div className="s-content">
+        {/* ── Appearance ───────────────────────────────────────────── */}
+        <Section title="Appearance" icon={<IconSliders size={13} />} sectionRef={refAppearance}>
+          <Row label="Mode" sub="System follows your OS light/dark preference">
+            <div className="s-seg">
+              {(['system', 'light', 'dark'] as const).map(m => (
+                <button key={m}
+                  className={`s-seg-btn${settings.appearance.mode === m ? ' active' : ''}`}
+                  onClick={() => update({ appearance: { mode: m } })}>
+                  {m === 'system' ? 'System' : m === 'light' ? 'Light' : 'Dark'}
+                </button>
+              ))}
+            </div>
+          </Row>
+          <div className="s-divider" />
+          <div className="s-subsection-label">Theme</div>
+          <div className="s-theme-grid">
+            {THEME_SWATCHES.map(t => (
+              <button
+                key={t.id}
+                className={`s-theme-swatch${settings.appearance.theme === t.id ? ' active' : ''}`}
+                onClick={() => update({ appearance: { theme: t.id } })}
+                aria-pressed={settings.appearance.theme === t.id}
+              >
+                <span className="s-theme-preview" style={{ background: t.bg }}>
+                  <span className="s-theme-line" style={{ background: t.surface, opacity: 1 }} />
+                  <span className="s-theme-accent" style={{ background: t.accent }} />
+                </span>
+                <span className="s-theme-name">{t.name}</span>
+              </button>
+            ))}
+          </div>
+          <div className="s-divider" />
+          <Row label="Density" sub="Compact tightens tables and controls to fit more on screen">
+            <div className="s-seg">
+              {(['comfortable', 'compact'] as const).map(d => (
+                <button key={d}
+                  className={`s-seg-btn${settings.appearance.density === d ? ' active' : ''}`}
+                  onClick={() => update({ appearance: { density: d } })}>
+                  {d === 'comfortable' ? 'Comfortable' : 'Compact'}
+                </button>
+              ))}
+            </div>
+          </Row>
+        </Section>
+
         {/* ── Appleify (mobile-only easter egg) ────────────────────── */}
         <div className={`appleify-card${settings.appleify ? ' fun-active' : ''}`}>
           <span className="appleify-card-icon"><IconApple size={22} /></span>
@@ -178,38 +220,6 @@ export default function SettingsPage() {
             </div>
           </div>
           <Toggle value={settings.fun} onChange={v => update({ fun: v })} />
-        </div>
-
-        {/* ── Theme ────────────────────────────────────────────────── */}
-        <div ref={refTheme}>
-          <Section title="Theme" icon={<IconPalette size={13} />}>
-            <div className="s-theme-grid">
-              {THEMES.map(t => {
-                const active = (settings.theme ?? 'void-amber') === t.id
-                return (
-                  <button
-                    key={t.id}
-                    className={`s-theme-swatch${active ? ' active' : ''}`}
-                    onClick={() => { endThemePreview(); update({ theme: t.id }) }}
-                    onMouseEnter={() => startThemePreview(t.id)}
-                    onMouseLeave={endThemePreview}
-                    title={t.name}
-                  >
-                    <span className="s-theme-preview" style={{ background: t.bg }}>
-                      <span className="s-theme-accent" style={{ background: t.accent }} />
-                      {t.base === 'light' && (
-                        <span className="s-theme-line" style={{ background: '#d4d4d8' }} />
-                      )}
-                    </span>
-                    <span className="s-theme-name">{t.name}</span>
-                  </button>
-                )
-              })}
-            </div>
-            <div style={{ padding: '4px 14px 8px', fontFamily: 'var(--mono)', fontSize: 10, color: 'var(--ghost)' }}>
-              Current: {getTheme(settings.theme ?? 'void-amber').name}
-            </div>
-          </Section>
         </div>
 
         {/* ── Grey Beard Mode ──────────────────────────────────────── */}

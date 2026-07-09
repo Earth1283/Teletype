@@ -1,42 +1,147 @@
-/* ── Color Themes ─────────────────────────────────────────────────────────── */
+/* ── Theme engine ────────────────────────────────────────────────────────────
+   Two axes on <html>, applied by AppearanceApplier (App.tsx):
+     data-mode  = "dark" | "light"      (resolved; "system" resolves in JS)
+     data-theme = "cobalt" | "signal" | "verdant" | "iris" | "ocean" | "rose"
 
-/* Cyan / Teal — new defaults */
-html[data-theme="void-cyan"]   { --amber: #22d3ee; }
-html[data-theme="void-teal"]   { --amber: #00c896; }
+   This file owns every COLOR decision. Scales (space/type/radii/z) and the
+   derived accent tints live in tokens.css and follow --accent automatically.
 
-/* Dark accent variants — only --amber changes; all derived vars update automatically */
-html[data-theme="void-blue"]   { --amber: #60a5fa; }
-html[data-theme="void-green"]  { --amber: #4ade80; }
-html[data-theme="void-rose"]   { --amber: #fb7185; }
-html[data-theme="void-purple"] { --amber: #a78bfa; }
+   Palette accents are picked per mode: dark accents sit ~L65 for legibility
+   on dark surfaces, light accents ~L45 so accent text passes on white.
+   "Signal" is the legacy phosphor-amber console and additionally restores
+   its original near-black neutrals in dark mode.                            */
 
-/* Slate — GitHub-dark-like cool backgrounds, amber accent */
-html[data-theme="slate-amber"] {
-  --void:      #0d1117;
-  --surface:   #161b22;
-  --elevated:  #21262d;
-  --border:    #30363d;
-  --border-hi: #484f58;
-  --ash:       #e6edf3;
-  --mist:      #8b949e;
-  --ghost:     #6e7681;
+/* ── Neutrals: dark (default) ─────────────────────────────────────────────── */
+:root,
+:root[data-mode='dark'] {
+  color-scheme: dark;
+
+  --void:           #0D0F13;
+  --surface:        #14161B;
+  --elevated:       #1B1E25;
+  --border:         #262A32;
+  --border-hi:      #353B46;
+
+  --text-primary:   #E9EBEE;
+  --text-secondary: #9BA1AC;
+  --text-muted:     #5E6572;
+
+  --live:           #2dd4bf;
+
+  /* Small-scale semantic accents (dots, toasts, misc single-color UI) */
+  --green:  #34d399;
+  --red:    #f56565;
+  --blue:   #6ba3f7;
+  --yellow: #fbbf24;
+
+  /* Reserved 4-tone severity scale — gauges, JFR/audit badges, thresholds.
+     Never reuse for chart series identity; always paired with icon+label. */
+  --status-good:     #169c4e;
+  --status-warning:  #ad8a1f;
+  --status-serious:  #b84b14;
+  --status-critical: #d42534;
+
+  --scrim: rgba(8, 9, 12, 0.62);
+
+  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.35);
+  --shadow-md: 0 4px 14px rgba(0, 0, 0, 0.42);
+  --shadow-lg: 0 16px 40px rgba(0, 0, 0, 0.5);
 }
 
-/* Light themes */
-html[data-theme="light-amber"],
-html[data-theme="light-blue"] {
-  --void:      #f8f9fc;
-  --surface:   #ffffff;
-  --elevated:  #f1f3f8;
-  --border:    #dde2ef;
-  --border-hi: #c8d0e4;
-  --ash:       #161b2e;
-  --mist:      #4a5578;
-  --ghost:     #8090b8;
-  --green:     #16a34a;
-  --red:       #dc2626;
-  --blue:      #2563eb;
-  --yellow:    #ca8a04;
+/* ── Neutrals: light ──────────────────────────────────────────────────────── */
+:root[data-mode='light'] {
+  color-scheme: light;
+
+  --void:           #F4F5F7;
+  --surface:        #FFFFFF;
+  --elevated:       #FFFFFF;
+  --border:         #E3E6EC;
+  --border-hi:      #C9CFD9;
+
+  --text-primary:   #1B1F26;
+  --text-secondary: #566070;
+  --text-muted:     #8B93A0;
+
+  --live:           #0d9488;
+
+  --green:  #0f9d63;
+  --red:    #dc3d43;
+  --blue:   #2f6fdb;
+  --yellow: #a17600;
+
+  --status-good:     #157f44;
+  --status-warning:  #8a6d00;
+  --status-serious:  #a53d0a;
+  --status-critical: #c11326;
+
+  --scrim: rgba(23, 26, 31, 0.42);
+
+  --shadow-sm: 0 1px 2px rgba(16, 24, 40, 0.06);
+  --shadow-md: 0 4px 14px rgba(16, 24, 40, 0.1);
+  --shadow-lg: 0 16px 40px rgba(16, 24, 40, 0.15);
+
+  /* Diverging-chart midpoint reads as "no change"; must be neutral per mode */
+  --chart-div-mid: #d9d9d4;
 }
-html[data-theme="light-amber"] { --amber: #d97706; }
-html[data-theme="light-blue"]  { --amber: #2563eb; }
+
+/* ── Palette accents ──────────────────────────────────────────────────────── */
+/* Cobalt — corporate default */
+:root,
+:root[data-theme='cobalt'] {
+  --accent: #4C82F7;
+}
+:root[data-mode='light'][data-theme='cobalt'],
+:root[data-mode='light']:not([data-theme]) {
+  --accent: #2563EB;
+}
+
+/* Signal — legacy phosphor-amber console */
+:root[data-theme='signal'] {
+  --accent: #F5A524;
+}
+:root[data-mode='light'][data-theme='signal'] {
+  --accent: #946300;
+}
+/* Signal keeps its original near-black instrument neutrals in dark mode */
+:root[data-theme='signal']:not([data-mode='light']) {
+  --void:           #0A0A0C;
+  --surface:        #131316;
+  --elevated:       #1B1B1F;
+  --border:         #26262B;
+  --border-hi:      #35353C;
+  --text-primary:   #EDEDEF;
+  --text-secondary: #9A9AA2;
+  --text-muted:     #5C5C64;
+}
+
+/* Verdant */
+:root[data-theme='verdant'] {
+  --accent: #3FB380;
+}
+:root[data-mode='light'][data-theme='verdant'] {
+  --accent: #147A52;
+}
+
+/* Iris */
+:root[data-theme='iris'] {
+  --accent: #9089F5;
+}
+:root[data-mode='light'][data-theme='iris'] {
+  --accent: #5A50D6;
+}
+
+/* Ocean */
+:root[data-theme='ocean'] {
+  --accent: #3EB8CE;
+}
+:root[data-mode='light'][data-theme='ocean'] {
+  --accent: #0E7490;
+}
+
+/* Rose */
+:root[data-theme='rose'] {
+  --accent: #E5729A;
+}
+:root[data-mode='light'][data-theme='rose'] {
+  --accent: #C13D68;
+}

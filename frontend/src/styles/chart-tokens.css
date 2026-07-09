@@ -1,0 +1,31 @@
+/* ── Chart palettes ──────────────────────────────────────────────────────────
+   Separate from UI tokens on purpose: chart color is chosen for CVD-safe
+   identity/magnitude/polarity, not brand matching. Values are the dataviz
+   skill's validated reference set, re-checked against this app's actual
+   chart surface (--surface #131316):
+     node validate_palette.js "<8 dark hexes>" --mode dark --surface "#131316"
+   → ALL CHECKS PASS (worst adjacent CVD ΔE 10.3 — floor band, mitigated by
+   the mandatory legend + selective direct labels for 4+ series).          */
+:root {
+  /* Categorical — fixed order, never cycled/reassigned when filters change */
+  --chart-cat-1: #3987e5; /* blue */
+  --chart-cat-2: #199e70; /* aqua */
+  --chart-cat-3: #c98500; /* yellow */
+  --chart-cat-4: #008300; /* green */
+  --chart-cat-5: #9085e9; /* violet */
+  --chart-cat-6: #e66767; /* red */
+  --chart-cat-7: #d55181; /* magenta */
+  --chart-cat-8: #d95926; /* orange */
+
+  /* Sequential — one hue, light -> dark, for magnitude (e.g. lock contention) */
+  --chart-seq-100: #cde2fb;
+  --chart-seq-250: #86b6ef;
+  --chart-seq-400: #3987e5;
+  --chart-seq-550: #1c5cab;
+  --chart-seq-700: #0d366b;
+
+  /* Diverging — blue <-> red, neutral gray midpoint (correlation heatmap) */
+  --chart-div-neg: #3987e5;
+  --chart-div-pos: #e66767;
+  --chart-div-mid: #383835;
+}

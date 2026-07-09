@@ -193,7 +193,7 @@
   min-width: 190px;
   padding: 4px;
   z-index: 50;
-  box-shadow: 0 8px 24px rgba(0,0,0,.4);
+  box-shadow: var(--shadow-md);
 }
 .snippet-menu-item {
   display: flex;
@@ -234,7 +234,7 @@
   padding: 8px 12px;
   border-bottom: 1px solid var(--border);
 }
-.sched-table td { padding: 10px 12px; border-bottom: 1px solid var(--border); color: var(--ash); }
+.sched-table td { padding: calc(10px * var(--density)) 12px; border-bottom: 1px solid var(--border); color: var(--ash); }
 .sched-table tr:last-child td { border-bottom: none; }
 .sched-table tr.row-paused td { opacity: 0.55; }
 .sched-table tr:hover td { background: var(--elevated); }

@@ -1,11 +1,19 @@
 import { createContext, useCallback, useContext, useState } from 'react'
-import { DEFAULT_THEME_ID } from './themes'
+
+export type ThemeMode = 'system' | 'light' | 'dark'
+export type ThemePalette = 'cobalt' | 'signal' | 'verdant' | 'iris' | 'ocean' | 'rose'
+export type Density = 'comfortable' | 'compact'
 
 export interface TeletypeSettings {
-  theme: string
   greyBeardMode: boolean
   fun: boolean
   appleify: boolean
+
+  appearance: {
+    mode: ThemeMode
+    theme: ThemePalette
+    density: Density
+  }
 
   glance: {
     anomalyThresholdTps: number
@@ -83,10 +91,14 @@ export interface TeletypeSettings {
 }
 
 export const DEFAULT_SETTINGS: TeletypeSettings = {
-  theme: DEFAULT_THEME_ID,
   greyBeardMode: false,
   fun: false,
   appleify: false,
+  appearance: {
+    mode: 'system',
+    theme: 'cobalt',
+    density: 'comfortable',
+  },
   glance: {
     anomalyThresholdTps: 2.0,
     anomalyThresholdTick: 2.0,

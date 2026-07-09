@@ -112,7 +112,7 @@
   border-radius: var(--r-md);
   overflow-y: auto;
   max-height: 220px;
-  box-shadow: 0 -8px 24px rgba(0,0,0,0.55);
+  box-shadow: var(--shadow-md);
   z-index: 50;
   margin-bottom: 4px;
 }
@@ -335,3 +335,12 @@
     padding: 6px 12px;
   }
 }
+
+/* ── Light mode: the log viewport stays a dark terminal ─────────────────────
+   Server output arrives with ANSI colors tuned for dark backgrounds; the
+   surrounding chrome follows the theme, the terminal itself does not. */
+:root[data-mode='light'] .console-log { background: #0D0F13; }
+:root[data-mode='light'] .console-log .log-line.info  { color: #E9EBEE; }
+:root[data-mode='light'] .console-log .log-line.warn  { color: #fbbf24; }
+:root[data-mode='light'] .console-log .log-line.error { color: #f56565; }
+:root[data-mode='light'] .console-log .log-line.debug { color: #9BA1AC; }

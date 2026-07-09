@@ -139,7 +139,7 @@
   display: flex;
   align-items: center;
   gap: 10px;
-  padding: 7px 10px;
+  padding: calc(7px * var(--density)) 10px;
   border-radius: var(--r-md);
   cursor: pointer;
   border: 1px solid transparent;
@@ -148,12 +148,12 @@
 }
 .fm-row:hover { background: var(--elevated); border-color: var(--border); }
 .fm-row.selected {
-  background: rgba(10, 132, 255, 0.16);
-  border-color: rgba(10, 132, 255, 0.34);
+  background: var(--accent-15);
+  border-color: var(--accent-30);
 }
 .fm-row.selected:hover {
-  background: rgba(10, 132, 255, 0.2);
-  border-color: rgba(10, 132, 255, 0.42);
+  background: var(--accent-15);
+  border-color: var(--accent-40);
 }
 .fm-row-icon { flex-shrink: 0; color: var(--mist); display: flex; }
 .fm-row-icon.dir { color: var(--amber); }
@@ -314,7 +314,7 @@
   width: 178px;
   flex-shrink: 0;
   border-right: 1px solid var(--border);
-  background: rgba(255, 255, 255, 0.018);
+  background: color-mix(in srgb, var(--text-primary) 2%, transparent);
   display: flex;
   flex-direction: column;
   overflow-y: auto;
@@ -329,7 +329,7 @@
   font-weight: 600;
   letter-spacing: 0.065em;
   text-transform: uppercase;
-  color: rgba(180, 180, 200, 0.4);
+  color: var(--text-muted);
   padding: 8px 14px 3px;
 }
 
@@ -345,24 +345,24 @@
   transition: background 70ms;
   font-family: -apple-system, var(--sans), sans-serif;
   font-size: 13px;
-  color: rgba(220, 220, 235, 0.78);
+  color: var(--text-secondary);
 }
 
-.finder-sidebar-item:hover { background: rgba(255, 255, 255, 0.055); }
+.finder-sidebar-item:hover { background: color-mix(in srgb, var(--text-primary) 5%, transparent); }
 
 .finder-sidebar-item.active {
-  background: rgba(10, 132, 255, 0.2);
-  color: rgba(255, 255, 255, 0.92);
+  background: var(--accent-15);
+  color: var(--text-primary);
 }
 
 .finder-sidebar-icon {
-  color: #0A84FF;
+  color: var(--blue);
   flex-shrink: 0;
   display: flex;
   align-items: center;
 }
 
-.finder-sidebar-item.active .finder-sidebar-icon { color: #3FA5FF; }
+.finder-sidebar-item.active .finder-sidebar-icon { color: var(--blue); }
 
 .finder-sidebar-label {
   flex: 1;
@@ -376,7 +376,7 @@
   opacity: 0;
   background: none;
   border: none;
-  color: rgba(220, 220, 235, 0.35);
+  color: var(--text-muted);
   cursor: pointer;
   padding: 1px 3px;
   border-radius: 3px;
@@ -393,7 +393,7 @@
 
 .finder-sidebar-sep {
   height: 1px;
-  background: rgba(255, 255, 255, 0.055);
+  background: color-mix(in srgb, var(--text-primary) 5%, transparent);
   margin: 5px 10px;
 }
 
@@ -464,7 +464,7 @@
 
 .finder-view-btn + .finder-view-btn { border-left: 1px solid var(--border); }
 .finder-view-btn.active { background: var(--elevated); color: var(--ash); }
-.finder-view-btn:not(.active):hover { background: rgba(255,255,255,0.04); color: var(--ash); }
+.finder-view-btn:not(.active):hover { background: color-mix(in srgb, var(--text-primary) 4%, transparent); color: var(--ash); }
 
 /* ── Upload progress ─────────────────────────────────────────────────────── */
 
@@ -514,14 +514,14 @@
   height: 7px;
   overflow: hidden;
   border-radius: 999px;
-  background: rgba(255,255,255,0.08);
-  border: 1px solid rgba(255,255,255,0.07);
+  background: color-mix(in srgb, var(--text-primary) 8%, transparent);
+  border: 1px solid color-mix(in srgb, var(--text-primary) 7%, transparent);
 }
 
 .fm-upload-bar-fill {
   height: 100%;
   border-radius: inherit;
-  background: linear-gradient(90deg, var(--amber), #fbbf24);
+  background: linear-gradient(90deg, var(--accent), color-mix(in srgb, var(--accent) 65%, white));
   transition: width 120ms linear;
 }
 
@@ -618,11 +618,11 @@
   border: 1.5px solid transparent;
 }
 
-.finder-icon-item:hover { background: rgba(255, 255, 255, 0.05); }
+.finder-icon-item:hover { background: color-mix(in srgb, var(--text-primary) 5%, transparent); }
 
 .finder-icon-item.selected {
-  background: rgba(10, 132, 255, 0.18);
-  border-color: rgba(10, 132, 255, 0.4);
+  background: var(--accent-15);
+  border-color: var(--accent-40);
 }
 
 .finder-icon-squircle {
@@ -631,7 +631,7 @@
   border-radius: 22.5%;
   overflow: hidden;
   flex-shrink: 0;
-  box-shadow: 0 2px 8px rgba(0,0,0,0.45), inset 0 0.5px 0 rgba(255,255,255,0.18);
+  box-shadow: var(--shadow-sm), inset 0 0.5px 0 color-mix(in srgb, var(--text-primary) 18%, transparent);
 }
 
 .finder-icon-squircle svg {
@@ -643,7 +643,7 @@
 .finder-icon-name {
   font-family: -apple-system, var(--sans), sans-serif;
   font-size: 11px;
-  color: rgba(220, 220, 235, 0.85);
+  color: var(--text-primary);
   text-align: center;
   width: 100%;
   overflow: hidden;
@@ -655,7 +655,7 @@
   padding: 0 3px;
 }
 
-.finder-icon-item.selected .finder-icon-name { color: #fff; }
+.finder-icon-item.selected .finder-icon-name { color: var(--text-primary); }
 
 /* ── Thread dump view ────────────────────────────────────────────────────── */
 

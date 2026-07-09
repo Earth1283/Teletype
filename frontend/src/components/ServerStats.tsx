@@ -680,20 +680,23 @@ const CORR_METRICS: CorrMetric[] = [
   { key: 'pingP50',     label: 'Ping P50', extract: s => (s.pingP50 != null && s.pingP50 > 0) ? s.pingP50 : null },
 ]
 
+// Diverging pair (blue <-> red) + neutral gray midpoint — the dataviz-skill
+// chart palette, not the status/categorical scale, since polarity (not
+// identity or severity) is what a correlation sign encodes.
+function rPole(r: number): string {
+  return r > 0 ? 'var(--chart-div-pos)' : 'var(--chart-div-neg)'
+}
+
 function rColor(r: number): string {
-  const abs = Math.abs(r)
-  if (abs < 0.2) return 'var(--ghost)'
-  const sign = r > 0 ? 1 : -1
-  if (abs > 0.7) return sign > 0 ? 'var(--green)' : 'var(--red)'
-  if (abs > 0.4) return sign > 0 ? '#6ee7a0' : '#f9a8a8'
-  return sign > 0 ? '#a7f3d0' : '#fecaca'
+  if (Math.abs(r) < 0.2) return 'var(--ghost)'
+  return rPole(r)
 }
 
 function rBg(r: number): string {
   const abs = Math.abs(r)
-  if (abs < 0.2) return 'transparent'
-  const opacity = Math.min(abs * 0.35, 0.25)
-  return r > 0 ? `rgba(74,222,128,${opacity})` : `rgba(248,113,113,${opacity})`
+  if (abs < 0.2) return 'color-mix(in srgb, var(--chart-div-mid) 25%, transparent)'
+  const pct = Math.round(Math.min(0.12 + abs * 0.28, 0.4) * 100)
+  return `color-mix(in srgb, ${rPole(r)} ${pct}%, transparent)`
 }
 
 interface CorrelationTableProps {

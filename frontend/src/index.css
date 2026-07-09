@@ -1,18 +1,28 @@
-@import './styles/tokens.css';
-@import './styles/animations.css';
-@import './styles/layout.css';
-@import './styles/console.css';
-@import './styles/players.css';
-@import './styles/files.css';
-@import './styles/auth.css';
-@import './styles/shared.css';
-@import './styles/actions.css';
-@import './styles/context.css';
-@import './styles/glance.css';
-@import './styles/palette.css';
-@import './styles/settings.css';
-@import './styles/network.css';
-@import './styles/themes.css';
-@import './styles/macos.css';
-@import './styles/appleify.css';
-@import './styles/profiling.css';
+@import 'tailwindcss';
+
+/* Legacy/per-page CSS is explicitly layered below Tailwind's `utilities`
+   layer (declared by the import above) — otherwise, per the CSS cascade
+   layers spec, these unlayered imports would beat ANY Tailwind utility
+   class regardless of specificity or source order. `base` for tokens/resets,
+   `components` for everything else, matching Tailwind's own layer names so
+   ordering falls out of the layer declaration above, not import order. */
+@import './styles/themes.css' layer(base);
+@import './styles/tokens.css' layer(base);
+@import './styles/chart-tokens.css' layer(base);
+@import './styles/animations.css' layer(base);
+@import './styles/layout.css' layer(components);
+@import './styles/console.css' layer(components);
+@import './styles/players.css' layer(components);
+@import './styles/files.css' layer(components);
+@import './styles/auth.css' layer(components);
+@import './styles/shared.css' layer(components);
+@import './styles/actions.css' layer(components);
+@import './styles/context.css' layer(components);
+@import './styles/context-menu.css' layer(components);
+@import './styles/glance.css' layer(components);
+@import './styles/settings.css' layer(components);
+@import './styles/network.css' layer(components);
+@import './styles/macos.css' layer(components);
+@import './styles/appleify.css' layer(components);
+@import './styles/profiling.css' layer(components);
+@import './shell/shell.css' layer(components);

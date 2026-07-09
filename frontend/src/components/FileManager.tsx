@@ -4,7 +4,6 @@ import Editor, { useMonaco } from '@monaco-editor/react'
 import { api, TOKEN_KEY } from '../api/client'
 import { useSettings } from '../SettingsContext'
 import { useContextMenu, type ContextMenuItem } from '../ContextMenu'
-import { getTheme } from '../themes'
 import PromptModal, { type PromptVariant } from './PromptModal'
 import {
   IconFolder, IconFile, IconUpload, IconDownload,
@@ -264,6 +263,38 @@ export default function FileManager() {
   const monacoInst = useMonaco()
 
   const effectiveView = editing ? 'list' : viewMode
+
+  useEffect(() => {
+    if (!monacoInst) return
+    // Theme values come from the live CSS custom properties so the editor
+    // follows whatever mode/palette AppearanceApplier stamped on <html>.
+    const cs = getComputedStyle(document.documentElement)
+    const v = (name: string, fallback: string) => cs.getPropertyValue(name).trim() || fallback
+    const isLight = (document.documentElement.dataset.mode
+      ?? (window.matchMedia('(prefers-color-scheme: light)').matches ? 'light' : 'dark')) === 'light'
+    const accent = v('--accent', isLight ? '#2563EB' : '#4C82F7')
+    monacoInst.editor.defineTheme('teletype-ui', {
+      base: isLight ? 'vs' : 'vs-dark',
+      inherit: true,
+      rules: [],
+      colors: {
+        'editor.background': v('--surface', isLight ? '#FFFFFF' : '#131316'),
+        'editor.foreground': v('--text-primary', isLight ? '#1B1F26' : '#EDEDEF'),
+        'editorLineNumber.foreground': v('--text-muted', '#5C5C64'),
+        'editorLineNumber.activeForeground': v('--text-secondary', '#9A9AA2'),
+        'editor.selectionBackground': accent + '33',
+        'editorCursor.foreground': accent,
+        'editor.lineHighlightBackground': v('--elevated', '#1B1B1F'),
+        'editorIndentGuide.background': v('--border', '#26262B'),
+        'editorIndentGuide.activeBackground': v('--border-hi', '#3A3A40'),
+        'editorWidget.background': v('--elevated', '#1B1B1F'),
+        'editorWidget.border': v('--border', '#26262B'),
+        'editorSuggestWidget.background': v('--elevated', '#1B1B1F'),
+        'editorSuggestWidget.border': v('--border', '#26262B'),
+      },
+    })
+    monacoInst.editor.setTheme('teletype-ui')
+  }, [monacoInst, settings.appearance])
 
   useEffect(() => {
     if (!monacoInst) return
@@ -1109,7 +1140,7 @@ export default function FileManager() {
               language={langFor(editing.path.split('/').pop() ?? '')}
               value={editorContent}
               onChange={(v) => setEditorContent(v ?? '')}
-              theme={getTheme(settings.theme).base === 'light' ? 'vs' : 'vs-dark'}
+              theme="teletype-ui"
               options={editorOptions}
             />
           </div>

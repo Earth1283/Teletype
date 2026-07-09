@@ -1,41 +1,50 @@
-/* ── Design system ──────────────────────────────────────────── */
+/* ── Design tokens ───────────────────────────────────────────────────────────
+   Color VALUES live in themes.css (mode × palette on <html> data attributes).
+   This file owns: legacy aliases, accent tints derived from --accent (so any
+   palette stays in lockstep via color-mix), type/space/radius/z scales, the
+   Tailwind @theme bridge, and base element styles.                          */
 :root {
-  --void:        #0e1117;
-  --surface:     #161b22;
-  --elevated:    #1c2231;
-  --border:      #21283a;
-  --border-hi:   #2a3450;
+  --bg: var(--void);
+  --surface-raised: var(--elevated);
 
-  --amber:       #f07a3a;
-  /* Derived from --amber so all themes get correct tints by only overriding --amber */
-  --amber-dim:   color-mix(in srgb, var(--amber) 12%, transparent);
-  --amber-glow:  color-mix(in srgb, var(--amber) 25%, transparent);
-  --accent-04:   color-mix(in srgb, var(--amber)  4%, transparent);
-  --accent-05:   color-mix(in srgb, var(--amber)  5%, transparent);
-  --accent-15:   color-mix(in srgb, var(--amber) 15%, transparent);
-  --accent-30:   color-mix(in srgb, var(--amber) 30%, transparent);
-  --accent-40:   color-mix(in srgb, var(--amber) 40%, transparent);
-  --accent-50:   color-mix(in srgb, var(--amber) 50%, transparent);
+  /* Legacy names — page CSS predates the theme engine and reads these.
+     They now follow the active theme; do not assign raw colors here. */
+  --amber:      var(--accent);
+  --ash:        var(--text-primary);
+  --mist:       var(--text-secondary);
+  --ghost:      var(--text-muted);
 
-  /* Live/connected status — teal, distinct from accent */
-  --live:        #2dd4bf;
+  /* Derived from --accent via color-mix so every tint stays in lockstep */
+  --amber-dim:   color-mix(in srgb, var(--accent) 12%, transparent);
+  --amber-glow:  color-mix(in srgb, var(--accent) 25%, transparent);
+  --accent-dim:  var(--amber-dim);
+  --accent-glow: var(--amber-glow);
+  --accent-04:   color-mix(in srgb, var(--accent)  4%, transparent);
+  --accent-05:   color-mix(in srgb, var(--accent)  5%, transparent);
+  --accent-15:   color-mix(in srgb, var(--accent) 15%, transparent);
+  --accent-30:   color-mix(in srgb, var(--accent) 30%, transparent);
+  --accent-40:   color-mix(in srgb, var(--accent) 40%, transparent);
+  --accent-50:   color-mix(in srgb, var(--accent) 50%, transparent);
 
-  --ash:         #d0d5e8;
-  --mist:        #6d7fa8;
-  --ghost:       #485275;
-
-  --green:       #34d399;
-  --red:         #f56565;
-  --blue:        #6ba3f7;
-  --yellow:      #fbbf24;
-
-  --display: 'Inter', system-ui, sans-serif;
-  --sans:    'Inter', system-ui, sans-serif;
+  --display: 'IBM Plex Sans', system-ui, sans-serif;
+  --sans:    'IBM Plex Sans', system-ui, sans-serif;
   --mono:    'JetBrains Mono', monospace;
 
+  /* Sharp instrument-panel radii — not the soft rounded-pill look */
   --r-sm: 4px;
   --r-md: 6px;
-  --r-lg: 10px;
+  --r-lg: 8px;
+
+  /* 8px spacing scale */
+  --space-1: 8px;
+  --space-2: 16px;
+  --space-3: 24px;
+  --space-4: 32px;
+  --space-5: 48px;
+  --space-6: 64px;
+
+  /* Density factor — row paddings multiply by this (see [data-density]) */
+  --density: 1;
 
   /* Z-index scale */
   --z-base:         1;
@@ -48,19 +57,79 @@
   --z-banner:       300;
 }
 
+/* Compact density: tighter rows for high-information screens */
+:root[data-density='compact'] {
+  --density: 0.5;
+}
+
+@theme {
+  --color-void: var(--void);
+  --color-bg: var(--bg);
+  --color-surface: var(--surface);
+  --color-surface-raised: var(--surface-raised);
+  --color-elevated: var(--elevated);
+  --color-border: var(--border);
+  --color-border-hi: var(--border-hi);
+  --color-accent: var(--accent);
+  --color-live: var(--live);
+  --color-text-primary: var(--text-primary);
+  --color-text-secondary: var(--text-secondary);
+  --color-text-muted: var(--text-muted);
+  --color-status-good: var(--status-good);
+  --color-status-warning: var(--status-warning);
+  --color-status-serious: var(--status-serious);
+  --color-status-critical: var(--status-critical);
+  --color-scrim: var(--scrim);
+
+  --font-sans: var(--sans);
+  --font-mono: var(--mono);
+
+  --radius-sm: var(--r-sm);
+  --radius-md: var(--r-md);
+  --radius-lg: var(--r-lg);
+
+  --spacing-1: var(--space-1);
+  --spacing-2: var(--space-2);
+  --spacing-3: var(--space-3);
+  --spacing-4: var(--space-4);
+  --spacing-5: var(--space-5);
+  --spacing-6: var(--space-6);
+
+  --z-index-sidebar: var(--z-sidebar);
+  --z-index-mobile-nav: var(--z-mobile-nav);
+  --z-index-mobile-header: var(--z-mobile-header);
+  --z-index-modal: var(--z-modal);
+  --z-index-palette: var(--z-palette);
+  --z-index-toast: var(--z-toast);
+  --z-index-banner: var(--z-banner);
+}
+
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 html, body, #root { height: 100%; }
 body {
   font-family: var(--sans);
   background: var(--void);
-  color: var(--ash);
+  color: var(--text-primary);
   -webkit-font-smoothing: antialiased;
+}
+
+/* ── Perforated / paper-tape divider motif ──────────────────────────────── */
+.tape-divider {
+  border: none;
+  height: 1px;
+  background-image: repeating-linear-gradient(
+    to right,
+    var(--border) 0,
+    var(--border) 4px,
+    transparent 4px,
+    transparent 8px
+  );
 }
 
 /* ── Scrollbar ──────────────────────────────────────────────── */
 ::-webkit-scrollbar { width: 6px; height: 6px; }
 ::-webkit-scrollbar-track { background: transparent; }
-::-webkit-scrollbar-thumb { background: var(--ghost); border-radius: 3px; }
-::-webkit-scrollbar-thumb:hover { background: var(--mist); }
+::-webkit-scrollbar-thumb { background: var(--text-muted); border-radius: 3px; }
+::-webkit-scrollbar-thumb:hover { background: var(--text-secondary); }
 /* Firefox */
-* { scrollbar-width: thin; scrollbar-color: var(--ghost) transparent; }
+* { scrollbar-width: thin; scrollbar-color: var(--text-muted) transparent; }

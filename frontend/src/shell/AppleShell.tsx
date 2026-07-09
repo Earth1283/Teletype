@@ -1,41 +1,23 @@
-import { useState, useCallback, useEffect, useRef } from 'react'
-import { api, TOKEN_KEY } from '../api/client'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { useSettings } from '../SettingsContext'
-import { useLogs } from '../LogContext'
 import { useToast } from '../ToastContext'
-import { ErrorBoundary } from '../ErrorBoundary'
-import Console from './Console'
-import PlayerList from './PlayerList'
-import ServerStats from './ServerStats'
-import FileManager from './FileManager'
-import GlancePage from './GlancePage'
-import ActionsPage from './actions/ActionsPage'
-import SettingsPage from './SettingsPage'
-import AuditPage from './AuditPage'
-import NetworkPage from './NetworkPage'
+import { useShell } from './ShellKernel'
+import { PageOutlet } from './PageOutlet'
+import { PRIMARY_MOBILE_TABS, SECONDARY_MOBILE_TABS, tabDef, type Tab } from './tabs'
 import CommandPalette from '../CommandPalette'
-import {
-  IconTerminal, IconUsers, IconCpu, IconFolder,
-  IconLogOut, IconActivity, IconZap, IconSettings, IconList, IconNetwork,
-  IconCommand,
-} from '../Icons'
+import { IconLogOut, IconCommand } from '../Icons'
 
-type Tab = 'glance' | 'console' | 'players' | 'stats' | 'files' | 'actions' | 'audit' | 'network' | 'settings'
-
-const TABS: { id: Tab; label: string; Icon: React.FC<{ size?: number }>; iconColor: string }[] = [
-  { id: 'glance',   label: 'Glance',   Icon: IconActivity, iconColor: 'apple-row-icon--blue'   },
-  { id: 'console',  label: 'Console',  Icon: IconTerminal, iconColor: 'apple-row-icon--indigo' },
-  { id: 'players',  label: 'Players',  Icon: IconUsers,    iconColor: 'apple-row-icon--green'  },
-  { id: 'stats',    label: 'Stats',    Icon: IconCpu,      iconColor: 'apple-row-icon--purple' },
-  { id: 'files',    label: 'Files',    Icon: IconFolder,   iconColor: 'apple-row-icon--orange' },
-  { id: 'actions',  label: 'Actions',  Icon: IconZap,      iconColor: 'apple-row-icon--teal'   },
-  { id: 'audit',    label: 'Audit',    Icon: IconList,     iconColor: 'apple-row-icon--indigo' },
-  { id: 'network',  label: 'Network',  Icon: IconNetwork,  iconColor: 'apple-row-icon--blue'   },
-  { id: 'settings', label: 'Settings', Icon: IconSettings, iconColor: ''                        },
-]
-
-const PRIMARY_TABS: Tab[]   = ['glance', 'console', 'players', 'actions']
-const SECONDARY_TABS: Tab[] = ['stats', 'files', 'audit', 'network', 'settings']
+const ROW_ICON_COLOR: Partial<Record<Tab, string>> = {
+  glance: 'apple-row-icon--blue',
+  console: 'apple-row-icon--indigo',
+  players: 'apple-row-icon--green',
+  stats: 'apple-row-icon--purple',
+  files: 'apple-row-icon--orange',
+  actions: 'apple-row-icon--teal',
+  audit: 'apple-row-icon--indigo',
+  network: 'apple-row-icon--blue',
+  profiling: 'apple-row-icon--purple',
+}
 
 function EllipsisCircle({ size = 24 }: { size?: number }) {
   return (
@@ -64,14 +46,14 @@ function haptic(pattern: VibratePattern = 6) {
   if ('vibrate' in navigator) navigator.vibrate(pattern)
 }
 
-export default function AppleShell() {
-  const [tab, setTab]               = useState<Tab>('glance')
-  const [moreOpen, setMoreOpen]     = useState(false)
-  const [paletteOpen, setPaletteOpen] = useState(false)
+export default function AppleShell({ onLogout }: { onLogout: () => void }) {
+  const {
+    tab, setTab, visitedTabs, paletteOpen, setPaletteOpen, openPalette,
+    mobileMoreOpen: moreOpen, setMobileMoreOpen: setMoreOpen, connected,
+  } = useShell()
   const [pressingTab, setPressingTab] = useState<Tab | null>(null)
   const [pillsCollapsed, setPillsCollapsed] = useState(false)
   const { settings, update } = useSettings()
-  const { connected } = useLogs()
   const toast = useToast()
 
   const mainRef      = useRef<HTMLElement>(null)
@@ -81,7 +63,7 @@ export default function AppleShell() {
   const pressTimer   = useRef<ReturnType<typeof setTimeout> | null>(null)
   const longFired    = useRef(false)
 
-  const activeTab = TABS.find(t => t.id === tab)!
+  const activeTab = tabDef(tab)
 
   useEffect(() => {
     if (!moreOpen) return
@@ -92,23 +74,12 @@ export default function AppleShell() {
       document.body.classList.remove('mobile-nav-open')
       window.removeEventListener('keydown', handler)
     }
-  }, [moreOpen])
-
-  useEffect(() => {
-    const handler = (e: KeyboardEvent) => {
-      if ((e.metaKey || e.ctrlKey) && e.key === 'k') {
-        e.preventDefault()
-        if (settings.palette.enabled) setPaletteOpen(p => !p)
-      }
-    }
-    window.addEventListener('keydown', handler)
-    return () => window.removeEventListener('keydown', handler)
-  }, [settings.palette.enabled])
+  }, [moreOpen, setMoreOpen])
 
   const navigate = useCallback((t: Tab) => {
     setTab(t)
     setMoreOpen(false)
-  }, [])
+  }, [setTab, setMoreOpen])
 
   // Scroll whichever element inside <main> is scrolled, back to top
   const scrollToTop = useCallback(() => {
@@ -203,12 +174,6 @@ export default function AppleShell() {
     return () => { c1(); c2() }
   }, [pillsCollapsed])
 
-  const signOut = () => {
-    localStorage.removeItem(TOKEN_KEY)
-    api.post('/auth/logout').catch(() => {})
-    window.location.reload()
-  }
-
   return (
     <div className="appleify-root">
       {/* ── Floating pill navigation bar ───────────────────────── */}
@@ -232,7 +197,7 @@ export default function AppleShell() {
                 className="apple-nav-icon-btn"
                 type="button"
                 aria-label="Search"
-                onClick={() => setPaletteOpen(true)}
+                onClick={openPalette}
               >
                 <IconCommand size={17} />
               </button>
@@ -252,17 +217,7 @@ export default function AppleShell() {
 
       {/* ── Page content ───────────────────────────────────────── */}
       <main className="apple-main" ref={mainRef}>
-        <ErrorBoundary key={tab} label={`${activeTab.label} failed to render`}>
-          {tab === 'glance'   && <GlancePage />}
-          {tab === 'console'  && <Console />}
-          {tab === 'players'  && <PlayerList />}
-          {tab === 'stats'    && <ServerStats onNavigate={t => setTab(t as Tab)} />}
-          {tab === 'files'    && <FileManager />}
-          {tab === 'actions'  && <ActionsPage />}
-          {tab === 'audit'    && <AuditPage />}
-          {tab === 'network'  && <NetworkPage />}
-          {tab === 'settings' && <SettingsPage />}
-        </ErrorBoundary>
+        <PageOutlet activeTab={tab} visitedTabs={visitedTabs} onNavigate={navigate} />
       </main>
 
       {/* ── Floating pill tab bar ──────────────────────────────── */}
@@ -271,8 +226,8 @@ export default function AppleShell() {
         className={`apple-tab-bar${pillsCollapsed ? ' apple-pill-hidden' : ''}`}
         aria-label="Navigation"
       >
-        {PRIMARY_TABS.map(tabId => {
-          const t      = TABS.find(t => t.id === tabId)!
+        {PRIMARY_MOBILE_TABS.map(tabId => {
+          const t      = tabDef(tabId)
           const active = tab === tabId
           return (
             <button
@@ -301,12 +256,12 @@ export default function AppleShell() {
           type="button"
           className={[
             'apple-tab-btn',
-            SECONDARY_TABS.includes(tab) ? 'active' : '',
+            SECONDARY_MOBILE_TABS.includes(tab) ? 'active' : '',
           ].filter(Boolean).join(' ')}
           onPointerDown={() => setPressingTab('settings')}
           onPointerUp={handleTabUp}
           onPointerCancel={handleTabUp}
-          onClick={() => { haptic(5); setMoreOpen(o => !o) }}
+          onClick={() => { haptic(5); setMoreOpen(!moreOpen) }}
           aria-label="More"
           aria-expanded={moreOpen}
         >
@@ -345,8 +300,8 @@ export default function AppleShell() {
 
         {/* Secondary nav items */}
         <div className="apple-list-section">
-          {SECONDARY_TABS.map(tabId => {
-            const t = TABS.find(t => t.id === tabId)!
+          {SECONDARY_MOBILE_TABS.map(tabId => {
+            const t = tabDef(tabId)
             const active = tab === tabId
             return (
               <button
@@ -355,7 +310,7 @@ export default function AppleShell() {
                 className="apple-list-row"
                 onClick={() => navigate(tabId)}
               >
-                <div className={`apple-row-icon${active ? ' apple-row-icon--blue' : ` ${t.iconColor}`}`}>
+                <div className={`apple-row-icon${active ? ' apple-row-icon--blue' : ` ${ROW_ICON_COLOR[tabId] ?? ''}`}`}>
                   <t.Icon size={17} />
                 </div>
                 <span className={`apple-row-label${active ? ' apple-row-label--blue' : ''}`}>
@@ -377,7 +332,7 @@ export default function AppleShell() {
             <ChevronRight />
           </button>
 
-          <button type="button" className="apple-list-row" onClick={signOut}>
+          <button type="button" className="apple-list-row" onClick={onLogout}>
             <div className="apple-row-icon apple-row-icon--red">
               <IconLogOut size={17} />
             </div>
@@ -390,7 +345,7 @@ export default function AppleShell() {
       <CommandPalette
         open={paletteOpen}
         onClose={() => setPaletteOpen(false)}
-        onNavigate={t => setTab(t as Tab)}
+        onNavigate={setTab}
       />
     </div>
   )

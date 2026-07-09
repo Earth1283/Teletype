@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react'
+import { useState, useMemo, useRef } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { api } from '../api/client'
 import { useContextMenu } from '../ContextMenu'
@@ -31,9 +31,16 @@ type PromptState = {
 const MAX_HEALTH = 20
 
 function healthColor(hp: number) {
-  if (hp > 14) return 'var(--green)'
-  if (hp > 8)  return 'var(--yellow)'
-  return 'var(--red)'
+  if (hp > 14) return 'var(--status-good)'
+  if (hp > 8)  return 'var(--status-warning)'
+  return 'var(--status-critical)'
+}
+
+function pingColor(ms?: number) {
+  if (ms == null) return 'var(--text-muted)'
+  if (ms < 80) return 'var(--status-good)'
+  if (ms < 150) return 'var(--status-warning)'
+  return 'var(--status-critical)'
 }
 
 function playerSkinUrl(uuid: string) {
@@ -79,6 +86,8 @@ export default function PlayerList() {
   // Persists between player selections so the command isn't reset each time
   const [customCommand, setCustomCommand] = useState('effect give {player} minecraft:speed 60 1')
   const [loadingAction, setLoadingAction] = useState<string | null>(null)
+  const [checked, setChecked] = useState<Set<string>>(new Set())
+  const lastCheckIdx = useRef<number | null>(null)
   const { openContextMenu } = useContextMenu()
 
   function showPrompt(title: string, message: React.ReactNode, variant: PromptVariant = 'info') {
@@ -176,6 +185,68 @@ export default function PlayerList() {
   const count = data?.length ?? 0
   const sel = data?.find(p => p.uuid === selected) ?? null
 
+  // Players can leave between refetches; act only on the ones still online
+  const checkedPlayers = useMemo(
+    () => sortedPlayers.filter(p => checked.has(p.uuid)),
+    [sortedPlayers, checked],
+  )
+
+  function toggleCheck(idx: number, uuid: string, shiftKey: boolean) {
+    setChecked(prev => {
+      const next = new Set(prev)
+      if (shiftKey && lastCheckIdx.current != null) {
+        const [from, to] = [Math.min(lastCheckIdx.current, idx), Math.max(lastCheckIdx.current, idx)]
+        for (let i = from; i <= to; i++) next.add(sortedPlayers[i].uuid)
+      } else if (next.has(uuid)) {
+        next.delete(uuid)
+      } else {
+        next.add(uuid)
+      }
+      return next
+    })
+    lastCheckIdx.current = idx
+  }
+
+  async function bulkRun(key: string, label: string, cmdFor: (name: string) => string) {
+    const targets = checkedPlayers
+    setLoadingAction(key)
+    let failed = 0
+    try {
+      for (const p of targets) {
+        try {
+          await api.post('/execute', { command: cmdFor(p.name) })
+        } catch {
+          failed++
+        }
+      }
+    } finally {
+      setLoadingAction(null)
+    }
+    if (failed === 0) toast.success(`${label} — ${targets.length} player${targets.length === 1 ? '' : 's'}`)
+    else toast.error(`${label} failed for ${failed} of ${targets.length} players`)
+  }
+
+  function bulkKick() {
+    setPrompt({
+      title: `Kick ${checkedPlayers.length} players?`,
+      message: `Disconnect ${checkedPlayers.map(p => p.name).join(', ')} from the server?`,
+      confirmLabel: 'Kick all',
+      cancelLabel: 'Cancel',
+      onConfirm: () => bulkRun('bulk-kick', 'Kicked', n => `kick ${n}`),
+    })
+  }
+
+  function bulkBan() {
+    setPrompt({
+      title: `Ban ${checkedPlayers.length} players?`,
+      message: `Ban ${checkedPlayers.map(p => p.name).join(', ')}? This cannot be undone from Teletype.`,
+      variant: 'danger',
+      confirmLabel: 'Ban all',
+      cancelLabel: 'Cancel',
+      onConfirm: () => bulkRun('bulk-ban', 'Banned', n => `ban ${n}`),
+    })
+  }
+
   // If selected player left mid-session, show offline message
   const selectedGone = selected !== null && !sel && !isLoading
 
@@ -224,13 +295,21 @@ export default function PlayerList() {
           ))}
           {error && <div style={{ padding: '12px 14px', fontSize: 12, color: 'var(--red)' }}>Failed to load players</div>}
 
-          {sortedPlayers.map(p => (
+          {sortedPlayers.map((p, idx) => (
             <div
               key={p.uuid}
-              className={`mac-master-row${selected === p.uuid ? ' active' : ''}`}
+              className={`mac-master-row${selected === p.uuid ? ' active' : ''}${checked.has(p.uuid) ? ' checked' : ''}`}
               onClick={() => setSelected(p.uuid === selected ? null : p.uuid)}
               onContextMenu={e => openPlayerCtx(e, p)}
             >
+              <input
+                type="checkbox"
+                className="player-check"
+                checked={checked.has(p.uuid)}
+                readOnly
+                aria-label={`Select ${p.name}`}
+                onClick={e => { e.stopPropagation(); toggleCheck(idx, p.uuid, e.shiftKey) }}
+              />
               <PlayerAvatar player={p} />
               <div className="mac-master-info">
                 <div className="mac-master-name">{p.name}</div>
@@ -238,6 +317,33 @@ export default function PlayerList() {
               </div>
             </div>
           ))}
+
+          {checkedPlayers.length > 0 && (
+            <div className="bulk-bar">
+              <span className="bulk-count">{checkedPlayers.length} selected</span>
+              <button className="bulk-btn" disabled={!!loadingAction}
+                onClick={() => bulkRun('bulk-heal', 'Healed', n => `effect give ${n} minecraft:instant_health 1 10`)}>
+                Heal
+              </button>
+              <button className="bulk-btn" disabled={!!loadingAction}
+                onClick={() => bulkRun('bulk-feed', 'Fed', n => `effect give ${n} minecraft:saturation 1 10`)}>
+                Feed
+              </button>
+              <button className="bulk-btn" disabled={!!loadingAction}
+                onClick={() => bulkRun('bulk-surv', 'Survival', n => `gamemode survival ${n}`)}>
+                Survival
+              </button>
+              <button className="bulk-btn" disabled={!!loadingAction}
+                onClick={() => bulkRun('bulk-crea', 'Creative', n => `gamemode creative ${n}`)}>
+                Creative
+              </button>
+              <button className="bulk-btn" disabled={!!loadingAction} onClick={bulkKick}>Kick</button>
+              <button className="bulk-btn danger" disabled={!!loadingAction} onClick={bulkBan}>Ban</button>
+              <button className="bulk-btn clear" title="Clear selection" onClick={() => { setChecked(new Set()); lastCheckIdx.current = null }}>
+                ✕
+              </button>
+            </div>
+          )}
 
           {data && count === 0 && (
             <div className="player-empty-state">
@@ -289,7 +395,7 @@ export default function PlayerList() {
                         <div
                           key={i}
                           className="mac-health-pip"
-                          style={{ background: i < Math.round(sel.health / 2) ? healthColor(sel.health) : 'rgba(255,255,255,0.08)' }}
+                          style={{ background: i < Math.round(sel.health / 2) ? healthColor(sel.health) : 'color-mix(in srgb, ' + healthColor(sel.health) + ' 18%, transparent)' }}
                         />
                       ))}
                       <span style={{ marginLeft: 6, fontFamily: 'var(--mono)', fontSize: 11, color: 'var(--mist)' }}>
@@ -308,13 +414,22 @@ export default function PlayerList() {
                   <span className="mac-player-meta-label">Game Mode</span>
                   <span className="mac-player-meta-value">{sel.gameMode ?? 'unknown'}</span>
                 </div>
-                <div className="mac-player-meta-row">
-                  <span className="mac-player-meta-label">Food / Level</span>
-                  <span className="mac-player-meta-value">{sel.foodLevel ?? '?'} food · level {sel.level ?? '?'}</span>
+              </div>
+
+              <div className="grid grid-cols-3 gap-2">
+                <div className="rounded-md border border-border bg-surface px-2.5 py-2 text-center">
+                  <div className="font-mono text-[9px] uppercase tracking-wide text-text-muted">Food</div>
+                  <div className="mt-0.5 font-mono text-base text-text-primary">{sel.foodLevel ?? '—'}</div>
                 </div>
-                <div className="mac-player-meta-row">
-                  <span className="mac-player-meta-label">Ping</span>
-                  <span className="mac-player-meta-value">{typeof sel.ping === 'number' ? `${sel.ping}ms` : 'unknown'}</span>
+                <div className="rounded-md border border-border bg-surface px-2.5 py-2 text-center">
+                  <div className="font-mono text-[9px] uppercase tracking-wide text-text-muted">Level</div>
+                  <div className="mt-0.5 font-mono text-base text-text-primary">{sel.level ?? '—'}</div>
+                </div>
+                <div className="rounded-md border border-border bg-surface px-2.5 py-2 text-center">
+                  <div className="font-mono text-[9px] uppercase tracking-wide text-text-muted">Ping</div>
+                  <div className="mt-0.5 font-mono text-base" style={{ color: pingColor(sel.ping) }}>
+                    {typeof sel.ping === 'number' ? `${sel.ping}` : '—'}
+                  </div>
                 </div>
               </div>
 

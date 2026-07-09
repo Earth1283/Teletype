@@ -263,6 +263,10 @@ interface GlanceChartProps {
   title: string
   data: ProcessedSnap[]
   dataKey: keyof ProcessedSnap
+  /** Field `stats`/`allStats` were computed over, when it differs from `dataKey`
+   *  (e.g. memory is plotted in MB but its anomaly stats are over the 0-1 ratio).
+   *  Defaults to `dataKey`. Mixing units here silently produces meaningless z-scores. */
+  statsKey?: keyof ProcessedSnap
   color: string
   yDomain: [number | string, number | string]
   yFormatter: (v: number) => string
@@ -283,30 +287,32 @@ interface GlanceChartProps {
 }
 
 function GlanceChart({
-  title, data, dataKey, color, yDomain, yFormatter,
+  title, data, dataKey, statsKey, color, yDomain, yFormatter,
   stats, allStats, thresholds, bifurTs, chartId,
   getLogsAround, logWindowMs, onPointClick,
   greyBeardMode, showBifurcation, logCorrelation,
   gcEvents, showGcLabels = false, showGcHint = false,
 }: GlanceChartProps) {
+  const sKey = statsKey ?? dataKey
   const latest = data[data.length - 1]
   const currentVal = latest ? (latest[dataKey] as number) : 0
+  const currentStatsVal = latest ? (latest[sKey] as number) : 0
 
   const bifurIdx = data.findIndex(d => d.timestamp >= bifurTs)
   const bifurPct = bifurIdx < 0 ? 100 : (bifurIdx / data.length) * 100
 
   const sigmaStr = !greyBeardMode && stats.std > 0.01
-    ? (() => { const z = (currentVal - stats.mean) / stats.std; return `${z > 0 ? '+' : ''}${z.toFixed(1)}σ` })()
+    ? (() => { const z = (currentStatsVal - stats.mean) / stats.std; return `${z > 0 ? '+' : ''}${z.toFixed(1)}σ` })()
     : null
 
   const renderDot = greyBeardMode ? false : (props: any) => {
     const { cx, cy, payload, index } = props
     if (cx == null || cy == null) return <g key={`d-empty-${index}`} />
-    const v = payload[dataKey] as number
+    const v = payload[sKey] as number
     if (stats.std < 0.01) return <g key={`d-${cx}`} />
     const z = (v - stats.mean) / stats.std
-    const aboveThreshold = dataKey === 'tps1' ? z < -thresholds.tps
-      : dataKey === 'memPct' ? z > thresholds.mem
+    const aboveThreshold = sKey === 'tps1' ? z < -thresholds.tps
+      : sKey === 'memPct' ? z > thresholds.mem
       : z > thresholds.tick
     if (!aboveThreshold) return <g key={`d-${cx}`} />
     const dotColor = Math.abs(z) > (thresholds.tick + 1) ? 'var(--red)' : 'var(--amber)'
@@ -374,12 +380,12 @@ function GlanceChart({
           <XAxis
             dataKey="timestamp" type="number" scale="time" domain={['dataMin', 'dataMax']}
             tickFormatter={fmtTime}
-            tick={{ fill: 'var(--mist)', fontFamily: 'var(--sans)', fontSize: 9 }}
+            tick={{ fill: 'var(--mist)', fontFamily: 'var(--mono)', fontSize: 9 }}
             tickLine={false} axisLine={false} interval="preserveStartEnd" minTickGap={60}
           />
           <YAxis
             domain={yDomain} width={38}
-            tick={{ fill: 'var(--mist)', fontFamily: 'var(--sans)', fontSize: 9 }}
+            tick={{ fill: 'var(--mist)', fontFamily: 'var(--mono)', fontSize: 9 }}
             tickLine={false} axisLine={false} tickCount={3} tickFormatter={yFormatter}
           />
           <Tooltip content={tooltipContent} cursor={{ stroke: 'var(--border-hi)', strokeWidth: 1 }} />
@@ -388,7 +394,7 @@ function GlanceChart({
             <>
               <ReferenceArea
                 x1={bifurTs} x2={data[data.length - 1]?.timestamp}
-                fill="rgba(255,255,255,0.018)" stroke="none"
+                fill="color-mix(in srgb, var(--text-primary) 2%, transparent)" stroke="none"
               />
               <ReferenceLine
                 x={bifurTs} stroke="var(--border-hi)" strokeDasharray="2 3" strokeWidth={1}
@@ -454,7 +460,7 @@ function g_arc(startDeg: number, sweepDeg: number, r = SP.r): string {
 
 interface GZone { from: number; to: number; color: string }
 
-const G = '#34d399', Y = '#eab308', O = '#f97316', R = '#ef4444'
+const G = 'var(--status-good)', Y = 'var(--status-warning)', O = 'var(--status-serious)', R = 'var(--status-critical)'
 
 function buildZones(gs: TeletypeSettings['glance']) {
   return {
@@ -554,14 +560,14 @@ function SpeedoGauge({ label, value, displayValue, subLine, min, max, zones, sig
         {/* Label */}
         <text x={SP.cx} y={SP.cy + (hasSubLine ? 20 : 12)} textAnchor="middle" dominantBaseline="middle"
           fill="var(--mist)" fontSize="5.8" fontWeight="600" letterSpacing="0.08em"
-          style={{ fontFamily: 'var(--sans)' }}>
+          style={{ fontFamily: 'var(--mono)' }}>
           {label.toUpperCase()}
         </text>
 
         {/* Sigma */}
         {sigma != null && Math.abs(sigma) > 0.1 && (
           <text x={SP.cx} y={SP.cy + (hasSubLine ? 28 : 20)} textAnchor="middle" dominantBaseline="middle"
-            fill="var(--ghost)" fontSize="5" style={{ fontFamily: 'var(--sans)' }}>
+            fill="var(--ghost)" fontSize="5" style={{ fontFamily: 'var(--mono)' }}>
             {sigma > 0 ? '+' : ''}{sigma.toFixed(1)}σ
           </text>
         )}
@@ -870,6 +876,8 @@ export default function GlancePage() {
           <UptimeDisplay uptimeStr={uptimeStr} />
         </div>
 
+        <div className="tape-divider" />
+
         {/* Window selector */}
         <div className="mac-seg-ctrl" style={{ alignSelf: 'center' }}>
           {WINDOWS.map(w => (
@@ -905,7 +913,7 @@ export default function GlancePage() {
                 yFormatter={v => `${Math.round(v)}ms`} stats={allStats.tickTimeMs} chartId="tick" />
             )}
             {gs.showChartMem && (
-              <GlanceChart {...SHARED} title="Memory" dataKey="memUsedMb"
+              <GlanceChart {...SHARED} title="Memory" dataKey="memUsedMb" statsKey="memPct"
                 color={memColor(memP)} yDomain={[0, memMaxMb]}
                 yFormatter={fmtMem} stats={allStats.memPct} chartId="mem"
                 gcEvents={!gbm ? gcEvents : undefined} showGcLabels={windowMin <= 15} showGcHint />

@@ -27,7 +27,7 @@
   display: flex;
   align-items: center;
   gap: 12px;
-  padding: 10px 14px;
+  padding: calc(10px * var(--density)) 14px;
   background: var(--surface);
   border: 1px solid var(--border);
   border-radius: var(--r-md);
@@ -222,7 +222,7 @@
   align-items: center;
   justify-content: center;
   padding: 24px;
-  background: rgba(0,0,0,0.62);
+  background: var(--scrim);
   backdrop-filter: blur(5px);
   -webkit-backdrop-filter: blur(5px);
 }
@@ -235,7 +235,7 @@
   background: var(--surface);
   border: 1px solid var(--border-hi);
   border-radius: var(--r-lg);
-  box-shadow: 0 26px 90px rgba(0,0,0,0.58);
+  box-shadow: var(--shadow-lg);
 }
 .stats-guide-head {
   display: flex;
@@ -276,7 +276,7 @@
 }
 .stats-guide-close:hover {
   color: var(--ash);
-  background: rgba(255,255,255,0.05);
+  background: color-mix(in srgb, var(--text-primary) 5%, transparent);
 }
 .stats-guide-intro {
   margin: 0;
@@ -574,4 +574,133 @@
   font-size: 11.5px;
   color: var(--ghost);
   margin-top: 3px;
+}
+
+/* ── Multi-select / bulk actions ────────────────────────────────────────── */
+.player-check {
+  appearance: none;
+  width: 14px;
+  height: 14px;
+  flex-shrink: 0;
+  border: 1px solid var(--border-hi);
+  border-radius: 3px;
+  background: var(--surface);
+  cursor: pointer;
+  display: grid;
+  place-content: center;
+  transition: border-color 100ms, background 100ms;
+}
+.player-check:hover { border-color: var(--accent-50); }
+.player-check:checked {
+  background: var(--accent);
+  border-color: var(--accent);
+}
+.player-check:checked::after {
+  content: '';
+  width: 8px;
+  height: 8px;
+  clip-path: polygon(14% 44%, 0 65%, 50% 100%, 100% 16%, 80% 0%, 43% 62%);
+  background: var(--surface);
+}
+.mac-master-row.checked { background: var(--accent-05); }
+
+.bulk-bar {
+  position: sticky;
+  bottom: 0;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  flex-wrap: wrap;
+  padding: 8px 10px;
+  background: var(--elevated);
+  border-top: 1px solid var(--border);
+  box-shadow: var(--shadow-md);
+}
+.bulk-count {
+  font-family: var(--mono);
+  font-size: 10.5px;
+  color: var(--mist);
+  margin-right: 4px;
+  white-space: nowrap;
+}
+.bulk-btn {
+  font-family: var(--sans);
+  font-size: 11px;
+  color: var(--ash);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--r-sm);
+  padding: 3px 8px;
+  cursor: pointer;
+  transition: border-color 100ms, color 100ms, background 100ms;
+}
+.bulk-btn:hover:not(:disabled) { border-color: var(--accent-50); color: var(--accent); }
+.bulk-btn:disabled { opacity: 0.5; cursor: default; }
+.bulk-btn.danger:hover:not(:disabled) { border-color: var(--status-critical); color: var(--status-critical); }
+.bulk-btn.clear { margin-left: auto; color: var(--ghost); }
+
+/* ── DefaultShell retheme of mac-master-* markup ─────────────────────────────
+   PlayerList reuses the macOS master/detail classes; inside the default
+   shell (.shell) they must follow the token theme, not the glass look. */
+.shell .mac-master-list { border-right: 1px solid var(--border); }
+.shell .mac-master-header { color: var(--text-muted); font-family: var(--sans); }
+.shell .mac-master-row:hover { background: color-mix(in srgb, var(--text-primary) 4%, transparent); }
+.shell .mac-master-row.active {
+  background: var(--accent-15);
+  border-color: var(--accent-30);
+}
+.shell .mac-master-avatar {
+  background: var(--accent-dim);
+  border: 1px solid var(--accent-30);
+  color: var(--accent);
+  font-family: var(--sans);
+}
+.shell .mac-master-row.active .mac-master-avatar {
+  background: var(--accent-15);
+  border-color: var(--accent-40);
+  color: var(--accent);
+}
+.shell .mac-master-avatar.skin,
+.shell .mac-player-big-avatar.skin {
+  background: color-mix(in srgb, var(--text-primary) 6%, transparent);
+}
+.shell .mac-master-name { color: var(--text-primary); font-family: var(--sans); }
+.shell .mac-master-row.active .mac-master-name { color: var(--text-primary); }
+.shell .mac-master-world { color: var(--text-muted); }
+.shell .mac-detail-empty-text { color: var(--text-muted); font-family: var(--sans); }
+.shell .mac-player-detail-name { color: var(--text-primary); font-family: var(--sans); }
+.shell .mac-player-big-avatar {
+  background: var(--accent-dim);
+  color: var(--accent);
+}
+.shell .mac-player-meta-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--r-lg);
+}
+.shell .mac-player-meta-row {
+  border-bottom: 1px solid var(--border);
+  font-family: var(--sans);
+}
+.shell .mac-player-meta-label { color: var(--text-secondary); }
+.shell .mac-player-meta-value { color: var(--text-primary); }
+.shell .mac-player-action-btn {
+  font-family: var(--sans);
+  border: 1px solid var(--border);
+  background: var(--surface);
+  color: var(--text-primary);
+  border-radius: var(--r-md);
+  cursor: pointer;
+}
+.shell .mac-player-action-btn:hover {
+  background: var(--elevated);
+  border-color: var(--border-hi);
+}
+.shell .mac-player-action-btn.danger {
+  background: color-mix(in srgb, var(--status-critical) 8%, transparent);
+  border-color: color-mix(in srgb, var(--status-critical) 25%, transparent);
+  color: var(--status-critical);
+}
+.shell .mac-player-action-btn.danger:hover {
+  background: color-mix(in srgb, var(--status-critical) 15%, transparent);
 }

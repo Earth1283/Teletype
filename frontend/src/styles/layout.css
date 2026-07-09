@@ -16,34 +16,27 @@ body.mobile-nav-open {
   transform: translateX(-50%);
   z-index: var(--z-banner);
   display: flex;
-  align-items: center;
-  gap: 12px;
-  max-width: min(760px, calc(100vw - 24px));
-  padding: 9px 10px 9px 14px;
-  background: rgba(127, 29, 29, 0.96);
-  border: 1px solid rgba(248, 113, 113, 0.65);
+  align-items: flex-start;
+  gap: 10px;
+  max-width: min(600px, calc(100vw - 24px));
+  padding: 10px 10px 10px 14px;
+  background: color-mix(in srgb, var(--status-critical) 16%, var(--void) 84%);
+  border: 1px solid color-mix(in srgb, var(--status-critical) 45%, transparent);
   border-radius: var(--r-md);
-  color: #fff7ed;
+  color: var(--ash);
   font-family: var(--sans);
   font-size: 12.5px;
-  line-height: 1.35;
-  box-shadow: 0 10px 30px rgba(0, 0, 0, .35);
+  line-height: 1.4;
+  box-shadow: var(--shadow-md);
 }
 
 .insecure-http-banner-copy {
-  display: flex;
-  align-items: center;
-  gap: 8px;
   min-width: 0;
 }
 
 .insecure-http-banner strong {
-  color: #ffffff;
-  white-space: nowrap;
-}
-
-.insecure-http-banner span {
-  min-width: 0;
+  color: var(--status-critical);
+  margin-right: 5px;
 }
 
 .insecure-http-dismiss {
@@ -56,7 +49,7 @@ body.mobile-nav-open {
   border: 0;
   border-radius: var(--r-sm);
   background: transparent;
-  color: #fff7ed;
+  color: var(--ash);
   cursor: pointer;
   flex-shrink: 0;
   opacity: 0.82;
@@ -65,12 +58,12 @@ body.mobile-nav-open {
 
 .insecure-http-dismiss:hover,
 .insecure-http-dismiss:focus-visible {
-  background: rgba(255, 255, 255, 0.12);
+  background: var(--accent-15);
   opacity: 1;
 }
 
 .insecure-http-dismiss:focus-visible {
-  outline: 2px solid rgba(255, 247, 237, 0.75);
+  outline: 2px solid var(--status-critical);
   outline-offset: 2px;
 }
 
@@ -426,7 +419,7 @@ body.mobile-nav-open {
     position: fixed;
     inset: 0;
     z-index: calc(var(--z-mobile-nav) + 1);
-    background: rgba(0, 0, 0, 0.52);
+    background: var(--scrim);
     backdrop-filter: blur(3px);
     border: 0;
     cursor: default;
@@ -444,7 +437,7 @@ body.mobile-nav-open {
     background: var(--surface);
     border-top: 1px solid var(--border-hi);
     border-radius: 18px 18px 0 0;
-    box-shadow: 0 -16px 48px rgba(0, 0, 0, 0.5);
+    box-shadow: var(--shadow-lg);
     transform: translateY(100%);
     transition: transform 300ms cubic-bezier(0.16, 1, 0.3, 1);
     /* clear bottom nav + safe area */
@@ -595,7 +588,7 @@ body.mobile-nav-open {
   font-family: var(--sans);
   font-size: 12.5px;
   color: var(--ash);
-  box-shadow: 0 8px 24px rgba(0,0,0,.45);
+  box-shadow: var(--shadow-md);
   pointer-events: all;
   max-width: 320px;
   animation: toast-in 200ms cubic-bezier(0.16, 1, 0.3, 1);

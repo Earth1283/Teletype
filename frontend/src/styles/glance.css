@@ -86,7 +86,7 @@
   animation: none !important;
 }
 .glance-status-uptime {
-  font-family: var(--sans);
+  font-family: var(--mono);
   font-size: 11px;
   color: var(--mist);
 }
@@ -94,7 +94,7 @@
   display: flex;
   align-items: center;
   gap: 5px;
-  font-family: var(--sans);
+  font-family: var(--mono);
   font-size: 10px;
   color: var(--mist);
 }
@@ -135,7 +135,7 @@
   background: var(--elevated);
 }
 .speedo-uptime-label {
-  font-family: var(--sans);
+  font-family: var(--mono);
   font-size: 9px;
   font-weight: 600;
   text-transform: uppercase;
@@ -212,7 +212,7 @@
 }
 .glance-chart-card:hover {
   border-color: var(--border-hi);
-  box-shadow: 0 2px 12px rgba(0,0,0,0.3);
+  box-shadow: var(--shadow-sm);
 }
 .glance-chart-header {
   display: flex;
@@ -267,7 +267,7 @@
   max-width: 280px;
   overflow: hidden;
   pointer-events: none;
-  box-shadow: 0 8px 24px rgba(0,0,0,0.55);
+  box-shadow: var(--shadow-md);
 }
 .glance-tooltip-incident {
   display: flex;

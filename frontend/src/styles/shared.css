@@ -2,7 +2,7 @@
 .modal-overlay {
   position: fixed;
   inset: 0;
-  background: rgba(0,0,0,.6);
+  background: var(--scrim);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -168,7 +168,7 @@
   align-items: center;
   gap: 8px;
   padding: 10px 16px;
-  border-bottom: 0.5px solid rgba(255, 255, 255, 0.07);
+  border-bottom: 0.5px solid color-mix(in srgb, var(--text-primary) 7%, transparent);
   flex-shrink: 0;
   flex-wrap: wrap;
 }
@@ -202,7 +202,7 @@
 }
 
 .audit-filter-input:focus,
-.audit-filter-select:focus { border-color: rgba(10, 132, 255, 0.5); }
+.audit-filter-select:focus { border-color: var(--accent-50); }
 
 .audit-reset-btn {
   background: none;
@@ -229,7 +229,7 @@
   height: 28px;
 }
 
-.audit-export-btn:hover { background: rgba(255,255,255,0.06); }
+.audit-export-btn:hover { background: color-mix(in srgb, var(--text-primary) 6%, transparent); }
 
 @media (max-width: 640px) {
   .modal-overlay {
@@ -289,85 +289,6 @@
   text-align: center;
 }
 
-/* ── Keyboard help overlay ───────────────────────────────────── */
-.kbd-help-card {
-  background: var(--surface);
-  border: 1px solid var(--border-hi);
-  border-radius: var(--r-lg);
-  padding: 20px;
-  width: 420px;
-  max-width: 90vw;
-  animation: modal-in 220ms cubic-bezier(0.16, 1, 0.3, 1);
-}
-
-.kbd-help-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  margin-bottom: 16px;
-}
-
-.kbd-help-title {
-  font-size: 13px;
-  font-weight: 600;
-  color: var(--ash);
-}
-
-.kbd-help-group {
-  margin-bottom: 14px;
-}
-
-.kbd-help-group-label {
-  font-size: 10px;
-  font-weight: 600;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-  color: var(--ghost);
-  margin-bottom: 6px;
-  padding-bottom: 4px;
-  border-bottom: 1px solid var(--border);
-}
-
-.kbd-help-row {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 4px 0;
-}
-
-.kbd-help-desc {
-  font-size: 12.5px;
-  color: var(--mist);
-}
-
-.kbd-help-keys {
-  display: flex;
-  align-items: center;
-  gap: 2px;
-}
-
-.kbd-key {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  min-width: 22px;
-  height: 20px;
-  padding: 0 5px;
-  background: var(--elevated);
-  border: 1px solid var(--border-hi);
-  border-bottom-width: 2px;
-  border-radius: 4px;
-  font-family: var(--mono);
-  font-size: 11px;
-  color: var(--ash);
-  white-space: nowrap;
-}
-
-.kbd-plus {
-  font-size: 10px;
-  color: var(--ghost);
-  margin: 0 1px;
-}
 
 /* ── Audit pagination ────────────────────────────────────────── */
 .audit-pagination {
@@ -378,4 +299,73 @@
   border-top: 1px solid var(--border);
   flex-shrink: 0;
   justify-content: center;
+}
+
+/* ── Data table (default-shell pages; themed + density-aware) ──────────────── */
+.data-table-wrap {
+  overflow: auto;
+  border: 1px solid var(--border);
+  border-radius: var(--r-md);
+  background: var(--surface);
+}
+.data-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-family: var(--sans);
+  font-size: 12.5px;
+}
+.data-table th {
+  position: sticky;
+  top: 0;
+  background: var(--elevated);
+  padding: 8px 14px;
+  text-align: left;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--mist);
+  border-bottom: 1px solid var(--border);
+  white-space: nowrap;
+}
+.data-table td {
+  padding: calc(9px * var(--density)) 14px;
+  border-bottom: 1px solid var(--border);
+  color: var(--ash);
+  vertical-align: middle;
+}
+.data-table tbody tr:last-child td { border-bottom: none; }
+.data-table tbody tr:hover td { background: var(--accent-04); }
+.data-table tbody tr.ctx-active td { background: var(--accent-15); }
+
+/* ── DefaultShell retheme of mac-seg-* segmented controls ────────────────────
+   Glance / Stats / Actions reuse the macOS segmented control markup; inside
+   the default shell they follow the token theme. */
+.shell .mac-seg-ctrl {
+  background: var(--void);
+  border: 1px solid var(--border);
+  border-radius: var(--r-md);
+}
+.shell .mac-seg-btn {
+  font-family: var(--sans);
+  color: var(--text-secondary);
+  cursor: pointer;
+  border-radius: calc(var(--r-md) - 2px);
+}
+.shell .mac-seg-btn.active {
+  background: var(--accent-15);
+  color: var(--accent);
+  box-shadow: none;
+}
+.shell .mac-seg-btn:not(.active):hover {
+  background: color-mix(in srgb, var(--text-primary) 5%, transparent);
+  color: var(--text-primary);
+}
+.shell .mac-seg-badge {
+  background: color-mix(in srgb, var(--text-primary) 8%, transparent);
+  color: var(--text-secondary);
+}
+.shell .mac-seg-btn.active .mac-seg-badge {
+  background: var(--accent-30);
+  color: var(--accent);
 }

@@ -1,8 +1,9 @@
-import { useState } from 'react'
+import { useMemo, useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { api } from '../api/client'
 import { useContextMenu } from '../ContextMenu'
 import { Skeleton } from '../Skeleton'
+import { Eyebrow } from '../design'
 
 interface AuditEntry {
   id: number
@@ -101,8 +102,41 @@ export default function AuditPage() {
   const hasMore = entries.length === PAGE_SIZE
   const hasPrev = offset > 0
 
+  const kpis = useMemo(() => {
+    if (entries.length === 0) return null
+    const actorCounts = new Map<string, number>()
+    const actionCounts = new Map<string, number>()
+    for (const e of entries) {
+      actorCounts.set(e.actor, (actorCounts.get(e.actor) ?? 0) + 1)
+      actionCounts.set(e.action, (actionCounts.get(e.action) ?? 0) + 1)
+    }
+    const topActor = [...actorCounts.entries()].sort((a, b) => b[1] - a[1])[0]
+    const topAction = [...actionCounts.entries()].sort((a, b) => b[1] - a[1])[0]
+    return { total: entries.length, topActor, topAction }
+  }, [entries])
+
   return (
     <div className="audit-root">
+      {kpis && (
+        <div className="grid grid-cols-3 gap-3 px-4 pt-3">
+          <div className="rounded-md border border-border bg-surface p-3">
+            <Eyebrow>Entries (page)</Eyebrow>
+            <div className="mt-1 font-mono text-xl text-text-primary">{kpis.total}</div>
+          </div>
+          <div className="rounded-md border border-border bg-surface p-3">
+            <Eyebrow>Top Actor</Eyebrow>
+            <div className="mt-1 truncate font-mono text-xl text-text-primary">{kpis.topActor[0]}</div>
+            <div className="font-mono text-[11px] text-text-muted">{kpis.topActor[1]} actions</div>
+          </div>
+          <div className="rounded-md border border-border bg-surface p-3">
+            <Eyebrow>Top Action</Eyebrow>
+            <div className="mt-1 truncate font-mono text-xl" style={{ color: ACTION_COLORS[kpis.topAction[0]] ?? 'var(--ash)' }}>
+              {kpis.topAction[0]}
+            </div>
+            <div className="font-mono text-[11px] text-text-muted">{kpis.topAction[1]} times</div>
+          </div>
+        </div>
+      )}
       <div className="audit-toolbar">
         <span className="audit-title">Audit Log</span>
         <span className="audit-meta">
@@ -137,8 +171,8 @@ export default function AuditPage() {
         <button className="audit-export-btn" onClick={exportCsv}>Export CSV</button>
       </div>
 
-      <div className="mac-tbl-wrap" style={{ borderRadius: 0, border: 'none', flex: 1 }}>
-        <table className="mac-tbl">
+      <div className="data-table-wrap" style={{ borderRadius: 0, border: 'none', flex: 1 }}>
+        <table className="data-table">
           <thead>
             <tr>
               {['Timestamp', 'Actor', 'IP', 'Action', 'Detail'].map(h => (
