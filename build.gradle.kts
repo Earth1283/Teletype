@@ -17,13 +17,20 @@ val kotlinxSerializationVersion = "1.8.1"
 val kotlinxCoroutinesVersion = "1.10.2"
 val logbackVersion = "1.5.18"
 
+// kotlin-reflect leaks in transitively via ktor-server-core-jvm but is never used
+// (code only does ::class.java, no KClass/reflection APIs) — drop it from the app's
+// own classpaths. Scoped by name (not configurations.all) so the Kotlin compiler's
+// own internal classpaths — which genuinely need kotlin-reflect — are untouched.
+configurations.matching { it.name in setOf("compileClasspath", "runtimeClasspath", "testCompileClasspath", "testRuntimeClasspath") }.configureEach {
+    exclude(group = "org.jetbrains.kotlin", module = "kotlin-reflect")
+}
+
 dependencies {
     // Paper API — provided by the server at runtime in plugin mode
     compileOnly("io.papermc.paper:paper-api:1.21-R0.1-SNAPSHOT")
 
     // Kotlin stdlib
     implementation(kotlin("stdlib"))
-    implementation(kotlin("reflect"))
 
     // Kotlinx
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:$kotlinxCoroutinesVersion")
@@ -34,6 +41,13 @@ dependencies {
     implementation("io.ktor:ktor-server-netty-jvm:$ktorVersion")
     implementation("io.ktor:ktor-server-websockets-jvm:$ktorVersion")
     implementation("io.ktor:ktor-server-auth-jvm:$ktorVersion")
+    // Do NOT exclude com.auth0:jwks-rsa here even though this project only signs/validates
+    // HMAC256 (see java-jwt below). Ktor compiles every top-level function in its JWTUtils.kt
+    // into one JWTUtilsKt class file; that class also holds a JWK-based algorithm helper whose
+    // catch block references com.auth0.jwk.JwkException. JVM class verification resolves every
+    // exception-table type for the whole class at link time, so the first JWT check — even a
+    // pure-HMAC one — loads JWTUtilsKt and throws NoClassDefFoundError for the missing class if
+    // jwks-rsa isn't on the classpath.
     implementation("io.ktor:ktor-server-auth-jwt-jvm:$ktorVersion")
     implementation("io.ktor:ktor-server-content-negotiation-jvm:$ktorVersion")
     implementation("io.ktor:ktor-serialization-kotlinx-json-jvm:$ktorVersion")
@@ -80,6 +94,7 @@ tasks {
         inputs.file("frontend/package-lock.json")
         // Use the lock file npm writes after install as a marker — avoids hashing all of node_modules
         outputs.file("frontend/node_modules/.package-lock.json")
+        outputs.cacheIf { true }
     }
 
     val buildFrontend by registering(Exec::class) {
@@ -89,11 +104,17 @@ tasks {
         inputs.dir("frontend/src")
         inputs.file("frontend/package.json")
         outputs.dir("src/main/resources/webroot")
+        outputs.cacheIf { true }
     }
 
     shadowJar {
         dependsOn(buildFrontend)
         archiveClassifier.set("")
+
+        // sqlite-jdbc bundles natives for every OS; this server only ever runs on
+        // Linux, Linux-Musl (Alpine), Mac, or Windows — drop Android and FreeBSD.
+        exclude("org/sqlite/native/Linux-Android/**")
+        exclude("org/sqlite/native/FreeBSD/**")
 
         manifest {
             attributes(

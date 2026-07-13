@@ -2,6 +2,7 @@ package io.github.Earth1283.teletype.profiling
 
 import io.github.Earth1283.teletype.Teletype
 import jdk.jfr.Configuration
+import jdk.jfr.FlightRecorder
 import jdk.jfr.Recording
 import jdk.jfr.RecordingState
 import jdk.jfr.consumer.RecordedObject
@@ -32,8 +33,14 @@ class JfrManager(private val plugin: Teletype) {
 
     fun init() {
         try {
-            Recording::class.java
-            jfrAvailable = true
+            // Referencing Recording::class only proves the jdk.jfr module is on the classpath,
+            // not that recording actually works (e.g. -XX:-FlightRecorder, non-HotSpot JVMs).
+            // FlightRecorder.isAvailable() is the real capability check.
+            jfrAvailable = FlightRecorder.isAvailable()
+            if (!jfrAvailable) {
+                plugin.logger.warning("[Profiling] JFR unavailable on this JVM — profiling disabled")
+                return
+            }
             scanExistingRecordings()
             if (plugin.teletypeConfig.profilingEnabled && plugin.teletypeConfig.profilingContinuousEnabled) {
                 startContinuousLocked(StartContinuousRequest())
@@ -81,26 +88,26 @@ class JfrManager(private val plugin: Teletype) {
         plugin.logger.info("[Profiling] Scanned ${recordings.size} existing recording(s)")
     }
 
-    fun getStatus(): Map<String, Any?> {
+    fun getStatus(): ProfilingStatus {
         val cfg = plugin.teletypeConfig
-        return mapOf(
-            "jfrAvailable" to jfrAvailable,
-            "profilingEnabled" to cfg.profilingEnabled,
-            "continuousEnabled" to cfg.profilingContinuousEnabled,
-            "continuousRunning" to lock.withLock {
+        return ProfilingStatus(
+            jfrAvailable = jfrAvailable,
+            profilingEnabled = cfg.profilingEnabled,
+            continuousEnabled = cfg.profilingContinuousEnabled,
+            continuousRunning = lock.withLock {
                 continuousRecording?.state == RecordingState.RUNNING
             },
-            "config" to mapOf(
-                "maxDiskMb" to (appliedContinuousReq.maxDiskMb ?: cfg.profilingContinuousMaxDiskMb),
-                "maxAgeSec" to (appliedContinuousReq.maxAgeSec ?: cfg.profilingContinuousMaxAgeSec),
-                "template" to (appliedContinuousReq.template ?: cfg.profilingContinuousTemplate),
-                "dumpOnExit" to (appliedContinuousReq.dumpOnExit ?: cfg.profilingContinuousDumpOnExit),
-                "outputDir" to cfg.profilingContinuousOutputDir,
+            config = ProfilingConfigStatus(
+                maxDiskMb = appliedContinuousReq.maxDiskMb ?: cfg.profilingContinuousMaxDiskMb,
+                maxAgeSec = appliedContinuousReq.maxAgeSec ?: cfg.profilingContinuousMaxAgeSec,
+                template = appliedContinuousReq.template ?: cfg.profilingContinuousTemplate,
+                dumpOnExit = appliedContinuousReq.dumpOnExit ?: cfg.profilingContinuousDumpOnExit,
+                outputDir = cfg.profilingContinuousOutputDir,
             ),
-            "recordings" to mapOf(
-                "outputDir" to cfg.profilingRecordingsOutputDir,
-                "maxTotalDiskMb" to cfg.profilingRecordingsMaxTotalDiskMb,
-                "totalSizeBytes" to recordings.values.filter { it.status == RecordingStatus.COMPLETE }
+            recordings = ProfilingRecordingsStatus(
+                outputDir = cfg.profilingRecordingsOutputDir,
+                maxTotalDiskMb = cfg.profilingRecordingsMaxTotalDiskMb,
+                totalSizeBytes = recordings.values.filter { it.status == RecordingStatus.COMPLETE }
                     .mapNotNull { it.sizeBytes }.sum(),
             ),
         )

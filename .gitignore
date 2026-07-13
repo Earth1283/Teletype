@@ -4,6 +4,12 @@
 # Gradle cache folder
 .gradle
 
+# Kotlin compiler daemon cache
+.kotlin
+
+# core dumps
+core
+
 # Gradle build folder
 build
 

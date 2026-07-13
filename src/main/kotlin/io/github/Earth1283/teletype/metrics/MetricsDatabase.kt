@@ -13,6 +13,10 @@ import java.sql.Connection
 
 class MetricsDatabase(dataFolder: File) {
 
+    companion object {
+        private const val MAX_PLAYER_EVENTS = 1_000
+    }
+
     // Two connections so dashboard reads (history/gcEvents/playerEvents) never queue
     // behind the periodic write flush or nightly retention downsampling — WAL mode
     // (enabled below) allows one writer and readers to proceed concurrently at the
@@ -307,11 +311,14 @@ class MetricsDatabase(dataFolder: File) {
 
     suspend fun playerEvents(from: Long, to: Long): List<PlayerEvent> = readMutex.withLock {
         withContext(Dispatchers.IO) {
+            // Capped and taken from the newest end of the range — an unbounded result on a busy
+            // server over a multi-day window can reach thousands of rows, and the frontend renders
+            // one marker per event, which freezes the chart. Most-recent events are the useful ones.
             val result = mutableListOf<PlayerEvent>()
             readConn.prepareStatement(
-                "SELECT ts, uuid, name, action FROM player_events WHERE ts >= ? AND ts <= ? ORDER BY ts"
+                "SELECT ts, uuid, name, action FROM player_events WHERE ts >= ? AND ts <= ? ORDER BY ts DESC LIMIT ?"
             ).use { ps ->
-                ps.setLong(1, from); ps.setLong(2, to)
+                ps.setLong(1, from); ps.setLong(2, to); ps.setInt(3, MAX_PLAYER_EVENTS)
                 ps.executeQuery().use { rs ->
                     while (rs.next()) result += PlayerEvent(
                         ts     = rs.getLong("ts"),
@@ -321,7 +328,7 @@ class MetricsDatabase(dataFolder: File) {
                     )
                 }
             }
-            result
+            result.sortedBy { it.ts }
         }
     }
 

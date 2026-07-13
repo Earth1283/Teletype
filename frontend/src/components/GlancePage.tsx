@@ -56,6 +56,12 @@ const FOCUS_SEC: Record<number, number> = {
 
 const MAX_DISPLAY_PTS = 600
 const MAX_GC_MARKERS = 160
+// Young-gen GC on G1/ZGC/Shenandoah fires constantly and is usually sub-millisecond —
+// real noise, not signal. Drop it before capping so a wall of trivial markers doesn't
+// crowd out (or get sampled over) the pauses that actually explain a lag spike.
+const GC_NOISE_FLOOR_MS = 5
+// Past this many markers, per-marker duration labels just overlap into unreadable text.
+const MAX_GC_LABELS = 20
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -775,10 +781,15 @@ export default function GlancePage() {
     if (data.length === 0) return []
     const from = data[0].timestamp
     const to = data[data.length - 1].timestamp
-    const visible = rawGcEvents.filter(event => event.ts >= from && event.ts <= to)
+    const visible = rawGcEvents.filter(event =>
+      event.ts >= from && event.ts <= to && event.durationMs >= GC_NOISE_FLOOR_MS)
     if (visible.length <= MAX_GC_MARKERS) return visible
-    const step = Math.ceil(visible.length / MAX_GC_MARKERS)
-    return visible.filter((_, i) => i % step === 0)
+    // Keep the longest (most diagnostically useful) pauses rather than an even stride,
+    // which would sample noise and signal alike and could drop the one spike that matters.
+    return [...visible]
+      .sort((a, b) => b.durationMs - a.durationMs)
+      .slice(0, MAX_GC_MARKERS)
+      .sort((a, b) => a.ts - b.ts)
   }, [data, rawGcEvents])
 
   const SHARED = {
@@ -916,7 +927,8 @@ export default function GlancePage() {
               <GlanceChart {...SHARED} title="Memory" dataKey="memUsedMb" statsKey="memPct"
                 color={memColor(memP)} yDomain={[0, memMaxMb]}
                 yFormatter={fmtMem} stats={allStats.memPct} chartId="mem"
-                gcEvents={!gbm ? gcEvents : undefined} showGcLabels={windowMin <= 15} showGcHint />
+                gcEvents={!gbm ? gcEvents : undefined}
+                showGcLabels={windowMin <= 15 && gcEvents.length <= MAX_GC_LABELS} showGcHint />
             )}
             {gs.showChartCpu && hasCpuData && (
               <GlanceChart {...SHARED} title="Host CPU" dataKey="cpuPercent"

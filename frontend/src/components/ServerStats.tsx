@@ -89,6 +89,16 @@ function downsample<T extends { timestamp: number }>(data: T[]): T[] {
   return data.filter((_, i) => i % step === 0 || i === data.length - 1)
 }
 
+// Each event renders as its own SVG ReferenceLine — thousands of markers (a busy
+// server over 7d) freezes the chart on layout/paint. Cap it; a dense cluster of
+// join/leave markers is unreadable anyway.
+const MAX_EVENT_MARKERS = 150
+function downsampleEvents(events?: PlayerEvent[]): PlayerEvent[] {
+  if (!events || events.length <= MAX_EVENT_MARKERS) return events ?? []
+  const step = Math.ceil(events.length / MAX_EVENT_MARKERS)
+  return events.filter((_, i) => i % step === 0)
+}
+
 function computeStats(values: (number | null)[]): { mean: number; std: number } | null {
   const valid = values.filter((v): v is number => v !== null && isFinite(v))
   if (valid.length < 3) return null
@@ -487,7 +497,7 @@ function MiniChart({ data, dataKey, color, label, guideId, onGuide, yDomain, yFm
             tick={{ fill: 'var(--mist)', fontFamily: 'var(--mono)', fontSize: 9 }}
             tickLine={false} axisLine={false} tickCount={3} tickFormatter={fmt} />
           <Tooltip content={<ChartTooltip />} cursor={{ stroke: 'var(--border-hi)', strokeWidth: 1 }} />
-          {events?.map(ev => (
+          {downsampleEvents(events).map(ev => (
             <ReferenceLine key={`${ev.ts}-${ev.uuid}`} x={ev.ts}
               stroke={ev.action === 'join' ? 'var(--green)' : 'var(--red)'}
               strokeWidth={1} strokeOpacity={0.55} strokeDasharray="2 3" />

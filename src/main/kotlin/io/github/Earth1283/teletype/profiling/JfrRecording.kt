@@ -58,3 +58,29 @@ data class StartContinuousRequest(
     val template: String? = null,
     val dumpOnExit: Boolean? = null,
 )
+
+@Serializable
+data class ProfilingConfigStatus(
+    val maxDiskMb: Long,
+    val maxAgeSec: Long,
+    val template: String,
+    val dumpOnExit: Boolean,
+    val outputDir: String,
+)
+
+@Serializable
+data class ProfilingRecordingsStatus(
+    val outputDir: String,
+    val maxTotalDiskMb: Long,
+    val totalSizeBytes: Long,
+)
+
+@Serializable
+data class ProfilingStatus(
+    val jfrAvailable: Boolean,
+    val profilingEnabled: Boolean,
+    val continuousEnabled: Boolean,
+    val continuousRunning: Boolean,
+    val config: ProfilingConfigStatus,
+    val recordings: ProfilingRecordingsStatus,
+)
