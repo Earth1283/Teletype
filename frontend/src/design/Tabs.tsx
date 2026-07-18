@@ -21,8 +21,8 @@ export function Tabs<T extends string>({ items, active, onChange, orientation = 
   return (
     <nav
       className={cx(
-        'flex gap-1',
-        orientation === 'vertical' ? 'flex-col' : 'flex-row',
+        'flex',
+        orientation === 'vertical' ? 'flex-col gap-0.5' : 'flex-row gap-1',
         className,
       )}
     >
@@ -36,7 +36,7 @@ export function Tabs<T extends string>({ items, active, onChange, orientation = 
             title={item.hint ? `${item.label} (${item.hint})` : undefined}
             onClick={() => onChange(item.id)}
             className={cx(
-              'relative flex items-center gap-2.5 rounded-sm px-3 py-2 text-left font-sans text-[13px]',
+              'relative flex items-center gap-2.5 rounded-sm px-3 py-1.5 text-left font-sans text-[13px]',
               'transition-colors duration-150',
               isActive
                 ? 'bg-accent/10 text-accent'

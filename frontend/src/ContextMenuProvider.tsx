@@ -43,11 +43,10 @@ export function ContextMenuProvider({ children }: { children: ReactNode }) {
   ) => {
     const width = 230
     const height = estimateHeight(items)
+    const flipped = clientY + height > window.innerHeight - 8
     const x = Math.min(clientX, window.innerWidth - width - 8)
-    const y = clientY + height > window.innerHeight - 8
-      ? Math.max(8, clientY - height)
-      : clientY
-    setMenu({ x: Math.max(8, x), y, items, target })
+    const y = flipped ? Math.max(8, clientY - height) : clientY
+    setMenu({ x: Math.max(8, x), y, items, target, flipped })
   }, [])
 
   const openWheelAt = useCallback((
@@ -250,6 +249,7 @@ export function ContextMenuProvider({ children }: { children: ReactNode }) {
         <div
           className="mac-ctx"
           data-context-kind={menu.target?.kind}
+          data-flip-y={menu.flipped ? 'true' : undefined}
           style={{ left: menu.x, top: menu.y }}
           onMouseDown={event => event.stopPropagation()}
           onContextMenu={event => event.preventDefault()}

@@ -34,7 +34,10 @@
   margin-bottom: 6px;
   transition: border-color 120ms, transform 150ms;
 }
-.player-row:hover { border-color: var(--border-hi); transform: translateX(2px); }
+.player-row:hover { border-color: var(--border-hi); }
+@media (hover: hover) and (pointer: fine) {
+  .player-row:hover { transform: translateX(2px); }
+}
 .player-avatar {
   width: 34px;
   height: 34px;

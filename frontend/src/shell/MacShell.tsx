@@ -16,6 +16,9 @@ interface WinState {
   w: number; h: number
   z: number
   min: boolean; max: boolean
+  /* Genie target: offset (relative to the window's own center) that points at
+     its dock icon, captured at the moment it was minimized. */
+  gx?: number; gy?: number
 }
 
 interface AppDef {
@@ -173,10 +176,19 @@ export default function MacShell({ onLogout }: { onLogout: () => void }) {
   const [showAbout, setShowAbout] = useState(false)
   const [showRestartConfirm, setShowRestartConfirm] = useState(false)
   const [prompt, setPrompt] = useState<PromptState>(null)
+  const [launchingId, setLaunchingId] = useState<MacTab | null>(null)
   const iRef = useRef<Interaction | null>(null)
   const menuBarRef = useRef<HTMLDivElement>(null)
+  const desktopAreaRef = useRef<HTMLDivElement>(null)
+  const dockIconRefs = useRef<Map<MacTab, HTMLButtonElement>>(new Map())
+  const [reducedMotion] = useState(() => typeof window !== 'undefined' && window.matchMedia('(prefers-reduced-motion: reduce)').matches)
   const { settings, update } = useSettings()
   const { openContextMenu } = useContextMenu()
+
+  const registerDockIcon = useCallback((id: MacTab, el: HTMLButtonElement | null) => {
+    if (el) dockIconRefs.current.set(id, el)
+    else dockIconRefs.current.delete(id)
+  }, [])
 
   useEffect(() => {
     const t = setInterval(() => setClock(new Date()), 1000)
@@ -242,6 +254,11 @@ export default function MacShell({ onLogout }: { onLogout: () => void }) {
       setWins(prev => {
         const ex = prev.find(w => w.id === id)
         if (ex) return prev.map(w => w.id === id ? { ...w, min: false, z: nz } : w)
+        // Real launch, not a refocus — bounce the dock icon like macOS does.
+        if (!reducedMotion) {
+          setLaunchingId(id)
+          setTimeout(() => setLaunchingId(cur => cur === id ? null : cur), 640)
+        }
         const app = APPS.find(a => a.id === id)!
         const offset = (prev.length % 9) * 22
         const vw = window.innerWidth
@@ -272,8 +289,28 @@ export default function MacShell({ onLogout }: { onLogout: () => void }) {
     })
   }
 
+  // Genie target: how far (in unscaled px) the window's own center sits from
+  // its dock icon's center, right now. Captured once at minimize-time so a
+  // later dock-magnification hover doesn't jitter the already-shrinking window.
+  function genieOffset(win: WinState): { gx: number; gy: number } {
+    const deskEl = desktopAreaRef.current
+    const iconEl = dockIconRefs.current.get(win.id)
+    if (!deskEl || !iconEl) return { gx: 0, gy: 260 }
+    const deskRect = deskEl.getBoundingClientRect()
+    const iconRect = iconEl.getBoundingClientRect()
+    const curCenterX = win.max ? deskRect.width / 2 : win.x + win.w / 2
+    const curCenterY = win.max ? deskRect.height / 2 : win.y + win.h / 2
+    const targetX = iconRect.left + iconRect.width / 2 - deskRect.left
+    const targetY = iconRect.top + iconRect.height / 2 - deskRect.top
+    return { gx: targetX - curCenterX, gy: targetY - curCenterY }
+  }
+
   function minWin(id: MacTab) {
-    setWins(prev => prev.map(w => w.id === id ? { ...w, min: true } : w))
+    setWins(prev => prev.map(w => {
+      if (w.id !== id) return w
+      const { gx, gy } = reducedMotion ? { gx: 0, gy: 0 } : genieOffset(w)
+      return { ...w, min: true, gx, gy }
+    }))
     if (activeId === id) {
       const others = wins.filter(w => w.id !== id && !w.min)
       setActiveId(others.length ? others.reduce((a, b) => a.z > b.z ? a : b).id : null)
@@ -541,7 +578,7 @@ export default function MacShell({ onLogout }: { onLogout: () => void }) {
       </div>
 
       {/* ── Desktop area ─────────────────────────────────────────────────── */}
-      <div className="mac-desktop-area" onClick={() => setActiveId(null)}>
+      <div className="mac-desktop-area" ref={desktopAreaRef} onClick={() => setActiveId(null)}>
         {wins.length === 0 && (
           <div className="mac-desktop-hint">Double-click an icon in the dock to open an app</div>
         )}
@@ -559,12 +596,22 @@ export default function MacShell({ onLogout }: { onLogout: () => void }) {
             onNavigate={(t) => openApp(t as MacTab)}
             onTitleCtx={winTitleCtx}
             threadDumpText={threadDumpText}
+            reducedMotion={reducedMotion}
           />
         ))}
       </div>
 
       {/* ── Dock ──────────────────────────────────────────────────────────── */}
-      <MacDock apps={DOCK_APPS} wins={wins} activeId={activeId} onOpen={openApp} onCtx={dockCtx} />
+      <MacDock
+        apps={DOCK_APPS}
+        wins={wins}
+        activeId={activeId}
+        onOpen={openApp}
+        onCtx={dockCtx}
+        launchingId={launchingId}
+        registerIcon={registerDockIcon}
+        reducedMotion={reducedMotion}
+      />
 
       {/* ── Spotlight ─────────────────────────────────────────────────────── */}
       <CommandPalette
@@ -637,13 +684,18 @@ interface MacWindowProps {
   onNavigate: (t: string) => void
   onTitleCtx: (e: React.MouseEvent, id: MacTab) => void
   threadDumpText: string
+  reducedMotion: boolean
 }
 
-function MacWindow({ win, isActive, onFocus, onStartDrag, onStartResize, onClose, onMin, onMax, onNavigate, onTitleCtx, threadDumpText }: MacWindowProps) {
+function MacWindow({ win, isActive, onFocus, onStartDrag, onStartResize, onClose, onMin, onMax, onNavigate, onTitleCtx, threadDumpText, reducedMotion }: MacWindowProps) {
   const app = APPS.find(a => a.id === win.id)!
-  const posStyle = win.max
+  const posStyle: React.CSSProperties = win.max
     ? { zIndex: win.z }
     : { left: win.x, top: win.y, width: win.w, height: win.h, zIndex: win.z }
+  // Genie: shrink toward the real dock icon instead of a generic fixed point.
+  if (win.min && !reducedMotion) {
+    posStyle.transform = `translate(${win.gx ?? 0}px, ${win.gy ?? 260}px) scale(0.05)`
+  }
 
   return (
     <div
@@ -684,24 +736,98 @@ interface MacDockProps {
   activeId: MacTab | null
   onOpen: (id: MacTab) => void
   onCtx: (e: React.MouseEvent, app: AppDef) => void
+  launchingId: MacTab | null
+  registerIcon: (id: MacTab, el: HTMLButtonElement | null) => void
+  reducedMotion: boolean
 }
 
-function MacDock({ apps, wins, activeId, onOpen, onCtx }: MacDockProps) {
+// Real dock magnification: continuous cursor-distance falloff, with neighbors
+// physically displaced (not just scaled) so grown icons don't overlap —
+// exactly what macOS does and a static CSS :hover rule can't.
+const DOCK_MAX_SCALE = 1.7
+const DOCK_RADIUS = 90 // px — gaussian falloff half-width
+
+function MacDock({ apps, wins, activeId, onOpen, onCtx, launchingId, registerIcon, reducedMotion }: MacDockProps) {
+  const dockRef = useRef<HTMLDivElement>(null)
+  // Magnification transform lands on this inner wrapper, not the outer button —
+  // the tooltip label is an untransformed sibling of it, so it doesn't fly off
+  // to a scaled, mispositioned spot when its icon magnifies.
+  const innerRefs = useRef<Map<MacTab, HTMLDivElement>>(new Map())
+  const rafRef = useRef<number | null>(null)
+  const canMagnify = !reducedMotion && typeof window !== 'undefined' && window.matchMedia('(hover: hover) and (pointer: fine)').matches
+
+  const relax = useCallback(() => {
+    apps.forEach(app => {
+      const el = innerRefs.current.get(app.id)
+      if (el) { el.classList.add('dock-relax'); el.style.transform = '' }
+    })
+  }, [apps])
+
+  const applyAt = useCallback((mouseX: number) => {
+    if (!dockRef.current) return
+    const els = apps.map(a => innerRefs.current.get(a.id))
+    const rects = els.map(el => el?.getBoundingClientRect())
+    const baseWidth = rects.find(r => r)?.width ?? 52
+    const scales = rects.map(r => {
+      if (!r) return 1
+      const center = r.left + r.width / 2 // viewport space, same as mouseX (clientX)
+      const dist = Math.abs(mouseX - center)
+      const influence = Math.exp(-(dist * dist) / (2 * DOCK_RADIUS * DOCK_RADIUS))
+      return 1 + (DOCK_MAX_SCALE - 1) * influence
+    })
+    let peak = 0
+    for (let i = 1; i < scales.length; i++) if (scales[i] > scales[peak]) peak = i
+    const shifts = new Array(scales.length).fill(0)
+    for (let i = peak + 1; i < scales.length; i++) {
+      shifts[i] = shifts[i - 1] + (baseWidth / 2) * (scales[i - 1] + scales[i] - 2)
+    }
+    for (let i = peak - 1; i >= 0; i--) {
+      shifts[i] = shifts[i + 1] - (baseWidth / 2) * (scales[i + 1] + scales[i] - 2)
+    }
+    els.forEach((el, i) => {
+      if (!el) return
+      el.classList.remove('dock-relax')
+      const lift = -((scales[i] - 1) / (DOCK_MAX_SCALE - 1)) * 22
+      el.style.transform = `translate3d(${shifts[i]}px, ${lift}px, 0) scale(${scales[i]})`
+    })
+  }, [apps])
+
+  function onMouseMove(e: React.MouseEvent) {
+    if (!canMagnify) return
+    const x = e.clientX
+    if (rafRef.current) cancelAnimationFrame(rafRef.current)
+    rafRef.current = requestAnimationFrame(() => applyAt(x))
+  }
+
+  function onMouseLeave() {
+    if (rafRef.current) cancelAnimationFrame(rafRef.current)
+    relax()
+  }
+
   return (
     <div className="mac-dock-container" onContextMenu={e => e.stopPropagation()}>
-      <div className="mac-dock">
+      <div className="mac-dock" ref={dockRef} onMouseMove={onMouseMove} onMouseLeave={onMouseLeave}>
         {apps.map(app => {
           const win = wins.find(w => w.id === app.id)
           const isActive = activeId === app.id
           return (
             <button
               key={app.id}
+              ref={el => registerIcon(app.id, el)}
               className={`mac-dock-icon${isActive ? ' dock-active' : ''}`}
               onClick={() => onOpen(app.id)}
               onContextMenu={e => { e.preventDefault(); onCtx(e, app) }}
               title={app.label}
             >
-              <AppIcon id={app.id} />
+              <div
+                className={`mac-dock-icon-inner${launchingId === app.id ? ' launching' : ''}`}
+                ref={el => {
+                  if (el) innerRefs.current.set(app.id, el)
+                  else innerRefs.current.delete(app.id)
+                }}
+              >
+                <AppIcon id={app.id} />
+              </div>
               <span className="mac-dock-label">{app.label}</span>
               {win && !win.min && <span className="mac-dock-dot" />}
               {win?.min && <span className="mac-dock-dot minimized" />}

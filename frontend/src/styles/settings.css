@@ -250,7 +250,10 @@
   display: flex;
   align-items: flex-end;
 }
-.s-theme-swatch:hover .s-theme-preview { border-color: var(--border-hi); transform: scale(1.08); }
+.s-theme-swatch:hover .s-theme-preview { border-color: var(--border-hi); }
+@media (hover: hover) and (pointer: fine) {
+  .s-theme-swatch:hover .s-theme-preview { transform: scale(1.08); }
+}
 .s-theme-swatch.active .s-theme-preview {
   border-color: var(--amber);
   box-shadow: 0 0 0 1px var(--amber);

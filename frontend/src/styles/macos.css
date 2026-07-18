@@ -1,6 +1,16 @@
 /* ── macOS Desktop (fun mode) ─────────────────────────────────────────────── */
 
 .mac-desktop {
+  /* Fun Mode is a fixed-dark macOS chrome regardless of Teletype's own
+     light/dark theme setting — its backgrounds (menubar, dock, modals) are
+     hardcoded dark rgba throughout this file. --ash/--mist/--ghost are the
+     app's *theme-reactive* semantic tokens (they flip to near-black text
+     under the light theme); pin them locally so dock labels, menu items,
+     and the About/system modals stay legible no matter what theme is active. */
+  --ash:   rgba(222, 222, 233, 0.92);
+  --mist:  rgba(180, 180, 200, 0.6);
+  --ghost: rgba(180, 180, 200, 0.32);
+
   position: fixed;
   inset: 0;
   display: flex;
@@ -148,8 +158,8 @@
     0 28px 70px rgba(0, 0, 0, 0.68),
     0 8px 24px rgba(0, 0, 0, 0.4);
   overflow: hidden;
-  animation: mac-win-in 260ms cubic-bezier(0.16, 1, 0.3, 1);
-  transition: transform 300ms cubic-bezier(0.16, 1, 0.3, 1), opacity 260ms ease, box-shadow 200ms ease;
+  animation: mac-win-in 260ms var(--ease-out);
+  transition: transform 300ms var(--ease-out), opacity 260ms ease, box-shadow 200ms ease;
 }
 .mac-window.mac-win-active {
   border-color: rgba(255, 255, 255, 0.13);
@@ -159,7 +169,7 @@
     0 10px 30px rgba(0, 0, 0, 0.45);
 }
 .mac-window.mac-win-min {
-  transform: scale(0.12) translateY(55vh);
+  /* transform is set inline per-window, aimed at its real dock icon (genie) */
   opacity: 0;
   pointer-events: none;
 }
@@ -210,9 +220,9 @@
   cursor: pointer;
   position: relative;
   flex-shrink: 0;
-  transition: filter 80ms;
+  transition: filter 80ms, transform 80ms;
 }
-.mac-tl:active { filter: brightness(0.85); }
+.mac-tl:active { filter: brightness(0.85); transform: scale(0.88); }
 .mac-tl::after {
   content: '';
   position: absolute; inset: 0;
@@ -338,15 +348,40 @@
   cursor: pointer;
   padding: 0 2px;
   position: relative;
+}
+/* Magnification transform lands on this wrapper, not the outer button —
+   .mac-dock-label is an untransformed sibling of it (positioned relative to
+   the stable outer button), so the tooltip doesn't inherit the icon's scale
+   and fly off to a mispositioned, oversized spot while magnified. */
+.mac-dock-icon-inner {
   transform-origin: bottom center;
-  transition: transform 180ms cubic-bezier(0.16, 1, 0.3, 1);
+  will-change: transform;
 }
-.mac-dock-icon:hover { transform: translateY(-12px) scale(1.36); }
-.mac-dock-icon:has(+ .mac-dock-icon:hover),
-.mac-dock:has(.mac-dock-icon:hover) .mac-dock-icon:has(+ .mac-dock-icon:hover) {
-  transform: translateY(-6px) scale(1.16);
+/* Continuous magnification is driven by JS (cursor-distance falloff + neighbor
+   displacement, like the real dock) — see MacDock in MacShell.tsx. This class
+   only turns on the relax-back transition for the instant the cursor leaves;
+   while tracking, transform updates land every frame with no transition, or
+   the icons would lag behind the pointer. */
+.mac-dock-icon-inner.dock-relax {
+  transition: transform 240ms var(--ease-out);
 }
-.mac-dock-icon:hover + .mac-dock-icon { transform: translateY(-6px) scale(1.16); }
+
+/* Press feedback lands on the icon glyph itself (not the wrapper, which JS
+   already drives) — instant on pointer-down, not on release. */
+.mac-app-icon { transition: transform 90ms var(--ease-out); }
+.mac-dock-icon:active .mac-app-icon { transform: scale(0.88); }
+
+/* Launch bounce — the icon jumps once when a new window opens from it. */
+@keyframes mac-dock-bounce {
+  0%   { transform: translateY(0) scale(1, 1); }
+  28%  { transform: translateY(-30px) scale(1.1, 0.9); }
+  46%  { transform: translateY(0) scale(0.92, 1.1); }
+  68%  { transform: translateY(-11px) scale(1.04, 0.97); }
+  100% { transform: translateY(0) scale(1, 1); }
+}
+.mac-dock-icon-inner.launching .mac-app-icon {
+  animation: mac-dock-bounce 640ms var(--ease-bounce);
+}
 
 /* Active dock icon gets a slight glow ring */
 .mac-dock-icon.dock-active .mac-app-icon {
@@ -473,7 +508,7 @@
     0 4px 12px rgba(0, 0, 0, 0.35);
   padding: 4px;
   z-index: 99999;
-  animation: mac-ctx-in 110ms cubic-bezier(0.16, 1, 0.3, 1);
+  animation: mac-ctx-in 110ms var(--ease-out);
 }
 
 .mac-menu-item {
@@ -541,7 +576,7 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  animation: mac-ctx-in 160ms cubic-bezier(0.16, 1, 0.3, 1);
+  animation: mac-ctx-in 160ms var(--ease-out);
 }
 
 .mac-system-card {
@@ -1003,10 +1038,9 @@
 @media (prefers-reduced-motion: reduce) {
   .mac-desktop { animation: none; }
   .mac-window { animation: none; transition: opacity 150ms ease; }
-  .mac-window.mac-win-min { transform: none; }
+  .mac-window.mac-win-min { transform: none !important; }
   .mac-ctx { animation: none; }
-  .mac-dock-icon,
-  .mac-dock-icon:hover,
-  .mac-dock-icon:has(+ .mac-dock-icon:hover),
-  .mac-dock-icon:hover + .mac-dock-icon { transform: none; }
+  .mac-dock-icon-inner { transform: none !important; }
+  .mac-dock-icon-inner.launching .mac-app-icon { animation: none; }
+  .mac-app-icon { transition: none; }
 }

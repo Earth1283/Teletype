@@ -97,6 +97,18 @@ data class PlayerEvent(
 )
 
 @Serializable
+data class NetworkStatus(
+    val muxEnabled: Boolean,
+    val muxPort: Int,
+    val networkEnabled: Boolean,
+    val maxRoutes: Int,
+    val defaultRateLimitPerMinute: Int,
+    val routeCount: Int,
+    val maxPortForwards: Int,
+    val forwardCount: Int,
+)
+
+@Serializable
 data class ErrorResponse(val error: String)
 
 @Serializable

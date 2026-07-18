@@ -28,6 +28,7 @@ export interface ContextMenuState {
   y: number
   items: ContextMenuItem[]
   target?: ContextMenuTarget
+  flipped?: boolean
 }
 
 export interface ContextWheelState extends ContextMenuState {

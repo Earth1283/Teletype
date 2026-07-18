@@ -4,6 +4,7 @@ import io.github.Earth1283.teletype.Teletype
 import io.github.Earth1283.teletype.multiplex.PortForward
 import io.github.Earth1283.teletype.multiplex.RouteMapping
 import io.github.Earth1283.teletype.web.model.ErrorResponse
+import io.github.Earth1283.teletype.web.model.NetworkStatus
 import io.github.Earth1283.teletype.web.model.StatusResponse
 import io.ktor.http.HttpStatusCode
 import io.ktor.server.request.receive
@@ -22,15 +23,15 @@ fun Route.networkRoutes(plugin: Teletype) {
     val cfg = plugin.teletypeConfig
 
     get("/status") {
-        call.respond(mapOf(
-            "muxEnabled" to cfg.multiplexGamePort,
-            "muxPort" to cfg.multiplexPort,
-            "networkEnabled" to cfg.networkEnabled,
-            "maxRoutes" to cfg.networkMaxRoutes,
-            "defaultRateLimitPerMinute" to cfg.networkDefaultRateLimitPerMinute,
-            "routeCount" to store.getRoutes().size,
-            "maxPortForwards" to cfg.networkMaxPortForwards,
-            "forwardCount" to fwdStore.getForwards().size,
+        call.respond(NetworkStatus(
+            muxEnabled = cfg.multiplexGamePort,
+            muxPort = cfg.multiplexPort,
+            networkEnabled = cfg.networkEnabled,
+            maxRoutes = cfg.networkMaxRoutes,
+            defaultRateLimitPerMinute = cfg.networkDefaultRateLimitPerMinute,
+            routeCount = store.getRoutes().size,
+            maxPortForwards = cfg.networkMaxPortForwards,
+            forwardCount = fwdStore.getForwards().size,
         ))
     }
 

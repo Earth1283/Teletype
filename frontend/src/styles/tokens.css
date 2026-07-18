@@ -55,6 +55,12 @@
   --z-palette:      200;
   --z-toast:        250;
   --z-banner:       300;
+
+  /* Motion curves — reuse everywhere instead of hand-typing cubic-bezier() */
+  --ease-out:    cubic-bezier(0.16, 1, 0.3, 1);
+  --ease-in-out: cubic-bezier(0.4, 0, 0.2, 1);
+  /* Bounce — only for momentum-carrying, gesture-like moments (dock launch) */
+  --ease-bounce: cubic-bezier(0.34, 1.56, 0.64, 1);
 }
 
 /* Compact density: tighter rows for high-information screens */

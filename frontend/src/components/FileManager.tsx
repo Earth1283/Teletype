@@ -895,7 +895,7 @@ export default function FileManager() {
             )}
           </div>
           <div className="fm-upload-bar" aria-label="Upload progress">
-            <div className="fm-upload-bar-fill" style={{ width: `${uploadPercent}%` }} />
+            <div className="fm-upload-bar-fill" style={{ transform: `scaleX(${uploadPercent / 100})` }} />
           </div>
           <div className="fm-upload-files">
             {uploadItems.map(item => {

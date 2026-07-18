@@ -363,7 +363,9 @@
   transition: transform 120ms, box-shadow 120ms;
   flex-shrink: 0;
 }
-.color-swatch:hover { transform: scale(1.15); }
+@media (hover: hover) and (pointer: fine) {
+  .color-swatch:hover { transform: scale(1.15); }
+}
 .color-swatch.selected { border-color: var(--ash); box-shadow: 0 0 0 2px var(--void), 0 0 0 4px var(--ash); }
 .color-custom {
   width: 22px;

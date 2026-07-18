@@ -249,7 +249,7 @@ export default function CommandPalette({ open, onClose, onNavigate }: Props) {
   return (
     <div className="fixed inset-0 z-palette flex items-start justify-center bg-scrim pt-[12vh] backdrop-blur-[2px]" onClick={onClose}>
       <div
-        className="animate-[palette-in_180ms_cubic-bezier(0.16,1,0.3,1)] w-[90vw] max-w-[560px] overflow-hidden rounded-lg border border-border-hi bg-surface shadow-2xl"
+        className="w-[90vw] max-w-[560px] overflow-hidden rounded-lg border border-border-hi bg-surface shadow-2xl"
         onClick={e => e.stopPropagation()}
       >
         <div className="flex items-center gap-2.5 border-b border-border px-4 py-3">

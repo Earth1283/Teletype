@@ -301,7 +301,7 @@
   max-height: min(86vh, 800px);
   display: flex;
   flex-direction: column;
-  animation: modal-in 220ms cubic-bezier(0.16, 1, 0.3, 1);
+  animation: modal-in 220ms var(--ease-out);
 }
 
 .prof-event-body {
