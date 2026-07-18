@@ -365,7 +365,8 @@ fun Route.fileRoutes(plugin: Teletype) {
         val derivedName = req.fileName?.takeIf { it.isNotBlank() }
             ?: url.path.substringAfterLast('/').takeIf { it.isNotBlank() }
             ?: "download"
-        val dest = File(dir, derivedName)
+        val dest = resolveUploadDestination(dir, derivedName)
+            ?: return@post call.respond(HttpStatusCode.BadRequest, ErrorResponse("Invalid filename"))
 
         withContext(Dispatchers.IO) {
             url.openStream().use { input -> dest.outputStream().use { input.copyTo(it) } }
