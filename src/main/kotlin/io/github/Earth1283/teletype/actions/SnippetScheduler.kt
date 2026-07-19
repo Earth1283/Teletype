@@ -200,7 +200,8 @@ class SnippetScheduler(private val plugin: Teletype, private val store: SnippetS
         snippet.cmds.forEach { cmd ->
             val filled = vars.entries.fold(cmd) { acc, (k, v) -> acc.replace("{$k}", v) }
             TeletypeCommandOrigin.run {
-                Bukkit.dispatchCommand(sender, filled.removePrefix("/"))
+                val finalCmd = filled.trimStart().removePrefix("/")
+                Bukkit.dispatchCommand(sender, finalCmd)
             }
         }
     }
