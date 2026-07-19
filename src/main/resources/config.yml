@@ -7,7 +7,7 @@ server:
   # HTTPS port (only used when tls.enabled: true).
   https-port: 8443
 
-  # Allowed CORS origins. Empty = allow all (fine for local use).
+  # Allowed CORS origins. Empty = allow all (fine for local/development/private use).
   # Example: ["https://panel.example.com", "http://localhost:3000"]
   cors-origins: []
 
@@ -27,7 +27,7 @@ server:
   # │                                                                         │
   # │ Set this to true to share ONE port for both. Players and browsers both  │
   # │ connect to multiplex-port (default 25565). Teletype figures out which   │
-  # │ connection is which automatically.                                       │
+  # │ connection is which automatically.                                      │
   # │                                                                         │
   # │ HOW TO ENABLE (3 steps):                                                │
   # │   1. Set multiplex-game-port below to: true                             │
@@ -37,15 +37,15 @@ server:
   # │      Players still connect to 25565. No firewall changes needed.        │
   # │                                                                         │
   # │ TROUBLESHOOTING — players can't connect after enabling:                 │
-  # │   • Did you restart TWICE? One restart is not enough (see step 2-3).   │
-  # │   • Check console for "[Teletype] Port multiplexer on :25565" — if     │
-  # │     that line is missing the multiplexer didn't start; restart again.  │
-  # │   • Make sure multiplex-port (below) matches what players connect to.  │
+  # │   • Did you restart TWICE? One restart is not enough (see step 2-3).    │
+  # │   • Check console for "[Teletype] Port multiplexer on :25565" — if      │
+  # │     that line is missing the multiplexer didn't start; restart again.   │
+  # │   • Make sure multiplex-port (below) matches what players connect to.   │
   # └─────────────────────────────────────────────────────────────────────────┘
   multiplex-game-port: false
 
   # The port everyone connects to when multiplex-game-port is enabled.
-  # Leave this at 25565 unless your server runs on a different port.
+  # Leave this at 25565 unless your server runs on a different port, check if that's true in server.properties
   # (Only used when multiplex-game-port is true.)
   multiplex-port: 25565
 
@@ -88,7 +88,7 @@ server:
 
 # ── Rate limiting ─────────────────────────────────────────────────────────────
 rate-limit:
-  # Master switch. Set false to disable all rate limiting.
+  # Master switch. Set false to disable all rate limiting, not advised.
   enabled: true
 
   auth:
@@ -124,6 +124,7 @@ auth:
   # Security guard: block `tty verify ...` when the command was dispatched by
   # Teletype itself, such as from the web console, /api/execute, or snippets.
   # Leave enabled to prevent a browser session from approving its own login.
+  # Or a threat actor approving their accomplice.
   disallow-teletype-verify: true
 
   # Security guard: block players from running `tty verify ...`, even when they
@@ -171,7 +172,7 @@ metrics:
       enabled: true
 
       # Compact 1-second rows to 1-minute averages for data older than N hours.
-      downsample-1s-after-hours: 24
+      downsample-1s-after-hours: 48
 
       # Compact 1-minute rows to 15-minute averages for data older than N days.
       downsample-1m-after-days: 7
@@ -200,15 +201,18 @@ files:
   enabled: true
 
   # Root directory exposed to the browser. Relative to server working directory.
+  # The server working directory is where `server.jar` is located. Or wherever
+  # you find server.properties and other executables like that.
   # Use an absolute path to lock it to a specific location.
   # ".." traversal is always blocked regardless of this setting.
   root: "."
 
   # Files larger than this (MB) are download-only; the Monaco editor won't open them.
+  # Larger files might crash the Monaco editor/the web page.
   max-edit-size-mb: 4
 
   # Extensions allowed for in-browser text editing. Empty = all detected text files.
-  # Example: ["yml", "json", "txt", "properties", "conf"]
+  # Example: editable-extensions: ["yml", "json", "txt", "properties", "conf"]
   editable-extensions: []
 
 # ── Profiling / Java Flight Recorder ─────────────────────────────────────────
@@ -230,7 +234,7 @@ profiling:
     max-age-sec: 3600
 
     # JFR template: "default" (<1% overhead) or "profile" (~2-5%, richer data).
-    # Use "profile" only for targeted diagnosis sessions, not permanently.
+    # Use "profile" only for targeted diagnosis sessions, not permanently in production.
     template: "default"
 
     # Write a snapshot of the rolling buffer to disk when the JVM shuts down.
@@ -261,6 +265,7 @@ glance:
     degraded-min: 15.0
 
   tick-time:
+    # tick-time, AKA, MSPT (milliseconds per tick)
     # Tick <= nominal-max-ms  → green
     # Tick <= degraded-max-ms → amber
     # Tick >  degraded-max-ms → red
@@ -271,7 +276,7 @@ glance:
     # Heap % <= nominal-max-pct  → blue (fine)
     # Heap % <= degraded-max-pct → amber (elevated)
     # Heap % >  degraded-max-pct → red  (critical)
-    nominal-max-pct: 65
+    nominal-max-pct: 70
     degraded-max-pct: 85
 
   anomaly:

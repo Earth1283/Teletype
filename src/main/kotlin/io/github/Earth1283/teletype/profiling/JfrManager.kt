@@ -114,7 +114,7 @@ class JfrManager(private val plugin: Teletype) {
     }
 
     fun startContinuous(req: StartContinuousRequest) = lock.withLock {
-        check(jfrAvailable) { "JFR not available on this JVM" }
+        check(jfrAvailable) { "JFR is not available on this JVM distribution" }
         continuousRecording?.stop()
         continuousRecording?.close()
         continuousRecording = null
@@ -149,6 +149,8 @@ class JfrManager(private val plugin: Teletype) {
     }
 
     fun stopContinuous() = lock.withLock {
+        // The next line should not even be shown because it requires startContinuous to even call this function
+        // But it's still here
         check(jfrAvailable) { "JFR not available on this JVM" }
         continuousRecording?.stop()
         continuousRecording?.close()

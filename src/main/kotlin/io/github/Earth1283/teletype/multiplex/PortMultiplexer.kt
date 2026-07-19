@@ -204,6 +204,10 @@ class PortMultiplexer(private val plugin: Teletype) {
         } catch (_: Exception) {}
     }
 
+    /*
+    HTTP detection logic -- if it starts with the following 4 chars, we know it's HTTP.
+    Minecraft packets are VarInts, none of which collide with this
+     */
     private fun isHttp(bytes: ByteArray): Boolean {
         val s = String(bytes, Charsets.ISO_8859_1)
         return s.startsWith("GET ") || s.startsWith("POST") || s.startsWith("PUT ") ||
