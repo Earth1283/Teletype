@@ -1,6 +1,6 @@
 # Teletype
 
-A real-time web admin panel for Paper/Spigot 1.21 servers, and frankly the only one you should be running. It embeds a Ktor HTTP server directly inside the plugin. No sidecar process. No Python daemon babysat by a cron job. No "just SSH in and tail the log like a caveman." One jar. One port. Done.
+A real-time web admin panel for Paper/Spigot 1.21+ servers, and frankly the only one you should be running. It embeds a Ktor HTTP server directly inside the plugin. No sidecar process. No Python daemon babysat by a cron job. No "just SSH in and tail the log like a caveman." One jar. One port. Done.
 
 If your current setup is a Discord bot that runs `screen -r` and prays, we need to talk.
 
@@ -25,9 +25,11 @@ If your current setup is a Discord bot that runs `screen -r` and prays, we need 
 
 **Requirements:** Paper 1.21+, Java 21+. That's it. If you're still on Java 8, that's a you problem, not a Teletype problem.
 
+To be honest, the fact that you made Minecraft 1.21+ run on Java 8 (which Mojang deprecated support for years ago) is an engineering feat in of itself. But that's probably not what you would be proud of.
+
 1. Drop `teletype-*.jar` into `plugins/` and restart.
 2. Open `http://<server-ip>:8080`. Copy the UUID on screen.
-3. In-game as op, or in console, run:
+3. In-game as op, or in console, paste and run the command:
    ```
    /tty verify <uuid>
    ```
