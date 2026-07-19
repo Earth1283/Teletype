@@ -437,7 +437,7 @@ export default function FileManager() {
 
   async function openFile(entry: FileEntry) {
     try {
-      const res = await api.get('/files/read', { params: { path: entry.path } })
+      const res = await api.get('/files/read', { params: { path: entry.path }, responseType: 'text' })
       setEditing({ path: entry.path })
       setEditorContent(res.data)
     } catch (e: any) {
