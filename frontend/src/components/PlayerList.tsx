@@ -44,11 +44,11 @@ function pingColor(ms?: number) {
 }
 
 function playerSkinUrl(uuid: string) {
-  return `https://crafatar.com/avatars/${uuid}?overlay&size=96`
+  return `https://mc-heads.net/avatar/${uuid}/96`
 }
 
 function playerBodyUrl(uuid: string) {
-  return `https://crafatar.com/renders/body/${uuid}?overlay&size=160`
+  return `https://mc-heads.net/body/${uuid}/160`
 }
 
 function PlayerAvatar({ player, large = false }: { player: Player; large?: boolean }) {
