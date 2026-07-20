@@ -43,12 +43,12 @@ function pingColor(ms?: number) {
   return 'var(--status-critical)'
 }
 
-function playerSkinUrl(uuid: string) {
-  return `https://mc-heads.net/avatar/${uuid}/96`
+function playerSkinUrl(name: string) {
+  return `https://mc-heads.net/avatar/${encodeURIComponent(name)}/96`
 }
 
-function playerBodyUrl(uuid: string) {
-  return `https://mc-heads.net/body/${uuid}/160`
+function playerBodyUrl(name: string) {
+  return `https://mc-heads.net/body/${encodeURIComponent(name)}/160`
 }
 
 function PlayerAvatar({ player, large = false }: { player: Player; large?: boolean }) {
@@ -60,7 +60,7 @@ function PlayerAvatar({ player, large = false }: { player: Player; large?: boole
   return (
     <div className={className}>
       <img
-        src={large ? playerBodyUrl(player.uuid) : playerSkinUrl(player.uuid)}
+        src={large ? playerBodyUrl(player.name) : playerSkinUrl(player.name)}
         alt=""
         loading="lazy"
         onError={() => setSkinFailed(true)}
@@ -147,7 +147,7 @@ export default function PlayerList() {
     openContextMenu(e, [
       { label: 'Copy Player Name', action: () => navigator.clipboard.writeText(player.name) },
       { label: 'Copy UUID', action: () => navigator.clipboard.writeText(player.uuid) },
-      { label: 'Copy Skin URL', action: () => navigator.clipboard.writeText(playerSkinUrl(player.uuid)) },
+      { label: 'Copy Skin URL', action: () => navigator.clipboard.writeText(playerSkinUrl(player.name)) },
       { type: 'separator' },
       { label: 'Heal', action: () => runCommand(`effect give ${player.name} minecraft:instant_health 1 10`, `Healed ${player.name}`).catch(() => {}) },
       { label: 'Feed', action: () => runCommand(`effect give ${player.name} minecraft:saturation 1 10`, `Fed ${player.name}`).catch(() => {}) },

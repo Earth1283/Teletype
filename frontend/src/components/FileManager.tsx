@@ -8,7 +8,7 @@ import PromptModal, { type PromptVariant } from './PromptModal'
 import {
   IconFolder, IconFile, IconUpload, IconDownload,
   IconFolderPlus, IconPencil, IconTrash, IconSave, IconX, IconGlobe,
-  IconChevronRight, IconChevronLeft, IconSearch, IconList,
+  IconChevronRight, IconChevronLeft, IconSearch, IconList, IconCheck,
 } from '../Icons'
 
 interface FileEntry {
@@ -240,6 +240,7 @@ export default function FileManager() {
   const [editing, setEditing] = useState<{ path: string } | null>(null)
   const [editorContent, setEditorContent] = useState('')
   const [saving, setSaving] = useState(false)
+  const [justSaved, setJustSaved] = useState(false)
   const [modal, setModal] = useState<Modal>(null)
   const [modalInput, setModalInput] = useState('')
   const [fetchUrl, setFetchUrl] = useState('')
@@ -310,6 +311,24 @@ export default function FileManager() {
       if (uploadFrameRef.current != null) cancelAnimationFrame(uploadFrameRef.current)
     }
   }, [])
+
+  const isSavingRef = useRef(false)
+  const saveFileRef = useRef<() => void>(() => {})
+  useEffect(() => { saveFileRef.current = saveFile })
+
+  useEffect(() => {
+    if (!editing) return
+    function handleKeyDown(e: KeyboardEvent) {
+      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 's') {
+        e.preventDefault()
+        // Ignore key-repeat events from a held-down chord — only the initial press should save
+        if (e.repeat) return
+        saveFileRef.current()
+      }
+    }
+    window.addEventListener('keydown', handleKeyDown)
+    return () => window.removeEventListener('keydown', handleKeyDown)
+  }, [!!editing])
 
   const qKey = ['files', cwd]
   const { data: entries = [], isLoading, error } = useQuery<FileEntry[]>({
@@ -440,6 +459,7 @@ export default function FileManager() {
       const res = await api.get('/files/read', { params: { path: entry.path }, responseType: 'text' })
       setEditing({ path: entry.path })
       setEditorContent(res.data)
+      setJustSaved(false)
     } catch (e: any) {
       if (e.response?.status === 415) downloadFile(entry)
       else showPrompt('Cannot open file', e.response?.data?.error ?? 'The selected file could not be opened.', 'error')
@@ -462,16 +482,21 @@ export default function FileManager() {
   }
 
   async function saveFile() {
-    if (!editing) return
+    // Ref check is synchronous (unlike `saving` state, which lags a render behind),
+    // so it actually blocks a second call fired in the same tick — e.g. a double-click
+    // or fast repeated Cmd/Ctrl+S before React has re-rendered the disabled button.
+    if (!editing || isSavingRef.current) return
+    isSavingRef.current = true
     setSaving(true)
     try {
       await api.put('/files/write', editorContent, {
         params: { path: editing.path },
         headers: { 'Content-Type': 'text/plain' },
       })
-      showPrompt('File saved', `Saved ${editing.path}`)
+      setJustSaved(true)
+      setTimeout(() => setJustSaved(false), 1600)
     } catch (e: any) { showPrompt('Save failed', e.response?.data?.error ?? 'The file could not be saved.', 'error') }
-    finally { setSaving(false) }
+    finally { isSavingRef.current = false; setSaving(false) }
   }
 
   async function deleteEntries(entriesToDelete: FileEntry[]) {
@@ -1128,8 +1153,9 @@ export default function FileManager() {
           <div className="fm-editor-panel">
             <div className="fm-editor-bar">
               <span className="fm-editor-path">{editing.path}</span>
-              <button className="pill-btn primary" onClick={saveFile} disabled={saving}>
-                <IconSave size={13} />{saving ? 'Saving…' : 'Save'}
+              <button className={`pill-btn primary${justSaved ? ' success' : ''}`} onClick={saveFile} disabled={saving || justSaved}>
+                {justSaved ? <IconCheck size={13} /> : <IconSave size={13} />}
+                {justSaved ? 'Saved' : saving ? 'Saving…' : 'Save'}
               </button>
               <button className="pill-btn" onClick={() => setEditing(null)}>
                 <IconX size={13} />Close
