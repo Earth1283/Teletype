@@ -133,6 +133,12 @@ function logLevel(line: string): string {
   if (u.includes('[ERROR]') || u.includes('[SEVERE]') || u.includes('[FATAL]')) return 'error'
   return ''
 }
+function stripAnsi(line: string): string {
+  return line.replace(/\x1b\[[0-9;]*m/g, '')
+}
+function stripLogPrefix(line: string): string {
+  return line.replace(/^(?:\[[^\]]*\]\s*)+:?\s*/, '')
+}
 
 // ── Tooltips ─────────────────────────────────────────────────────────────────
 
@@ -244,11 +250,14 @@ function IncidentTooltip({
       {nearbyLogs.length > 0 && (
         <div className="glance-tooltip-logs">
           <div className="tooltip-log-header">nearest log</div>
-          {nearbyLogs.slice(0, 3).map((l, i) => (
-            <div key={i} className={`tooltip-log-line ${logLevel(l.line)}`}>
-              {l.line.length > 58 ? l.line.slice(0, 58) + '…' : l.line}
-            </div>
-          ))}
+          {nearbyLogs.slice(0, 3).map((l, i) => {
+            const clean = stripLogPrefix(stripAnsi(l.line))
+            return (
+              <div key={i} className={`tooltip-log-line ${logLevel(l.line)}`}>
+                {clean.length > 58 ? clean.slice(0, 58) + '…' : clean}
+              </div>
+            )
+          })}
         </div>
       )}
       {(isIncident || nearbyLogs.length > 0) && onJumpToTs && (
@@ -670,7 +679,7 @@ function GlanceLogViewer({ tsLogs, clickedTs, onClear, isOpen, onToggle }: {
             const isExact = clickedTs !== null && Math.abs(log.ts - clickedTs) <= 1000
             return (
               <div className={`glance-log-line ${logLevel(log.line)}${inRange ? ' highlighted' : ''}${isExact ? ' exact' : ''}`}>
-                {log.line}
+                {stripAnsi(log.line)}
               </div>
             )
           }}

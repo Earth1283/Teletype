@@ -14,6 +14,12 @@ const convert = new AnsiConvert({ escapeXML: true, newline: true })
 
 type LogLevel = 'info' | 'warn' | 'error' | 'debug'
 
+function stripAnsi(line: string): string {
+  return line.replace(/\x1b\[[0-9;]*m/g, '')
+}
+function stripLogPrefix(line: string): string {
+  return line.replace(/^(?:\[[^\]]*\]\s*)+:?\s*/, '')
+}
 function lineClass(raw: string): LogLevel {
   const upper = raw.toUpperCase()
   if (upper.includes('[WARN]') || upper.includes('[WARNING]')) return 'warn'
@@ -182,11 +188,13 @@ export default function Console() {
   }, [input, completions, completionIdx, send, tabComplete])
 
   const openCtx = (e: React.MouseEvent, line: string) => {
+    const plain = e.shiftKey
+    const clean = stripAnsi(line)
     const items: ContextMenuItem[] = [
       {
-        label: 'Copy Line',
+        label: plain ? 'Copy Message Only' : 'Copy Line',
         shortcut: '⌘C',
-        action: () => navigator.clipboard.writeText(line),
+        action: () => navigator.clipboard.writeText(plain ? stripLogPrefix(clean) : clean),
       },
     ]
     if (quickActions.length > 0) {
