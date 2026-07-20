@@ -55,7 +55,7 @@ Read them. They exist so you don't have to open an issue asking a question alrea
 
 ```bash
 # Build frontend + plugin jar in one step
-./gradlew build          # requires Java 21
+./gradlew build          # requires Java 21 or above
 
 # Output: build/libs/teletype-*.jar
 ```
