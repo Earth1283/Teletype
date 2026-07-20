@@ -37,8 +37,8 @@ interface GcEvent {
 }
 
 interface SeriesStats { mean: number; std: number }
-interface DataStats { tps1: SeriesStats; tickTimeMs: SeriesStats; memPct: SeriesStats }
-interface AnomalyThresholds { tps: number; tick: number; mem: number }
+interface DataStats { tps1: SeriesStats; tickTimeMs: SeriesStats; memPct: SeriesStats; cpuPercent: SeriesStats }
+interface AnomalyThresholds { tps: number; tick: number; mem: number; cpu: number }
 
 type Status = 'nominal' | 'degraded' | 'incident'
 type WindowMin = 1 | 5 | 15 | 60 | 360 | 1440
@@ -207,6 +207,14 @@ function IncidentTooltip({
       heuristic: snap.memPct > 0.9 ? 'Memory pressure critical' : 'Memory surge detected',
     })
   }
+  if (allStats.cpuPercent.std > 0.5 && snap.cpuPercent != null && snap.cpuPercent >= 0) {
+    const z = (snap.cpuPercent - allStats.cpuPercent.mean) / allStats.cpuPercent.std
+    if (z > thresholds.cpu) anomalies.push({
+      label: 'CPU', z,
+      val: `${snap.cpuPercent.toFixed(0)}%`, mean: `${allStats.cpuPercent.mean.toFixed(0)}%`,
+      heuristic: snap.cpuPercent > 90 ? 'Host CPU saturated' : 'Host CPU spike',
+    })
+  }
   anomalies.sort((a, b) => Math.abs(b.z) - Math.abs(a.z))
   const isIncident = anomalies.length > 0
   const nearbyLogs = getLogsAround(snap.timestamp, logWindowMs)
@@ -328,6 +336,7 @@ function GlanceChart({
     const z = (v - stats.mean) / stats.std
     const aboveThreshold = sKey === 'tps1' ? z < -thresholds.tps
       : sKey === 'memPct' ? z > thresholds.mem
+      : sKey === 'cpuPercent' ? z > thresholds.cpu
       : z > thresholds.tick
     if (!aboveThreshold) return <g key={`d-${cx}`} />
     const dotColor = Math.abs(z) > (thresholds.tick + 1) ? 'var(--red)' : 'var(--amber)'
@@ -737,20 +746,19 @@ export default function GlancePage() {
     [rawData]
   )
 
-  const allStats = useMemo<DataStats>(() => ({
-    tps1:       computeStats(data.map(d => d.tps1)),
-    tickTimeMs: computeStats(data.map(d => d.tickTimeMs)),
-    memPct:     computeStats(data.map(d => d.memPct)),
-  }), [data])
+  const allStats = useMemo<DataStats>(() => {
+    const cpuVals = data.filter(d => d.cpuPercent != null && (d.cpuPercent as number) >= 0).map(d => d.cpuPercent as number)
+    return {
+      tps1:       computeStats(data.map(d => d.tps1)),
+      tickTimeMs: computeStats(data.map(d => d.tickTimeMs)),
+      memPct:     computeStats(data.map(d => d.memPct)),
+      cpuPercent: cpuVals.length > 1 ? computeStats(cpuVals) : { mean: 0, std: 0 },
+    }
+  }, [data])
 
   const memMaxMb = useMemo(() => {
     const mx = Math.max(...data.map(d => d.memMaxMb))
     return mx > 0 ? mx : 1
-  }, [data])
-
-  const cpuStats = useMemo(() => {
-    const vals = data.filter(d => d.cpuPercent != null && (d.cpuPercent as number) >= 0).map(d => d.cpuPercent as number)
-    return vals.length > 1 ? computeStats(vals) : { mean: 0, std: 0 }
   }, [data])
 
   const hasCpuData = current?.cpuPercent != null && current.cpuPercent >= 0
@@ -759,6 +767,7 @@ export default function GlancePage() {
     tps: gbm ? Infinity : gs.anomalyThresholdTps,
     tick: gbm ? Infinity : gs.anomalyThresholdTick,
     mem: gbm ? Infinity : gs.anomalyThresholdMem,
+    cpu: gbm ? Infinity : gs.anomalyThresholdCpu,
   }
 
   const bifurTs = useMemo(() => {
@@ -942,7 +951,7 @@ export default function GlancePage() {
             {gs.showChartCpu && hasCpuData && (
               <GlanceChart {...SHARED} title="Host CPU" dataKey="cpuPercent"
                 color={cpuColor(current!.cpuPercent!)} yDomain={[0, 100]}
-                yFormatter={v => `${v.toFixed(0)}%`} stats={cpuStats} chartId="cpu" />
+                yFormatter={v => `${v.toFixed(0)}%`} stats={allStats.cpuPercent} chartId="cpu" />
             )}
           </>
         )}

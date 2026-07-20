@@ -1136,9 +1136,10 @@ export default function FileManager() {
               </button>
             </div>
             <Editor
+              key={editing.path}
               height="100%"
               language={langFor(editing.path.split('/').pop() ?? '')}
-              value={editorContent}
+              defaultValue={editorContent}
               onChange={(v) => setEditorContent(v ?? '')}
               theme="teletype-ui"
               options={editorOptions}
