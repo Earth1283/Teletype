@@ -389,6 +389,10 @@ export default function FileManager() {
     setHistoryIdx(prev => prev + 1)
   }
 
+  function navigateToParent() {
+    navigate(cwd.split('/').slice(0, -1).join('/'))
+  }
+
   function goBack() {
     const idx = historyIdx - 1
     setHistoryIdx(idx)
@@ -1044,14 +1048,15 @@ export default function FileManager() {
                 <div
                   className={`finder-icon-item${selectedPaths.includes('..') ? ' selected' : ''}`}
                   onClick={e => { e.stopPropagation(); selectOnly('..') }}
-                  onDoubleClick={e => { e.stopPropagation(); goBack() }}
+                  onDoubleClick={e => { e.stopPropagation(); navigateToParent() }}
                   title="Parent folder"
                 >
                   <div className="finder-icon-squircle" style={{ background: 'linear-gradient(145deg, #6b7280, #374151)' }}>
                     <svg viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg">
                       <path d="M14,52 L14,42 Q14,36 20,36 L38,36 L44,44 L86,44 L86,52 Z" fill="rgba(255,255,255,0.38)"/>
                       <rect x="14" y="50" width="72" height="38" rx="7" fill="rgba(255,255,255,0.7)"/>
-                      <polyline points="52,36 36,50 52,64" fill="none" stroke="rgba(55,65,81,0.6)" strokeWidth="6" strokeLinecap="round" strokeLinejoin="round"/>
+                      <polyline points="36,74 50,58 64,74" fill="none" stroke="rgba(55,65,81,0.65)" strokeWidth="7" strokeLinecap="round" strokeLinejoin="round"/>
+                      <line x1="50" y1="58" x2="50" y2="82" stroke="rgba(55,65,81,0.65)" strokeWidth="7" strokeLinecap="round"/>
                     </svg>
                   </div>
                   <span className="finder-icon-name">..</span>
@@ -1085,7 +1090,7 @@ export default function FileManager() {
               {cwd && (
                 <div className={`fm-row${selectedPaths.includes('..') ? ' selected' : ''}`}
                   onClick={e => { e.stopPropagation(); selectOnly('..') }}
-                  onDoubleClick={() => goBack()}
+                  onDoubleClick={() => navigateToParent()}
                 >
                   <span className="fm-row-icon dir"><IconFolder size={14} /></span>
                   <span className="fm-row-name">..</span>
