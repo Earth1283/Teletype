@@ -31,6 +31,8 @@ import io.ktor.server.engine.embeddedServer
 import io.ktor.server.engine.sslConnector
 import io.ktor.server.netty.Netty
 import io.ktor.server.netty.NettyApplicationEngine
+import io.ktor.server.plugins.compression.Compression
+import io.ktor.server.plugins.compression.gzip
 import io.ktor.server.plugins.contentnegotiation.ContentNegotiation
 import io.ktor.server.plugins.cors.routing.CORS
 import io.ktor.server.plugins.forwardedheaders.ForwardedHeaders
@@ -105,6 +107,10 @@ class WebServer(private val plugin: Teletype) {
 
             install(ContentNegotiation) {
                 json(Json { ignoreUnknownKeys = true; encodeDefaults = true })
+            }
+
+            install(Compression) {
+                gzip()
             }
 
             install(CORS) {

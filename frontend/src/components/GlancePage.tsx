@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { memo, useEffect, useMemo, useRef, useState } from 'react'
 import {
   ComposedChart, Area,
   XAxis, YAxis, CartesianGrid, Tooltip,
@@ -309,7 +309,7 @@ interface GlanceChartProps {
   showGcHint?: boolean
 }
 
-function GlanceChart({
+const GlanceChart = memo(function GlanceChart({
   title, data, dataKey, statsKey, color, yDomain, yFormatter,
   stats, allStats, thresholds, bifurTs, chartId,
   getLogsAround, logWindowMs, onPointClick,
@@ -465,7 +465,7 @@ function GlanceChart({
       )}
     </div>
   )
-}
+})
 
 // ── Speedo Gauge ─────────────────────────────────────────────────────────────
 
@@ -735,11 +735,16 @@ export default function GlancePage() {
     staleTime: 1_000,
   })
 
+  // Only merge the fast "current" tick into the chart array for the short windows that
+  // are already polling histData at that same cadence (see refetchInterval above) — for
+  // windowMin > 5, histData refreshes every 30s, and merging current here would force the
+  // full data→allStats→gcEvents→4-chart recompute/repaint cascade every 2s for a change
+  // that's invisible at 1h-24h zoom.
   const rawData = useMemo(() => {
-    if (!current) return histData
+    if (!current || windowMin > 5) return histData
     const lastTs = histData[histData.length - 1]?.timestamp ?? 0
     return current.timestamp > lastTs + 500 ? [...histData, current] : histData
-  }, [histData, current])
+  }, [histData, current, windowMin])
 
   const data = useMemo(() =>
     downsample(rawData.map(d => ({ ...d, memPct: d.memMaxMb > 0 ? d.memUsedMb / d.memMaxMb : 0 }))),
@@ -763,12 +768,12 @@ export default function GlancePage() {
 
   const hasCpuData = current?.cpuPercent != null && current.cpuPercent >= 0
 
-  const thresholds: AnomalyThresholds = {
+  const thresholds: AnomalyThresholds = useMemo(() => ({
     tps: gbm ? Infinity : gs.anomalyThresholdTps,
     tick: gbm ? Infinity : gs.anomalyThresholdTick,
     mem: gbm ? Infinity : gs.anomalyThresholdMem,
     cpu: gbm ? Infinity : gs.anomalyThresholdCpu,
-  }
+  }), [gbm, gs.anomalyThresholdTps, gs.anomalyThresholdTick, gs.anomalyThresholdMem, gs.anomalyThresholdCpu])
 
   const bifurTs = useMemo(() => {
     if (data.length === 0) return Date.now()

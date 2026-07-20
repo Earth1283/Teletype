@@ -10,12 +10,22 @@ import kotlinx.coroutines.withContext
 import org.sqlite.SQLiteDataSource
 import java.io.File
 import java.sql.Connection
+import java.util.concurrent.ConcurrentHashMap
 
 class MetricsDatabase(dataFolder: File) {
 
     companion object {
         private const val MAX_PLAYER_EVENTS = 1_000
+        private const val MAX_GC_EVENTS = 1_000
+        // Kept below the 30s frontend poll interval so a fresh point always
+        // shows up within one client refetch; absorbs the case where several
+        // clients (or the same client's overlapping range switches) hit the
+        // same window while a bucketed query over days of rows is expensive.
+        private const val HISTORY_CACHE_TTL_MS = 20_000L
     }
+
+    private data class HistoryCacheEntry(val data: List<MetricSnapshot>, val computedAt: Long)
+    private val historyCache = ConcurrentHashMap<Int, HistoryCacheEntry>()
 
     // Two connections so dashboard reads (history/gcEvents/playerEvents) never queue
     // behind the periodic write flush or nightly retention downsampling — WAL mode
@@ -176,24 +186,38 @@ class MetricsDatabase(dataFolder: File) {
      * Retention only creates 1-minute rows once raw samples are older than 24h,
      * so recent multi-hour windows must not read metrics_1m exclusively.
      */
-    suspend fun history(windowMinutes: Int): List<MetricSnapshot> = readMutex.withLock {
-        withContext(Dispatchers.IO) {
-            val now  = System.currentTimeMillis()
-            val from = now - windowMinutes * 60_000L
-            if (windowMinutes <= 60) {
-                return@withContext queryTable("metrics_1s", from, now)
+    suspend fun history(windowMinutes: Int): List<MetricSnapshot> {
+        fun fresh() = historyCache[windowMinutes]?.takeIf {
+            System.currentTimeMillis() - it.computedAt < HISTORY_CACHE_TTL_MS
+        }
+        fresh()?.let { return it.data }
+
+        return readMutex.withLock {
+            withContext(Dispatchers.IO) {
+                // Re-check under the lock: another request for the same window may have
+                // populated the cache while we were waiting.
+                fresh()?.let { return@withContext it.data }
+
+                val now  = System.currentTimeMillis()
+                val from = now - windowMinutes * 60_000L
+                val result = if (windowMinutes <= 60) {
+                    queryTable("metrics_1s", from, now)
+                } else {
+                    val rawCutoff = now - 24L * 3_600_000L
+                    val minuteCutoff = now - 7L * 86_400_000L
+                    val bucketMs = bucketSizeMs(windowMinutes)
+                    val sources = buildList {
+                        add(MetricSource("metrics_1s", maxOf(from, rawCutoff), now))
+                        add(MetricSource("metrics_1m", maxOf(from, minuteCutoff), minOf(now, rawCutoff)))
+                        add(MetricSource("metrics_15m", from, minOf(now, minuteCutoff)))
+                    }.filter { it.from < it.to }
+
+                    queryBucketed(sources, origin = from, bucketMs = bucketMs)
+                }
+
+                historyCache[windowMinutes] = HistoryCacheEntry(result, System.currentTimeMillis())
+                result
             }
-
-            val rawCutoff = now - 24L * 3_600_000L
-            val minuteCutoff = now - 7L * 86_400_000L
-            val bucketMs = bucketSizeMs(windowMinutes)
-            val sources = buildList {
-                add(MetricSource("metrics_1s", maxOf(from, rawCutoff), now))
-                add(MetricSource("metrics_1m", maxOf(from, minuteCutoff), minOf(now, rawCutoff)))
-                add(MetricSource("metrics_15m", from, minOf(now, minuteCutoff)))
-            }.filter { it.from < it.to }
-
-            queryBucketed(sources, origin = from, bucketMs = bucketMs)
         }
     }
 
@@ -334,11 +358,13 @@ class MetricsDatabase(dataFolder: File) {
 
     suspend fun gcEvents(from: Long, to: Long): List<GcEvent> = readMutex.withLock {
         withContext(Dispatchers.IO) {
+            // Capped and taken from the newest end of the range, same rationale as
+            // playerEvents — an unbounded multi-day query can return thousands of rows.
             val result = mutableListOf<GcEvent>()
             readConn.prepareStatement(
-                "SELECT ts, name, action, cause, duration_ms FROM gc_events WHERE ts >= ? AND ts <= ? ORDER BY ts"
+                "SELECT ts, name, action, cause, duration_ms FROM gc_events WHERE ts >= ? AND ts <= ? ORDER BY ts DESC LIMIT ?"
             ).use { ps ->
-                ps.setLong(1, from); ps.setLong(2, to)
+                ps.setLong(1, from); ps.setLong(2, to); ps.setInt(3, MAX_GC_EVENTS)
                 ps.executeQuery().use { rs ->
                     while (rs.next()) result += GcEvent(
                         ts         = rs.getLong("ts"),
@@ -349,7 +375,7 @@ class MetricsDatabase(dataFolder: File) {
                     )
                 }
             }
-            result
+            result.sortedBy { it.ts }
         }
     }
 

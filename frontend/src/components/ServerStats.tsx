@@ -1,4 +1,4 @@
-import { useState, useMemo, useCallback } from 'react'
+import { useState, useMemo, useCallback, memo } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import {
   ComposedChart, Area, Line, XAxis, YAxis, CartesianGrid, Tooltip,
@@ -451,9 +451,10 @@ interface MiniChartProps {
   extraLine?: { key: keyof Snap; color: string; label: string }
 }
 
-function MiniChart({ data, dataKey, color, label, guideId, onGuide, yDomain, yFmt, events, extraLine }: MiniChartProps) {
+const MiniChart = memo(function MiniChart({ data, dataKey, color, label, guideId, onGuide, yDomain, yFmt, events, extraLine }: MiniChartProps) {
   const fmt = yFmt ?? ((v: number) => String(v))
   const current = data[data.length - 1]
+  const markers = useMemo(() => downsampleEvents(events), [events])
 
   function ChartTooltip({ active, payload }: any) {
     if (!active || !payload?.length) return null
@@ -497,7 +498,7 @@ function MiniChart({ data, dataKey, color, label, guideId, onGuide, yDomain, yFm
             tick={{ fill: 'var(--mist)', fontFamily: 'var(--mono)', fontSize: 9 }}
             tickLine={false} axisLine={false} tickCount={3} tickFormatter={fmt} />
           <Tooltip content={<ChartTooltip />} cursor={{ stroke: 'var(--border-hi)', strokeWidth: 1 }} />
-          {downsampleEvents(events).map(ev => (
+          {markers.map(ev => (
             <ReferenceLine key={`${ev.ts}-${ev.uuid}`} x={ev.ts}
               stroke={ev.action === 'join' ? 'var(--green)' : 'var(--red)'}
               strokeWidth={1} strokeOpacity={0.55} strokeDasharray="2 3" />
@@ -514,7 +515,7 @@ function MiniChart({ data, dataKey, color, label, guideId, onGuide, yDomain, yFm
       </ResponsiveContainer>
     </div>
   )
-}
+})
 
 // ── Z-Score Overlay ────────────────────────────────────────────────────────────
 
@@ -536,7 +537,7 @@ interface ZOverlayProps {
   onGuide: (guide: GuideContent) => void
 }
 
-function ZOverlay({ data, series, title, guideId, showMarkers, threshold, onAnomalyClick, onGuide }: ZOverlayProps) {
+const ZOverlay = memo(function ZOverlay({ data, series, title, guideId, showMarkers, threshold, onAnomalyClick, onGuide }: ZOverlayProps) {
   // Precompute Z-scores for each series
   const zData = useMemo(() => {
     const extracted = series.map(s =>
@@ -673,7 +674,7 @@ function ZOverlay({ data, series, title, guideId, showMarkers, threshold, onAnom
       </ResponsiveContainer>
     </div>
   )
-}
+})
 
 // ── Correlation table ──────────────────────────────────────────────────────────
 
@@ -714,7 +715,7 @@ interface CorrelationTableProps {
   onGuide: (guide: GuideContent) => void
 }
 
-function CorrelationTable({ data, onGuide }: CorrelationTableProps) {
+const CorrelationTable = memo(function CorrelationTable({ data, onGuide }: CorrelationTableProps) {
   const matrix = useMemo(() => {
     const cols = CORR_METRICS.map(m =>
       data.map(s => m.extract ? m.extract(s) : (s[m.key] as number | null | undefined) ?? null)
@@ -786,7 +787,7 @@ function CorrelationTable({ data, onGuide }: CorrelationTableProps) {
       </div>
     </div>
   )
-}
+})
 
 // ── Log panel ─────────────────────────────────────────────────────────────────
 
@@ -862,13 +863,19 @@ export default function ServerStats({ onNavigate }: Props) {
     enabled: ss.showChartPlayers,
   })
 
+  // Sparklines/summary want the freshest point (cheap: tiny SVGs, plain reduces).
+  // Merged every 2s tick on the "current" poll.
   const historyRawWithCurrent = useMemo(() => {
     if (!snap) return historyRaw
     const lastTs = historyRaw[historyRaw.length - 1]?.timestamp ?? 0
     return snap.timestamp > lastTs + 500 ? [...historyRaw, snap] : historyRaw
   }, [historyRaw, snap])
 
-  const history = useMemo(() => downsample(historyRawWithCurrent), [historyRawWithCurrent])
+  // Big Recharts charts (MiniChart/ZOverlay/CorrelationTable) derive from historyRaw
+  // only, so they recompute/repaint on the 30s history poll instead of every 2s
+  // snap tick — merging one live point is invisible at 1h-7d zoom anyway, and doing
+  // it here forced a full repaint of 9 chart components 15x more often than needed.
+  const history = useMemo(() => downsample(historyRaw), [historyRaw])
 
   const rangeSummary = useMemo(() => {
     const rows = historyRawWithCurrent
@@ -973,25 +980,25 @@ export default function ServerStats({ onNavigate }: Props) {
           <div className="stat-label">Players</div>
           <div className="stat-value amber">{data.onlinePlayers}</div>
           <div className="stat-sub">of {data.maxPlayers} max</div>
-          <Sparkline values={history.map(s => s.playerCount)} color="var(--amber)" />
+          <Sparkline values={historyRawWithCurrent.map(s => s.playerCount)} color="var(--amber)" />
         </div>
         <div className="stat-card">
           <div className="stat-label">TPS · 1m</div>
           <div className={`stat-value ${tpsClass(tps1)}`}>{tps1?.toFixed(1) ?? '—'}</div>
           <div className="stat-sub">target 20.0</div>
-          <Sparkline values={history.map(s => s.tps1)} color="var(--green)" />
+          <Sparkline values={historyRawWithCurrent.map(s => s.tps1)} color="var(--green)" />
         </div>
         <div className="stat-card">
           <div className="stat-label">TPS · 5m</div>
           <div className={`stat-value ${tpsClass(tps5)}`}>{tps5?.toFixed(1) ?? '—'}</div>
           <div className="stat-sub">5 min avg</div>
-          <Sparkline values={history.map(s => s.tps5)} color="var(--green)" />
+          <Sparkline values={historyRawWithCurrent.map(s => s.tps5)} color="var(--green)" />
         </div>
         <div className="stat-card">
           <div className="stat-label">TPS · 15m</div>
           <div className={`stat-value ${tpsClass(tps15)}`}>{tps15?.toFixed(1) ?? '—'}</div>
           <div className="stat-sub">15 min avg</div>
-          <Sparkline values={history.map(s => s.tps15)} color="var(--green)" />
+          <Sparkline values={historyRawWithCurrent.map(s => s.tps15)} color="var(--green)" />
         </div>
         <div className="stat-card">
           <div className="stat-label">Tick Time</div>
@@ -999,20 +1006,20 @@ export default function ServerStats({ onNavigate }: Props) {
             {snap ? `${Math.round(snap.tickTimeMs)}ms` : '—'}
           </div>
           <div className="stat-sub">healthy &lt;50ms</div>
-          <Sparkline values={history.map(s => s.tickTimeMs)} color="var(--amber)" />
+          <Sparkline values={historyRawWithCurrent.map(s => s.tickTimeMs)} color="var(--amber)" />
         </div>
         <div className="stat-card">
           <div className="stat-label">JVM Memory</div>
           <div className={`stat-value ${memClass(memPct)}`}>{snap ? fmtMem(snap.memUsedMb) : '—'}</div>
           <div className="stat-sub">{snap ? `of ${fmtMem(snap.memMaxMb)} max` : ''}</div>
-          <Sparkline values={history.map(s => s.memUsedMb)} color="var(--blue)" />
+          <Sparkline values={historyRawWithCurrent.map(s => s.memUsedMb)} color="var(--blue)" />
         </div>
         {snap?.cpuPercent != null && snap.cpuPercent >= 0 && (
           <div className="stat-card">
             <div className="stat-label">Host CPU</div>
             <div className={`stat-value ${cpuClass(snap.cpuPercent)}`}>{snap.cpuPercent.toFixed(1)}%</div>
             <div className="stat-sub">system-wide</div>
-            <Sparkline values={history.map(s => s.cpuPercent != null && s.cpuPercent >= 0 ? s.cpuPercent : null)} color="var(--red)" />
+            <Sparkline values={historyRawWithCurrent.map(s => s.cpuPercent != null && s.cpuPercent >= 0 ? s.cpuPercent : null)} color="var(--red)" />
           </div>
         )}
         {sysMemPct != null && snap?.sysMemUsedMb != null && snap?.sysMemTotalMb != null && (
@@ -1020,7 +1027,7 @@ export default function ServerStats({ onNavigate }: Props) {
             <div className="stat-label">Host RAM</div>
             <div className={`stat-value ${memClass(sysMemPct)}`}>{fmtMem(snap.sysMemUsedMb)}</div>
             <div className="stat-sub">of {fmtMem(snap.sysMemTotalMb)}</div>
-            <Sparkline values={history.map(s => s.sysMemUsedMb)} color="var(--blue)" />
+            <Sparkline values={historyRawWithCurrent.map(s => s.sysMemUsedMb)} color="var(--blue)" />
           </div>
         )}
         {diskPct != null && snap?.diskUsedGb != null && snap?.diskTotalGb != null && (
@@ -1028,7 +1035,7 @@ export default function ServerStats({ onNavigate }: Props) {
             <div className="stat-label">Disk</div>
             <div className={`stat-value ${diskClass(diskPct)}`}>{snap.diskUsedGb} GB</div>
             <div className="stat-sub">of {snap.diskTotalGb} GB used</div>
-            <Sparkline values={history.map(s => s.diskUsedGb)} color="var(--mist)" />
+            <Sparkline values={historyRawWithCurrent.map(s => s.diskUsedGb)} color="var(--mist)" />
           </div>
         )}
         {snap && (
@@ -1036,7 +1043,7 @@ export default function ServerStats({ onNavigate }: Props) {
             <div className="stat-label">Entities</div>
             <div className="stat-value">{snap.entityCount.toLocaleString()}</div>
             <div className="stat-sub">all worlds</div>
-            <Sparkline values={history.map(s => s.entityCount)} color="var(--blue)" />
+            <Sparkline values={historyRawWithCurrent.map(s => s.entityCount)} color="var(--blue)" />
           </div>
         )}
         {snap && (
@@ -1044,7 +1051,7 @@ export default function ServerStats({ onNavigate }: Props) {
             <div className="stat-label">Chunks</div>
             <div className="stat-value">{snap.loadedChunks.toLocaleString()}</div>
             <div className="stat-sub">loaded</div>
-            <Sparkline values={history.map(s => s.loadedChunks)} color="var(--mist)" />
+            <Sparkline values={historyRawWithCurrent.map(s => s.loadedChunks)} color="var(--mist)" />
           </div>
         )}
         {snap?.pingP50 != null && snap.pingP50 > 0 && (
@@ -1052,7 +1059,7 @@ export default function ServerStats({ onNavigate }: Props) {
             <div className="stat-label">Ping P50</div>
             <div className="stat-value green">{snap.pingP50}ms</div>
             <div className="stat-sub">median latency</div>
-            <Sparkline values={history.map(s => s.pingP50 != null && s.pingP50 > 0 ? s.pingP50 : null)} color="var(--green)" />
+            <Sparkline values={historyRawWithCurrent.map(s => s.pingP50 != null && s.pingP50 > 0 ? s.pingP50 : null)} color="var(--green)" />
           </div>
         )}
         {rangeSummary.samples > 0 && (
