@@ -112,6 +112,8 @@
   border: 1px solid var(--border);
   border-radius: var(--r-lg);
   padding: 20px;
+  container-type: inline-size;
+  overflow: hidden;
 }
 .stat-label {
   font-family: var(--sans);
@@ -121,13 +123,19 @@
   letter-spacing: 0.07em;
   color: var(--mist);
   margin-bottom: 6px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 .stat-value {
   font-family: var(--display);
-  font-size: 32px;
+  font-size: clamp(16px, 9cqi, 32px);
   font-weight: 700;
   line-height: 1;
   color: var(--ash);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 .stat-value.amber { color: var(--amber); }
 .stat-value.green { color: var(--green); }
@@ -138,6 +146,9 @@
   font-size: 11px;
   color: var(--mist);
   margin-top: 4px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 .stat-sparkline {
   display: block;
@@ -464,7 +475,7 @@
     padding: 12px;
   }
   .stat-value {
-    font-size: 24px;
+    font-size: clamp(14px, 9cqi, 24px);
     letter-spacing: 0;
   }
   .player-row {
