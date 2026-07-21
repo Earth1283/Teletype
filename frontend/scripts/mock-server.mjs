@@ -235,7 +235,7 @@ const server = http.createServer(async (req, res) => {
     await readBody(req)
     return json(res, { uuid: 'dev', message: 'Development mode — auto-verifying. No action needed.' })
   }
-  if (m === 'POST' && path.startsWith('/api/auth/poll/')) {
+  if ((m === 'POST' || m === 'GET') && path.startsWith('/api/auth/poll/')) {
     return json(res, { status: 'verified', token: 'dev-token' })
   }
 

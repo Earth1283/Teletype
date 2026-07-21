@@ -59,7 +59,7 @@ export default function Console() {
   })())
   const histCursorRef = useRef<number>(-1)
   const draftRef = useRef<string>('')
-  const { openContextMenu } = useContextMenu()
+  const { openContextMenu, isOpen: isMenuOpen } = useContextMenu()
 
   const clearCompletions = () => { setCompletions([]); setCompletionIdx(0) }
 
@@ -71,7 +71,7 @@ export default function Console() {
 
   const filteredLines = useMemo(
     () => searchOpen && searchQuery
-      ? displayedLines.filter(l => matchLine(l, searchQuery, fuzzyLevel))
+      ? displayedLines.filter(l => matchLine(l.text, searchQuery, fuzzyLevel))
       : displayedLines,
     [displayedLines, searchOpen, searchQuery, fuzzyLevel]
   )
@@ -103,9 +103,10 @@ export default function Console() {
       setIsAtBottom(true)
       return
     }
+    if (!isAtBottom || isMenuOpen) return
     const frame = requestAnimationFrame(() => scrollToBottom('auto'))
     return () => cancelAnimationFrame(frame)
-  }, [filteredLines.length, scrollToBottom])
+  }, [filteredLines.length, scrollToBottom, isAtBottom, isMenuOpen])
 
   const send = useCallback(() => {
     const cmd = input.trim()
@@ -283,14 +284,15 @@ export default function Console() {
         className="console-log"
         style={{ flex: 1 }}
         data={filteredLines}
+        computeItemKey={(_, item) => item.id}
         followOutput={() => 'auto'}
         atBottomStateChange={setIsAtBottom}
-        itemContent={(_, line) => (
+        itemContent={(_, item) => (
           <div
-            className={`log-line ${lineClass(line)}${wordWrap ? ' wrap' : ''}`}
+            className={`log-line ${lineClass(item.text)}${wordWrap ? ' wrap' : ''}`}
             style={{ fontSize }}
-            dangerouslySetInnerHTML={{ __html: convert.toHtml(formatLine(line)) }}
-            onContextMenu={e => openCtx(e, line)}
+            dangerouslySetInnerHTML={{ __html: convert.toHtml(formatLine(item.text)) }}
+            onContextMenu={e => openCtx(e, item.text)}
           />
         )}
         components={{

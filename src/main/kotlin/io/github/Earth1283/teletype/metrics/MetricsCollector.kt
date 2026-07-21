@@ -113,8 +113,8 @@ class MetricsCollector(private val plugin: Teletype, private val db: MetricsData
                     val refreshHeavyMetrics = sampleCounter++ % heavySampleEvery == 0
                     if (refreshHeavyMetrics) {
                         val worlds = Bukkit.getWorlds()
-                        cachedEntityCount = worlds.sumOf { it.entities.size }
-                        cachedLoadedChunks = worlds.sumOf { it.loadedChunks.size }
+                        cachedEntityCount = worlds.sumOf { it.entityCount }
+                        cachedLoadedChunks = worlds.sumOf { it.chunkCount }
 
                         val pings = if (pingMethod != null) {
                             onlinePlayers.mapNotNull { p ->

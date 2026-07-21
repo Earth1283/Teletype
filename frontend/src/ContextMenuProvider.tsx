@@ -243,7 +243,7 @@ export function ContextMenuProvider({ children }: { children: ReactNode }) {
   }, [closeContextMenu, menu, wheel])
 
   return (
-    <ContextMenuContext.Provider value={{ openContextMenu, closeContextMenu, setFallbackContextMenu }}>
+    <ContextMenuContext.Provider value={{ openContextMenu, closeContextMenu, setFallbackContextMenu, isOpen: !!menu || !!wheel }}>
       {children}
       {menu && (
         <div

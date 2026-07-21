@@ -6,8 +6,13 @@ export interface TimestampedLog {
   line: string
 }
 
+export interface LogLine {
+  id: number
+  text: string
+}
+
 interface LogContextValue {
-  lines: string[]
+  lines: LogLine[]
   tsLogs: TimestampedLog[]
   connected: boolean
   send: (cmd: string) => void
@@ -41,10 +46,11 @@ function parseLogTs(raw: string): number | null {
 }
 
 export function LogProvider({ children }: { children: React.ReactNode }) {
-  const [lines, setLines] = useState<string[]>([])
+  const [lines, setLines] = useState<LogLine[]>([])
   const [tsLogs, setTsLogs] = useState<TimestampedLog[]>([])
   const [connected, setConnected] = useState(false)
   const socketRef = useRef<ConsoleSocket | null>(null)
+  const nextLineIdRef = useRef(0)
 
   useEffect(() => {
     const socket = new ConsoleSocket()
@@ -53,8 +59,9 @@ export function LogProvider({ children }: { children: React.ReactNode }) {
     const unsubLog = socket.onLog((raw) => {
       const line = stripMinecraft(raw)
       const ts = parseLogTs(raw) ?? Date.now()
+      const id = nextLineIdRef.current++
       setLines(prev => {
-        const next = [...prev, line]
+        const next = [...prev, { id, text: line }]
         return next.length > 5000 ? next.slice(-5000) : next
       })
       setTsLogs(prev => {

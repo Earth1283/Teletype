@@ -43,12 +43,14 @@ export interface ContextMenuValue {
   ) => void
   closeContextMenu: () => void
   setFallbackContextMenu: (items: ContextMenuItem[]) => void
+  isOpen: boolean
 }
 
 export const ContextMenuContext = createContext<ContextMenuValue>({
   openContextMenu: () => {},
   closeContextMenu: () => {},
   setFallbackContextMenu: () => {},
+  isOpen: false,
 })
 
 export function useContextMenu() {
