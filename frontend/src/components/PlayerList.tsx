@@ -3,6 +3,7 @@ import { useQuery } from '@tanstack/react-query'
 import { api } from '../api/client'
 import { useContextMenu } from '../ContextMenu'
 import { useToast } from '../ToastContext'
+import { writeClipboard } from '../clipboard'
 import { IconRefresh } from '../Icons'
 import PromptModal, { type PromptVariant } from './PromptModal'
 import { Skeleton } from '../Skeleton'
@@ -145,9 +146,9 @@ export default function PlayerList() {
 
   function openPlayerCtx(e: React.MouseEvent, player: Player) {
     openContextMenu(e, [
-      { label: 'Copy Player Name', action: () => navigator.clipboard.writeText(player.name) },
-      { label: 'Copy UUID', action: () => navigator.clipboard.writeText(player.uuid) },
-      { label: 'Copy Skin URL', action: () => navigator.clipboard.writeText(playerSkinUrl(player.name)) },
+      { label: 'Copy Player Name', action: async () => { if (!await writeClipboard(player.name)) toast.error('Copy failed') } },
+      { label: 'Copy UUID', action: async () => { if (!await writeClipboard(player.uuid)) toast.error('Copy failed') } },
+      { label: 'Copy Skin URL', action: async () => { if (!await writeClipboard(playerSkinUrl(player.name))) toast.error('Copy failed') } },
       { type: 'separator' },
       { label: 'Heal', action: () => runCommand(`effect give ${player.name} minecraft:instant_health 1 10`, `Healed ${player.name}`).catch(() => {}) },
       { label: 'Feed', action: () => runCommand(`effect give ${player.name} minecraft:saturation 1 10`, `Fed ${player.name}`).catch(() => {}) },

@@ -4,6 +4,8 @@ import Editor, { useMonaco } from '@monaco-editor/react'
 import { api, TOKEN_KEY } from '../api/client'
 import { useSettings } from '../SettingsContext'
 import { useContextMenu, type ContextMenuItem } from '../ContextMenu'
+import { useToast } from '../ToastContext'
+import { writeClipboard } from '../clipboard'
 import PromptModal, { type PromptVariant } from './PromptModal'
 import {
   IconFolder, IconFile, IconUpload, IconDownload,
@@ -261,6 +263,7 @@ export default function FileManager() {
   const qc = useQueryClient()
   const { settings } = useSettings()
   const { openContextMenu } = useContextMenu()
+  const toast = useToast()
   const monacoInst = useMonaco()
 
   const effectiveView = editing ? 'list' : viewMode
@@ -554,8 +557,9 @@ export default function FileManager() {
     }
   }
 
-  function copyPaths(entriesToCopy: FileEntry[]) {
-    navigator.clipboard.writeText(entriesToCopy.map(entry => entry.path).join('\n'))
+  async function copyPaths(entriesToCopy: FileEntry[]) {
+    const ok = await writeClipboard(entriesToCopy.map(entry => entry.path).join('\n'))
+    if (!ok) toast.error('Copy failed')
   }
 
   async function doRename() {
@@ -782,7 +786,7 @@ export default function FileManager() {
         disabled: favs.some(f => f.path === cwd),
         action: () => addFav(cwd.split('/').filter(Boolean).pop() || 'Server Root', cwd),
       },
-      { label: 'Copy Folder Path', disabled: !cwd, action: () => navigator.clipboard.writeText(cwd) },
+      { label: 'Copy Folder Path', disabled: !cwd, action: async () => { if (!await writeClipboard(cwd)) toast.error('Copy failed') } },
     )
     openContextMenu(e, items, { kind: 'folderBackground', path: cwd })
   }
@@ -791,7 +795,7 @@ export default function FileManager() {
     const isDefault = DEFAULT_FAVS.some(d => d.id === fav.id)
     openContextMenu(e, [
       { label: 'Open Favorite', action: () => navigate(fav.path) },
-      { label: 'Copy Path', disabled: !fav.path, action: () => navigator.clipboard.writeText(fav.path) },
+      { label: 'Copy Path', disabled: !fav.path, action: async () => { if (!await writeClipboard(fav.path)) toast.error('Copy failed') } },
       { type: 'separator' },
       { label: 'Remove from Favorites', disabled: isDefault, danger: true, action: () => removeFav(fav.id) },
     ], { kind: 'favorite', id: fav.id, path: fav.path })

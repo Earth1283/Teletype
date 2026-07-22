@@ -6,6 +6,8 @@ import { useLogs } from '../LogContext'
 import { useSettings } from '../SettingsContext'
 import { useContextMenu, type ContextMenuItem } from '../ContextMenu'
 import { api } from '../api/client'
+import { writeClipboard } from '../clipboard'
+import { useToast } from '../ToastContext'
 import type { Snippet } from './actions/actionTypes'
 import RunModal from './actions/RunModal'
 import { IconSearch, IconX } from '../Icons'
@@ -60,6 +62,7 @@ export default function Console() {
   const histCursorRef = useRef<number>(-1)
   const draftRef = useRef<string>('')
   const { openContextMenu, isOpen: isMenuOpen } = useContextMenu()
+  const toast = useToast()
 
   const clearCompletions = () => { setCompletions([]); setCompletionIdx(0) }
 
@@ -195,7 +198,10 @@ export default function Console() {
       {
         label: plain ? 'Copy Message Only' : 'Copy Line',
         shortcut: '⌘C',
-        action: () => navigator.clipboard.writeText(plain ? stripLogPrefix(clean) : clean),
+        action: async () => {
+          const ok = await writeClipboard(plain ? stripLogPrefix(clean) : clean).catch(() => false)
+          if (!ok) toast.error('Copy failed')
+        },
       },
     ]
     if (quickActions.length > 0) {

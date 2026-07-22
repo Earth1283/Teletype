@@ -2,6 +2,8 @@ import { useMemo, useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { api } from '../api/client'
 import { useContextMenu } from '../ContextMenu'
+import { useToast } from '../ToastContext'
+import { writeClipboard } from '../clipboard'
 import { Skeleton } from '../Skeleton'
 import { Eyebrow } from '../design'
 
@@ -48,6 +50,7 @@ export default function AuditPage() {
   const [sinceInput, setSinceInput]     = useState('')
   const [offset, setOffset]             = useState(0)
   const { openContextMenu } = useContextMenu()
+  const toast = useToast()
 
   // Validate sinceInput — don't send NaN to backend
   const sinceMs = (() => {
@@ -85,12 +88,12 @@ export default function AuditPage() {
 
   const openCtx = (e: React.MouseEvent, entry: AuditEntry) => {
     openContextMenu(e, [
-      { label: 'Copy Detail', action: () => navigator.clipboard.writeText(entry.detail) },
+      { label: 'Copy Detail', action: async () => { if (!await writeClipboard(entry.detail)) toast.error('Copy failed') } },
       {
         label: 'Copy Row',
-        action: () => {
+        action: async () => {
           const line = [fmtTs(entry.ts), entry.actor, entry.ip, entry.action, entry.detail].join('\t')
-          navigator.clipboard.writeText(line)
+          if (!await writeClipboard(line)) toast.error('Copy failed')
         },
       },
       { type: 'separator' },
