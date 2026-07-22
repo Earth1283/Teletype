@@ -247,16 +247,16 @@ export default function CommandPalette({ open, onClose, onNavigate }: Props) {
   let flatIdx = 0
 
   return (
-    <div className="fixed inset-0 z-palette flex items-start justify-center bg-scrim pt-[12vh] backdrop-blur-[2px]" onClick={onClose}>
+    <div className="fixed inset-0 z-palette flex items-start justify-center bg-scrim pt-[10vh] backdrop-blur-[2px]" onClick={onClose}>
       <div
-        className="w-[90vw] max-w-[560px] overflow-hidden rounded-lg border border-border-hi bg-surface shadow-2xl"
+        className="w-[90vw] max-w-[520px] overflow-hidden rounded-lg border border-border-hi bg-surface shadow-2xl"
         onClick={e => e.stopPropagation()}
       >
-        <div className="flex items-center gap-2.5 border-b border-border px-4 py-3">
-          <IconSearch size={15} className="shrink-0 text-text-muted" />
+        <div className="flex items-center gap-2 border-b border-border px-3 py-2">
+          <IconSearch size={14} className="shrink-0 text-text-muted" />
           <input
             ref={inputRef}
-            className="min-w-0 flex-1 bg-transparent font-sans text-[13.5px] text-text-primary placeholder:text-text-muted focus:outline-none"
+            className="min-w-0 flex-1 bg-transparent font-sans text-[13px] text-text-primary placeholder:text-text-muted focus:outline-none"
             placeholder="Search commands, snippets, or type run <cmd>…"
             value={query}
             onChange={e => setQuery(e.target.value)}
@@ -266,13 +266,13 @@ export default function CommandPalette({ open, onClose, onNavigate }: Props) {
           <kbd className="rounded-sm border border-border px-1.5 py-0.5 font-mono text-[10px] text-text-muted">Esc</kbd>
         </div>
 
-        <div className="max-h-[360px] overflow-y-auto p-2" ref={listRef}>
+        <div className="max-h-[300px] overflow-y-auto p-1.5" ref={listRef}>
           {flatItems.length === 0 ? (
-            <div className="px-3 py-6 text-center font-sans text-[13px] text-text-muted">No results for &ldquo;{query}&rdquo;</div>
+            <div className="px-3 py-5 text-center font-sans text-[13px] text-text-muted">No results for &ldquo;{query}&rdquo;</div>
           ) : (
             Array.from(grouped.entries()).map(([category, items]) => (
               <div key={category}>
-                <div className="px-2.5 pb-1 pt-2.5 font-mono text-[10px] uppercase tracking-[0.1em] text-text-muted">{category}</div>
+                <div className="px-2 pb-0.5 pt-2 font-mono text-[10px] uppercase tracking-[0.1em] text-text-muted">{category}</div>
                 {items.map(item => {
                   const idx = flatIdx++
                   const active = idx === selectedIndex
@@ -281,7 +281,7 @@ export default function CommandPalette({ open, onClose, onNavigate }: Props) {
                       key={item.id}
                       data-idx={idx}
                       className={cx(
-                        'flex w-full items-center gap-2.5 rounded-sm px-2.5 py-2 text-left font-sans text-[13px]',
+                        'flex w-full items-center gap-2 rounded-sm px-2 py-1.5 text-left font-sans text-[13px]',
                         active ? 'bg-accent/10 text-text-primary' : 'text-text-secondary',
                       )}
                       onMouseEnter={() => setSelectedIndex(idx)}
@@ -299,7 +299,7 @@ export default function CommandPalette({ open, onClose, onNavigate }: Props) {
           )}
         </div>
 
-        <div className="flex items-center gap-4 border-t border-border px-4 py-2 font-mono text-[10px] text-text-muted">
+        <div className="flex items-center gap-3 border-t border-border px-3 py-1.5 font-mono text-[10px] text-text-muted">
           <span className="flex items-center gap-1"><kbd className="rounded-sm border border-border px-1">↑↓</kbd> navigate</span>
           <span className="flex items-center gap-1"><kbd className="rounded-sm border border-border px-1">↵</kbd> run</span>
           <span className="flex items-center gap-1"><kbd className="rounded-sm border border-border px-1">Esc</kbd> close</span>
