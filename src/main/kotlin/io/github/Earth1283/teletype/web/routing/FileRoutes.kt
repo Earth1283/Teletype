@@ -14,6 +14,7 @@ import io.ktor.http.HttpStatusCode
 import io.ktor.http.content.PartData
 import io.ktor.http.content.forEachPart
 import io.ktor.utils.io.jvm.javaio.toInputStream
+import io.ktor.server.application.createRouteScopedPlugin
 import io.ktor.server.request.receive
 import io.ktor.server.request.receiveChannel
 import io.ktor.server.request.receiveMultipart
@@ -38,6 +39,15 @@ private val UPLOAD_ID_PATTERN = Regex("[A-Za-z0-9._-]{8,120}")
 
 fun Route.fileRoutes(plugin: Teletype) {
     val cfg = plugin.teletypeConfig
+
+    install(createRouteScopedPlugin("TeletypeFilesGate") {
+        onCall { call ->
+            if (!cfg.filesEnabled) {
+                call.respond(HttpStatusCode.Forbidden, ErrorResponse("File manager is disabled (files.enabled: false)"))
+            }
+        }
+    }) {}
+
     val root = cfg.filesRoot.canonicalFile
     val rootPath = root.path
     val chunkRoot = File(plugin.dataFolder, "upload-chunks").canonicalFile

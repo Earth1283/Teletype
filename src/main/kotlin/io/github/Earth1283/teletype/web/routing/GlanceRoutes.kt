@@ -1,6 +1,7 @@
 package io.github.Earth1283.teletype.web.routing
 
 import io.github.Earth1283.teletype.Teletype
+import io.github.Earth1283.teletype.web.model.GlanceConfig
 import io.github.Earth1283.teletype.web.model.MetricSnapshot
 import io.github.Earth1283.teletype.web.model.ErrorResponse
 import io.ktor.http.HttpStatusCode
@@ -9,6 +10,21 @@ import io.ktor.server.routing.Route
 import io.ktor.server.routing.get
 
 fun Route.glanceRoutes(plugin: Teletype) {
+    get("/config") {
+        val cfg = plugin.teletypeConfig
+        call.respond(GlanceConfig(
+            tpsNominalMin = cfg.tpsNominalMin,
+            tpsDegradedMin = cfg.tpsDegradedMin,
+            tickNominalMaxMs = cfg.tickNominalMaxMs,
+            tickDegradedMaxMs = cfg.tickDegradedMaxMs,
+            memNominalMaxPct = cfg.memNominalMaxPct,
+            memDegradedMaxPct = cfg.memDegradedMaxPct,
+            anomalyTpsSigma = cfg.anomalyTpsSigma,
+            anomalyTickSigma = cfg.anomalyTickSigma,
+            anomalyMemorySigma = cfg.anomalyMemorySigma,
+        ))
+    }
+
     get("/current") {
         val snap = plugin.metricsCollector.latest
             ?: return@get call.respond(HttpStatusCode.ServiceUnavailable, ErrorResponse("Metrics not ready yet"))

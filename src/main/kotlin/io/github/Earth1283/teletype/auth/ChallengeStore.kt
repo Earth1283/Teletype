@@ -7,13 +7,14 @@ import java.time.Instant
 import java.util.UUID
 import java.util.concurrent.ConcurrentHashMap
 
-class ChallengeStore(plugin: Teletype) {
+class ChallengeStore(private val plugin: Teletype) {
     private val store = ConcurrentHashMap<UUID, PendingChallenge>()
 
     init {
         object : BukkitRunnable() {
             override fun run() {
-                val cutoff = Instant.now().minusSeconds(300)
+                val ttlSeconds = plugin.teletypeConfig.challengeTtlSeconds.coerceAtLeast(1L)
+                val cutoff = Instant.now().minusSeconds(ttlSeconds)
                 store.entries.removeIf { (_, challenge) ->
                     if (challenge.createdAt.isBefore(cutoff)) {
                         challenge.deferred.cancel()

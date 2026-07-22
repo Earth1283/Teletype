@@ -12,6 +12,7 @@ import io.github.Earth1283.teletype.web.model.SnippetCategory
 import io.github.Earth1283.teletype.web.model.StatusResponse
 import io.github.Earth1283.teletype.web.model.UpdateSnippetRequest
 import io.ktor.http.HttpStatusCode
+import io.ktor.server.application.createRouteScopedPlugin
 import io.ktor.server.request.receive
 import io.ktor.server.response.respond
 import io.ktor.server.routing.Route
@@ -29,6 +30,15 @@ private val SNIPPET_VAR_PATTERN = Regex("\\{(\\w+)\\}")
 fun Route.actionRoutes(plugin: Teletype) {
     val store = plugin.snippetStore
     val scheduler = plugin.snippetScheduler
+    val cfg = plugin.teletypeConfig
+
+    install(createRouteScopedPlugin("TeletypeActionsGate") {
+        onCall { call ->
+            if (!cfg.actionsEnabled) {
+                call.respond(HttpStatusCode.Forbidden, ErrorResponse("Actions are disabled (actions.enabled: false)"))
+            }
+        }
+    }) {}
 
     route("/categories") {
         get { call.respond(store.getCategories()) }
@@ -73,6 +83,10 @@ fun Route.actionRoutes(plugin: Teletype) {
             val cmds = req.cmds.filter { it.isNotBlank() }
             if (cmds.isEmpty()) {
                 call.respond(HttpStatusCode.BadRequest, ErrorResponse("At least one command required")); return@post
+            }
+            if (store.getSnippets().size >= cfg.actionsMaxSnippets) {
+                call.respond(HttpStatusCode.BadRequest,
+                    ErrorResponse("Snippet limit reached (max ${cfg.actionsMaxSnippets})")); return@post
             }
             val vars = cmds.flatMap { SNIPPET_VAR_PATTERN.findAll(it).map { m -> m.groupValues[1] }.toList() }.distinct()
             val snippet = Snippet(UUID.randomUUID().toString(), req.name.trim(), req.categoryId, cmds, vars)
@@ -123,9 +137,17 @@ fun Route.actionRoutes(plugin: Teletype) {
         get { call.respond(scheduler.getActions()) }
 
         post {
+            if (!cfg.actionsSchedulingEnabled) {
+                call.respond(HttpStatusCode.Forbidden,
+                    ErrorResponse("Scheduling is disabled (actions.scheduling-enabled: false)")); return@post
+            }
             val req = call.receive<CreateScheduleRequest>()
             if (store.findSnippet(req.snippetId) == null) {
                 call.respond(HttpStatusCode.NotFound, ErrorResponse("Snippet not found")); return@post
+            }
+            if (scheduler.getActions().size >= cfg.actionsMaxScheduled) {
+                call.respond(HttpStatusCode.BadRequest,
+                    ErrorResponse("Scheduled action limit reached (max ${cfg.actionsMaxScheduled})")); return@post
             }
             val action = ScheduledAction(
                 id            = UUID.randomUUID().toString(),
@@ -165,6 +187,10 @@ fun Route.actionRoutes(plugin: Teletype) {
         }
 
         patch("/{id}/resume") {
+            if (!cfg.actionsSchedulingEnabled) {
+                call.respond(HttpStatusCode.Forbidden,
+                    ErrorResponse("Scheduling is disabled (actions.scheduling-enabled: false)")); return@patch
+            }
             val id = call.parameters["id"]
                 ?: return@patch call.respond(HttpStatusCode.BadRequest, ErrorResponse("Missing id"))
             if (!scheduler.resume(id)) {

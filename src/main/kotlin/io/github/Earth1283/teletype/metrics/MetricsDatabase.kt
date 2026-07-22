@@ -395,6 +395,14 @@ class MetricsDatabase(dataFolder: File) {
         }
     }
 
+    suspend fun pruneMetrics15m(before: Long) = writeMutex.withLock {
+        withContext(Dispatchers.IO) {
+            conn.prepareStatement("DELETE FROM metrics_15m WHERE ts < ?").use { ps ->
+                ps.setLong(1, before); ps.executeUpdate()
+            }
+        }
+    }
+
     private fun queryTable(table: String, from: Long, to: Long): List<MetricSnapshot> {
         val result = mutableListOf<MetricSnapshot>()
         readConn.prepareStatement(

@@ -9,6 +9,7 @@ import io.ktor.http.ContentDisposition
 import io.ktor.http.ContentType
 import io.ktor.http.HttpHeaders
 import io.ktor.http.HttpStatusCode
+import io.ktor.server.application.createRouteScopedPlugin
 import io.ktor.server.request.receive
 import io.ktor.server.response.header
 import io.ktor.server.response.respond
@@ -23,6 +24,14 @@ import kotlinx.coroutines.withContext
 
 fun Route.profilingRoutes(plugin: Teletype) {
     val mgr = plugin.jfrManager
+
+    install(createRouteScopedPlugin("TeletypeProfilingGate") {
+        onCall { call ->
+            if (!plugin.teletypeConfig.profilingEnabled) {
+                call.respond(HttpStatusCode.Forbidden, ErrorResponse("Profiling is disabled (profiling.enabled: false)"))
+            }
+        }
+    }) {}
 
     get("/status") {
         call.respond(mgr.getStatus())

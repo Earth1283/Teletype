@@ -125,6 +125,7 @@ class SnippetScheduler(private val plugin: Teletype, private val store: SnippetS
     }
 
     private fun scheduleTask(action: ScheduledAction) {
+        if (!plugin.teletypeConfig.actionsSchedulingEnabled) return
         val snippet = store.findSnippet(action.snippetId) ?: return
         tasks[action.id]?.cancel()
         val nowMs = System.currentTimeMillis()

@@ -16,7 +16,7 @@ The Profiling sidebar section provides:
 
 ```yaml
 profiling:
-  enabled: true
+  enabled: true            # false = /api/profiling/* returns 403 Forbidden entirely
 
   continuous:
     enabled: true
@@ -35,7 +35,7 @@ All paths are relative to the plugin data folder (`plugins/Teletype/`). Parent d
 
 ## API Endpoints
 
-All endpoints require JWT authentication (same as all other `/api` routes).
+All endpoints require JWT authentication (same as all other `/api` routes), and all return `403 Forbidden` if `profiling.enabled: false`.
 
 | Method | Path | Description |
 |--------|------|-------------|

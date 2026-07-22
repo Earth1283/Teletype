@@ -279,15 +279,8 @@ Rate limiting is the outermost layer — a blocked IP never reaches JWT verifica
 
 ### Known config/behavior gaps
 
-These config keys are read by `TeletypeConfig` but not yet wired to the implementation:
+Every key in `config.yml` is wired to its implementation as of this version. Feature master switches (`actions.enabled`, `files.enabled`, `profiling.enabled`, `console.enabled`) reject requests at the route level via a `RouteScopedPlugin` installed with `install(createRouteScopedPlugin(...) { onCall { ... } })` — see `ActionRoutes.kt`, `FileRoutes.kt`, `ProfilingRoutes.kt`, `ConsoleWebSocket.kt`. This is the Ktor 3.x replacement for the old `Route.intercept(ApplicationCallPipeline.Plugins) { ... }` pattern: in Ktor 3, `Route` is an interface with no `intercept` member (only the internal `RoutingNode` implementation has one), so gating a whole route subtree has to go through `Route.install()` with a route-scoped plugin instead.
 
-| Config key | Parsed | Actual behavior |
-|------------|--------|-----------------|
-| `server.cors-origins` | yes | Ignored — Ktor CORS always uses `anyHost()` |
-| `metrics.sample-interval-ticks` | yes | Hardcoded to 20 ticks (1 Hz) in `MetricsCollector` |
-| `metrics.sqlite.flush-interval-seconds` | yes | Hardcoded to 15 seconds in `MetricsCollector` |
-| `metrics.sqlite.retention.downsample-1s-after-hours` | yes | Hardcoded to 24 h in `RetentionJob` |
-| `metrics.sqlite.retention.downsample-1m-after-days` | yes | Hardcoded to 7 d in `RetentionJob` |
-| `metrics.sqlite.retention.delete-15m-after-days` | yes | Not implemented — 15m rows are never deleted |
+Player join/leave events and GC events are always pruned at a fixed 30 days in `RetentionJob` — there is no `config.yml` key for this interval. If that needs to become configurable, add a `metrics.sqlite.retention.player-events-days` property to `TeletypeConfig` the same way the other retention keys are wired, then read it in `RetentionJob.runRetention()` instead of the hardcoded `d30` constant.
 
-If you want to make any of these functional, wire the `TeletypeConfig` property into the relevant class constructor and replace the hardcoded constant.
+`network.enabled: false` and the port-forward/route-mapping equivalents are handled differently on purpose: per `config.yml`'s own comment ("disable path routing without removing saved routes"), the `/api/network/*` management endpoints stay reachable so routes/forwards can still be listed, created, and edited while disabled — only the actual traffic-forwarding behavior (`PortForwardManager.bind`, `PortMultiplexer`'s routing decision) checks the flag. Don't "fix" this to also 403 the management routes; it's intentional.

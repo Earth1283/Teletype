@@ -10,7 +10,7 @@ Teletype generates `plugins/Teletype/config.yml` on first start. All keys and th
 server:
   port: 8080                   # HTTP listen port
   https-port: 8443             # HTTPS port (only when tls.enabled: true)
-  cors-origins: []             # Parsed but currently unused — CORS always allows all origins (anyHost)
+  cors-origins: []             # Empty = allow any origin (anyHost). Non-empty = only listed origins are allowed.
   max-websocket-connections: 8 # Max simultaneous authenticated WebSocket clients
   trust-proxy-headers: false   # Trust HTTPS/client IP headers from a hosting panel proxy
 
@@ -117,6 +117,8 @@ auth:
 
 > **Security note:** The `jwt-secret` is stored in plaintext in `config.yml`. Restrict file read access on the server.
 
+Expired challenges are swept every 30 seconds, so with a very small `challenge-ttl-seconds` a challenge may remain pollable for up to ~30 extra seconds past the configured TTL before it's actually removed.
+
 ---
 
 ## Console
@@ -135,20 +137,18 @@ console:
 ```yaml
 metrics:
   enabled: true
-  sample-interval-ticks: 20    # Parsed but currently hardcoded — sampler always runs at 20 ticks (1 Hz)
+  sample-interval-ticks: 20    # Sampler cadence in server ticks (20 = 1 Hz)
   in-memory-window-seconds: 900  # 15 minutes of 1-second data kept in RAM
 
   sqlite:
     enabled: true
-    flush-interval-seconds: 15   # Parsed but currently hardcoded — ring buffer flushes every 15 seconds
+    flush-interval-seconds: 15   # How often the sample buffer is flushed to SQLite
 
     retention:
-      enabled: true
-      # Note: the four keys below are parsed but currently hardcoded in RetentionJob.
-      # Changing them has no effect on actual retention behavior in this version.
-      downsample-1s-after-hours: 24   # Hardcoded: 1s rows older than 24h are averaged → 1m rows at midnight
-      downsample-1m-after-days: 7     # Hardcoded: 1m rows older than 7d are averaged → 15m rows at midnight
-      delete-15m-after-days: 90       # Not yet implemented — 15m rows are never deleted
+      enabled: true                   # Master switch for the nightly retention job. false = rows accumulate forever.
+      downsample-1s-after-hours: 24    # 1s rows older than this are averaged → 1m rows, raw rows deleted
+      downsample-1m-after-days: 7      # 1m rows older than this are averaged → 15m rows, minute rows deleted
+      delete-15m-after-days: 90        # 15m rows older than this are deleted outright
       player-events-days: 30          # Hardcoded: player join/leave events pruned at 30 days
 ```
 
@@ -165,13 +165,14 @@ The ≤ 15 minute window is served entirely from RAM. Windows from 16–60 minut
 
 ### Retention schedule
 
-The retention job runs once per day at midnight (server system timezone). At each run it:
+Set `metrics.sqlite.retention.enabled: false` to disable the job entirely — all three tables then keep every row forever (1s rows grow at roughly 86 KB/day).
 
-1. Averages 1-second rows from the 24h–48h-ago window → inserts into `metrics_1m`, deletes raw rows.
-2. Averages 1-minute rows from the 7d–8d-ago window → inserts into `metrics_15m`, deletes minute rows.
-3. Deletes player events older than 30 days.
+When enabled, the job runs once per day at midnight (server system timezone). Each of the three retention keys is read fresh from `config.yml` on every run, so changing them takes effect the next time the job fires (no restart needed) — although reload only picks up config edits made via `/tty stop` + `/tty start` or a full restart, per the note at the top of this doc. At each run it:
 
-`metrics_15m` rows are never deleted in the current implementation (`delete-15m-after-days` is not yet enforced).
+1. Averages 1-second rows older than `downsample-1s-after-hours` (default 48h) into `metrics_1m`, deletes the source raw rows. The averaged window is exactly the one day of rows that crossed the threshold since the previous run.
+2. Averages 1-minute rows older than `downsample-1m-after-days` (default 7d) into `metrics_15m`, deletes the source minute rows, same one-day-wide window logic.
+3. Deletes `metrics_15m` rows older than `delete-15m-after-days` (default 90d). Set to `0` to keep 15-minute rows forever.
+4. Deletes player events and GC events older than 30 days (fixed, not configurable).
 
 ### Sampled fields
 
@@ -187,12 +188,14 @@ Join and leave events are stored in a separate `player_events` table in `teletyp
 
 ```yaml
 actions:
-  enabled: true
-  scheduling-enabled: true       # Allow cron/interval/once scheduling
+  enabled: true                  # false = /api/actions/* returns 403 Forbidden entirely
+  scheduling-enabled: true       # false = schedule creation/resume rejected with 403; existing schedules stop firing (paused, not deleted)
   quick-actions-category-id: quick-actions  # Category shown in console right-click menu
-  max-snippets: 200
-  max-scheduled-actions: 50
+  max-snippets: 200              # POST /api/actions/snippets returns 400 once this many snippets exist
+  max-scheduled-actions: 50      # POST /api/actions/schedule returns 400 once this many scheduled actions exist
 ```
+
+When `scheduling-enabled` is `false`, snippets that were already scheduled stay stored (nothing is deleted) but their underlying Bukkit task is never armed — `startAll()` on plugin load, and `resume()` via the API, both no-op silently until the flag is turned back on.
 
 ---
 
@@ -200,7 +203,7 @@ actions:
 
 ```yaml
 files:
-  enabled: true
+  enabled: true                  # false = /api/files/* returns 403 Forbidden entirely
   root: "."                      # Root directory exposed. Relative to server working directory.
   max-edit-size-mb: 4            # Files larger than this open as download-only in the editor
   editable-extensions: []        # Restrict editable extensions. Empty = auto-detect text files.
@@ -248,4 +251,6 @@ glance:
     memory-sigma: 2.5
 ```
 
-The `anomaly.*-sigma` values control chart anomaly dot rendering and incident tooltip heuristics. Higher values = only flag more extreme deviations. These are server-side defaults; each browser client can override them in the Settings tab.
+The `anomaly.*-sigma` values are intended to control chart anomaly dot rendering and incident tooltip heuristics, with `tps`/`tick-time`/`memory` intended to control the Glance status badge and stat-card colors. Higher sigma values = only flag more extreme deviations.
+
+**Current state:** these nine values are served by the backend at `GET /api/glance/config` (see [API Reference](api.md)), but the bundled frontend does not call that endpoint yet — `GlancePage.tsx` and `SettingsContext.tsx` still use their own hardcoded defaults (19/15 TPS, 50/100ms tick, 65/85% memory, 2.0/2.0/2.5 sigma) independent of whatever is in `config.yml`. Changing these keys today has no visible effect in the shipped UI; the backend contract is in place for a future frontend change to fetch `/api/glance/config` on load and seed the Settings defaults from it (while still letting per-browser Settings overrides win, same as the sigma sliders already do).

@@ -79,7 +79,7 @@ class TeletypeConfig(private val plugin: Teletype) {
     val metricsSqliteEnabled: Boolean get() = bool("metrics.sqlite.enabled", true)
     val metricsFlushIntervalSeconds: Long get() = config.getLong("metrics.sqlite.flush-interval-seconds", 15)
     val retentionEnabled: Boolean get() = bool("metrics.sqlite.retention.enabled", true)
-    val retentionDownsample1sAfterHours: Int get() = config.getInt("metrics.sqlite.retention.downsample-1s-after-hours", 24)
+    val retentionDownsample1sAfterHours: Int get() = config.getInt("metrics.sqlite.retention.downsample-1s-after-hours", 48)
     val retentionDownsample1mAfterDays: Int get() = config.getInt("metrics.sqlite.retention.downsample-1m-after-days", 7)
     val retentionDelete15mAfterDays: Int get() = config.getInt("metrics.sqlite.retention.delete-15m-after-days", 90)
 

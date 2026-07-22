@@ -153,6 +153,27 @@ Rate limited: 30 requests/minute per IP (separate from the general API limit).
 
 ## Glance — Metrics
 
+### `GET /api/glance/config`
+
+Server-configured Glance thresholds, read live from `config.yml`'s `glance.*` keys (see [Configuration](configuration.md#glance-thresholds)).
+
+**Response 200:**
+```json
+{
+  "tpsNominalMin": 19.0,
+  "tpsDegradedMin": 15.0,
+  "tickNominalMaxMs": 50,
+  "tickDegradedMaxMs": 100,
+  "memNominalMaxPct": 65,
+  "memDegradedMaxPct": 85,
+  "anomalyTpsSigma": 2.0,
+  "anomalyTickSigma": 2.0,
+  "anomalyMemorySigma": 2.5
+}
+```
+
+Note: the bundled frontend does not currently call this endpoint — see the note in [Configuration](configuration.md#glance-thresholds).
+
 ### `GET /api/glance/current`
 
 Latest metric snapshot. Returns `503 Service Unavailable` if the sampler has not yet produced its first reading (normally resolves within one second of plugin start).
@@ -251,6 +272,8 @@ Events are recorded for every `PlayerJoinEvent` and `PlayerQuitEvent` and persis
 
 ## Actions
 
+All `/api/actions/*` routes return `403 Forbidden` if `actions.enabled: false` in `config.yml`. `POST /api/actions/snippets` returns `400` once `actions.max-snippets` is reached; `POST /api/actions/schedule` and `PATCH /api/actions/schedule/{id}/resume` return `403` if `actions.scheduling-enabled: false`, and `POST /api/actions/schedule` returns `400` once `actions.max-scheduled-actions` is reached.
+
 ### Categories
 
 | Method | Path | Body | Description |
@@ -328,7 +351,7 @@ See [actions.md](actions.md) for scheduling modes and cron format.
 
 ## File Manager
 
-All paths are relative to `files.root` in `config.yml`. Path traversal (`../`) is blocked server-side.
+All paths are relative to `files.root` in `config.yml`. Path traversal (`../`) is blocked server-side. All `/api/files/*` routes return `403 Forbidden` if `files.enabled: false`.
 
 | Method | Path | Params | Description |
 |--------|------|--------|-------------|

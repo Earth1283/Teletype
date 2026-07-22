@@ -109,6 +109,19 @@ data class NetworkStatus(
 )
 
 @Serializable
+data class GlanceConfig(
+    val tpsNominalMin: Double,
+    val tpsDegradedMin: Double,
+    val tickNominalMaxMs: Int,
+    val tickDegradedMaxMs: Int,
+    val memNominalMaxPct: Int,
+    val memDegradedMaxPct: Int,
+    val anomalyTpsSigma: Double,
+    val anomalyTickSigma: Double,
+    val anomalyMemorySigma: Double,
+)
+
+@Serializable
 data class ErrorResponse(val error: String)
 
 @Serializable

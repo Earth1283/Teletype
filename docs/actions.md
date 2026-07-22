@@ -161,8 +161,9 @@ PATCH /api/actions/schedule/{id}/resume
 
 | Limit | Default | Config key |
 |-------|---------|------------|
+| Actions subsystem | enabled | `actions.enabled` |
 | Max snippets | 200 | `actions.max-snippets` |
 | Max scheduled actions | 50 | `actions.max-scheduled-actions` |
 | Scheduling feature | enabled | `actions.scheduling-enabled` |
 
-Exceeding limits returns `400 Bad Request` or `403 Forbidden`.
+Exceeding limits returns `400 Bad Request` or `403 Forbidden`. If `actions.enabled: false`, every `/api/actions/*` route returns `403` regardless of the other keys. If `actions.scheduling-enabled: false`, creating or resuming a schedule returns `403`, and any already-scheduled action stops firing (its stored entry is untouched — it just doesn't get armed again until the flag is re-enabled and the plugin reloads or the action is resumed).
