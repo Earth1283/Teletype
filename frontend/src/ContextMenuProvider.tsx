@@ -155,11 +155,8 @@ export function ContextMenuProvider({ children }: { children: ReactNode }) {
         setWheel({ ...current, activeIndex: null })
         return
       }
-      closeContextMenu()
-      if (current) {
-        const item = current.items[activeIndex]
-        if (!('type' in item) && !item.disabled) void item.action?.()
-      }
+      const item = current.items[activeIndex]
+      Promise.resolve(!('type' in item) && !item.disabled ? item.action?.() : undefined).finally(closeContextMenu)
     }
 
     window.addEventListener('mousedown', onMouseDown, true)
@@ -267,8 +264,7 @@ export function ContextMenuProvider({ children }: { children: ReactNode }) {
                 className={`mac-ctx-item${item.danger ? ' danger' : ''}`}
                 disabled={item.disabled}
                 onClick={() => {
-                  closeContextMenu()
-                  void item.action?.()
+                  Promise.resolve(item.action?.()).finally(closeContextMenu)
                 }}
               >
                 <span className="mac-ctx-label">{item.label}</span>
@@ -304,8 +300,7 @@ export function ContextMenuProvider({ children }: { children: ReactNode }) {
                 style={{ transform: `translate(${x}px, ${y}px) translate(-50%, -50%)` }}
                 title={item.shortcut ? `${item.label} (${item.shortcut})` : item.label}
                 onClick={() => {
-                  closeContextMenu()
-                  void item.action?.()
+                  Promise.resolve(item.action?.()).finally(closeContextMenu)
                 }}
               >
                 <span className="ctx-wheel-label">{item.label}</span>

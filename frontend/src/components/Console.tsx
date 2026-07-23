@@ -291,7 +291,7 @@ export default function Console() {
         style={{ flex: 1 }}
         data={filteredLines}
         computeItemKey={(_, item) => item.id}
-        followOutput={() => 'auto'}
+        followOutput={isBottom => isBottom ? 'auto' : false}
         atBottomStateChange={setIsAtBottom}
         itemContent={(_, item) => (
           <div
