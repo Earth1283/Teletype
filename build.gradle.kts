@@ -68,6 +68,9 @@ dependencies {
     // and sqlite-jdbc's native-lib extraction breaks if the class path is changed.
     implementation("org.xerial:sqlite-jdbc:3.47.1.0")
 
+    // Archive decompression — tar.gz/tgz support for the file manager (ZIP uses the JDK's own java.util.zip)
+    implementation("org.apache.commons:commons-compress:1.27.1")
+
     // Logging (Ktor needs SLF4J; Logback satisfies it)
     implementation("ch.qos.logback:logback-classic:$logbackVersion")
 
@@ -138,6 +141,7 @@ tasks {
         relocate("com.auth0.", "teletype.shaded.auth0.")
         relocate("com.typesafe.", "teletype.shaded.typesafe.")
         relocate("org.bouncycastle.", "teletype.shaded.bouncycastle.")
+        relocate("org.apache.commons.compress.", "teletype.shaded.commonscompress.")
 
         // Merge SPI service descriptors — required for Ktor's Netty engine and serialization
         mergeServiceFiles()

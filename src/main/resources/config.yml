@@ -215,6 +215,10 @@ files:
   # Example: editable-extensions: ["yml", "json", "txt", "properties", "conf"]
   editable-extensions: []
 
+  # Guard against zip/tar bombs: decompressing an archive aborts once the total
+  # uncompressed size written would exceed this many MB.
+  max-decompress-size-mb: 1024
+
 # ── Profiling / Java Flight Recorder ─────────────────────────────────────────
 # JFR is built into the JVM (JDK 9+) with no extra dependencies or commercial
 # flags. It adds < 1% overhead on the default template; ~2-5% on profile.

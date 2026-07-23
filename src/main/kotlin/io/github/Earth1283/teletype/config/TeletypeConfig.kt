@@ -100,6 +100,7 @@ class TeletypeConfig(private val plugin: Teletype) {
     val filesMaxEditSizeMb: Int get() = config.getInt("files.max-edit-size-mb", 4)
     val filesEditableExtensions: Set<String> get() =
         config.getStringList("files.editable-extensions").map { it.lowercase() }.toSet()
+    val filesMaxDecompressSizeMb: Int get() = config.getInt("files.max-decompress-size-mb", 1024)
 
     // ── Network routing ───────────────────────────────────────────────────────
     val networkEnabled: Boolean get() = bool("network.enabled", true)

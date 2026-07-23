@@ -57,6 +57,9 @@ data class CopyRequest(val from: String, val to: String)
 data class FetchRequest(val url: String, val destPath: String, val fileName: String? = null)
 
 @Serializable
+data class DecompressRequest(val path: String, val destPath: String)
+
+@Serializable
 data class MetricSnapshot(
     val timestamp: Long,
     val tps1: Double,

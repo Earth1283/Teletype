@@ -10,7 +10,7 @@ import PromptModal, { type PromptVariant } from './PromptModal'
 import {
   IconFolder, IconFile, IconUpload, IconDownload,
   IconFolderPlus, IconPencil, IconTrash, IconSave, IconX, IconGlobe,
-  IconChevronRight, IconChevronLeft, IconSearch, IconList, IconCheck,
+  IconChevronRight, IconChevronLeft, IconSearch, IconList, IconCheck, IconArchive,
 } from '../Icons'
 
 interface FileEntry {
@@ -210,7 +210,20 @@ function fmtDate(ts: number) {
   return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')} ${String(d.getHours()).padStart(2,'0')}:${String(d.getMinutes()).padStart(2,'0')}`
 }
 
-type Modal = { type: 'rename'; entry: FileEntry } | { type: 'mkdir' } | { type: 'fetch' } | null
+function isArchive(name: string) {
+  const lower = name.toLowerCase()
+  return lower.endsWith('.zip') || lower.endsWith('.tar.gz') || lower.endsWith('.tgz')
+}
+
+function archiveBaseName(name: string) {
+  const lower = name.toLowerCase()
+  if (lower.endsWith('.tar.gz')) return name.slice(0, -'.tar.gz'.length)
+  if (lower.endsWith('.tgz')) return name.slice(0, -'.tgz'.length)
+  if (lower.endsWith('.zip')) return name.slice(0, -'.zip'.length)
+  return name
+}
+
+type Modal = { type: 'rename'; entry: FileEntry } | { type: 'mkdir' } | { type: 'fetch' } | { type: 'decompress'; entry: FileEntry } | null
 type UploadStatus = 'queued' | 'uploading' | 'done' | 'error'
 type FileClipboard = { action: 'copy' | 'cut'; entries: FileEntry[] } | null
 type PromptState = {
@@ -248,6 +261,9 @@ export default function FileManager() {
   const [fetchUrl, setFetchUrl] = useState('')
   const [fetchName, setFetchName] = useState('')
   const [fetchLoading, setFetchLoading] = useState(false)
+  const [decompressMode, setDecompressMode] = useState<'here' | 'new'>('here')
+  const [decompressFolderName, setDecompressFolderName] = useState('')
+  const [decompressLoading, setDecompressLoading] = useState(false)
   const [searchOpen, setSearchOpen] = useState(false)
   const [searchQuery, setSearchQuery] = useState('')
   const [searchScope, setSearchScope] = useState<'local' | 'global'>('local')
@@ -595,6 +611,28 @@ export default function FileManager() {
     finally { setFetchLoading(false) }
   }
 
+  function openDecompressModal(entry: FileEntry) {
+    setDecompressMode('here')
+    setDecompressFolderName(archiveBaseName(entry.name))
+    setModal({ type: 'decompress', entry })
+  }
+
+  async function doDecompress() {
+    if (modal?.type !== 'decompress') return
+    const parentDir = modal.entry.path.split('/').slice(0, -1).join('/')
+    const destPath = decompressMode === 'new'
+      ? joinPath(parentDir, decompressFolderName.trim())
+      : parentDir
+    if (decompressMode === 'new' && !decompressFolderName.trim()) return
+    setDecompressLoading(true)
+    try {
+      await api.post('/files/decompress', { path: modal.entry.path, destPath })
+      setModal(null); invalidateFiles()
+    } catch (e: any) {
+      showPrompt('Decompress failed', e.response?.data?.error ?? 'The archive could not be decompressed.', 'error')
+    } finally { setDecompressLoading(false) }
+  }
+
   async function upload(files: FileList | null) {
     if (!files || files.length === 0) return
     const selectedFiles = Array.from(files)
@@ -733,6 +771,9 @@ export default function FileManager() {
       items.push({ label: 'Open', action: () => handleIconActivate(entry) })
       if (!entry.isDirectory) {
         items.push({ label: 'Download', action: () => downloadFile(entry) })
+      }
+      if (!entry.isDirectory && isArchive(entry.name)) {
+        items.push({ label: 'Decompress...', action: () => openDecompressModal(entry) })
       }
     }
     items.push(
@@ -1143,6 +1184,11 @@ export default function FileManager() {
                         <IconDownload size={12} />
                       </button>
                     )}
+                    {!entry.isDirectory && isArchive(entry.name) && (
+                      <button className="row-action-btn" title="Decompress" onClick={() => openDecompressModal(entry)}>
+                        <IconArchive size={12} />
+                      </button>
+                    )}
                     <button className="row-action-btn" title="Rename" onClick={() => openModal({ type: 'rename', entry }, entry.name)}>
                       <IconPencil size={12} />
                     </button>
@@ -1225,6 +1271,41 @@ export default function FileManager() {
               <button className="pill-btn" onClick={() => setModal(null)}>Cancel</button>
               <button className="pill-btn primary" onClick={doFetch} disabled={fetchLoading || !fetchUrl.trim()}>
                 <IconDownload size={13} />{fetchLoading ? 'Downloading…' : 'Download'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── Decompress modal ──────────────────────────────────────────────── */}
+      {modal?.type === 'decompress' && (
+        <div className="modal-overlay" onClick={() => setModal(null)}>
+          <div className="modal-card" onClick={(e) => e.stopPropagation()}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 16 }}>
+              <IconArchive size={15} />
+              <div className="modal-title" style={{ margin: 0 }}>Decompress "{modal.entry.name}"</div>
+            </div>
+            <label style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10, cursor: 'pointer' }}>
+              <input type="radio" name="decompress-mode" checked={decompressMode === 'here'}
+                onChange={() => setDecompressMode('here')} />
+              Decompress contents to current folder
+            </label>
+            <label style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8, cursor: 'pointer' }}>
+              <input type="radio" name="decompress-mode" checked={decompressMode === 'new'}
+                onChange={() => setDecompressMode('new')} />
+              Decompress to a new folder
+            </label>
+            {decompressMode === 'new' && (
+              <input className="text-input" style={{ width: '100%', marginBottom: 4 }}
+                autoFocus placeholder="New folder name"
+                value={decompressFolderName} onChange={(e) => setDecompressFolderName(e.target.value)}
+                onKeyDown={(e) => { if (e.key === 'Enter') doDecompress(); if (e.key === 'Escape') setModal(null) }} />
+            )}
+            <div className="modal-footer">
+              <button className="pill-btn" onClick={() => setModal(null)}>Cancel</button>
+              <button className="pill-btn primary" onClick={doDecompress}
+                disabled={decompressLoading || (decompressMode === 'new' && !decompressFolderName.trim())}>
+                <IconArchive size={13} />{decompressLoading ? 'Decompressing…' : 'Decompress'}
               </button>
             </div>
           </div>

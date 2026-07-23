@@ -68,6 +68,13 @@ export const IconLink = ({ size = 16, className }: IconProps) => (
     <path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71" />
   </svg>
 )
+export const IconArchive = ({ size = 16, className }: IconProps) => (
+  <svg {...s(size)} viewBox="0 0 24 24" fill="none" stroke="currentColor" className={className}>
+    <rect x="3" y="4" width="18" height="4" rx="1" />
+    <path d="M5 8v10a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8" />
+    <line x1="10" y1="13" x2="14" y2="13" />
+  </svg>
+)
 export const IconFolderPlus = ({ size = 16, className }: IconProps) => (
   <svg {...s(size)} viewBox="0 0 24 24" fill="none" stroke="currentColor" className={className}>
     <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z" />

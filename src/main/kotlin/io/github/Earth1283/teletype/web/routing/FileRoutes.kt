@@ -2,11 +2,14 @@ package io.github.Earth1283.teletype.web.routing
 
 import io.github.Earth1283.teletype.Teletype
 import io.github.Earth1283.teletype.web.model.CopyRequest
+import io.github.Earth1283.teletype.web.model.DecompressRequest
 import io.github.Earth1283.teletype.web.model.ErrorResponse
 import io.github.Earth1283.teletype.web.model.FetchRequest
 import io.github.Earth1283.teletype.web.model.FileEntry
 import io.github.Earth1283.teletype.web.model.RenameRequest
 import io.github.Earth1283.teletype.web.model.StatusResponse
+import org.apache.commons.compress.archivers.tar.TarArchiveInputStream
+import org.apache.commons.compress.compressors.gzip.GzipCompressorInputStream
 import io.ktor.http.ContentDisposition
 import io.ktor.http.ContentType
 import io.ktor.http.HttpHeaders
@@ -31,11 +34,14 @@ import io.ktor.server.routing.put
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import java.io.File
+import java.io.InputStream
 import java.util.concurrent.ConcurrentHashMap
+import java.util.zip.ZipInputStream
 
 private const val MAX_UPLOAD_CHUNKS = 100_000
 private val uploadAssemblyLocks = ConcurrentHashMap<String, Any>()
 private val UPLOAD_ID_PATTERN = Regex("[A-Za-z0-9._-]{8,120}")
+private const val MAX_DECOMPRESS_ENTRIES = 100_000
 
 fun Route.fileRoutes(plugin: Teletype) {
     val cfg = plugin.teletypeConfig
@@ -383,6 +389,94 @@ fun Route.fileRoutes(plugin: Teletype) {
         }
 
         call.respond(StatusResponse("fetched ${dest.name} (${dest.length()} bytes)"))
+    }
+
+    post("/decompress") {
+        val req = call.receive<DecompressRequest>()
+        val archive = resolve(req.path)
+            ?: return@post call.respond(HttpStatusCode.Forbidden, ErrorResponse("Path outside root"))
+        if (!archive.exists() || !archive.isFile)
+            return@post call.respond(HttpStatusCode.NotFound, ErrorResponse("Archive not found"))
+
+        val destDir = resolve(req.destPath)
+            ?: return@post call.respond(HttpStatusCode.Forbidden, ErrorResponse("Destination path outside root"))
+        if (destDir.exists() && !destDir.isDirectory)
+            return@post call.respond(HttpStatusCode.BadRequest, ErrorResponse("Destination is not a folder"))
+
+        val lowerName = archive.name.lowercase()
+        val isZip = lowerName.endsWith(".zip")
+        val isTarGz = lowerName.endsWith(".tar.gz") || lowerName.endsWith(".tgz")
+        if (!isZip && !isTarGz)
+            return@post call.respond(HttpStatusCode.BadRequest, ErrorResponse("Unsupported archive type (only .zip and .tar.gz/.tgz are supported)"))
+
+        val maxBytes = cfg.filesMaxDecompressSizeMb * 1024 * 1024L
+
+        val result = withContext(Dispatchers.IO) {
+            runCatching {
+                destDir.mkdirs()
+                val destRoot = destDir.canonicalFile
+                var totalBytes = 0L
+                var entryCount = 0
+
+                fun extractEntry(name: String, isDirectory: Boolean, input: InputStream) {
+                    entryCount++
+                    if (entryCount > MAX_DECOMPRESS_ENTRIES)
+                        throw java.io.IOException("Archive has too many entries (max $MAX_DECOMPRESS_ENTRIES)")
+
+                    val target = File(destRoot, name).canonicalFile
+                    if (target.path != destRoot.path && !target.path.startsWith(destRoot.path + File.separator))
+                        throw java.io.IOException("Archive entry escapes destination folder: $name")
+
+                    if (isDirectory) {
+                        target.mkdirs()
+                        return
+                    }
+                    target.parentFile?.mkdirs()
+                    target.outputStream().use { out ->
+                        val buf = ByteArray(8192)
+                        while (true) {
+                            val n = input.read(buf)
+                            if (n == -1) break
+                            totalBytes += n
+                            if (totalBytes > maxBytes)
+                                throw java.io.IOException("Archive exceeds maximum decompressed size (${cfg.filesMaxDecompressSizeMb} MB)")
+                            out.write(buf, 0, n)
+                        }
+                    }
+                }
+
+                if (isZip) {
+                    ZipInputStream(archive.inputStream()).use { zis ->
+                        var entry = zis.nextEntry
+                        while (entry != null) {
+                            extractEntry(entry.name, entry.isDirectory, zis)
+                            zis.closeEntry()
+                            entry = zis.nextEntry
+                        }
+                    }
+                } else {
+                    GzipCompressorInputStream(archive.inputStream()).use { gz ->
+                        TarArchiveInputStream(gz).use { tis ->
+                            var entry = tis.nextEntry
+                            while (entry != null) {
+                                extractEntry(entry.name, entry.isDirectory, tis)
+                                entry = tis.nextEntry
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        result.fold(
+            onSuccess = {
+                call.respond(StatusResponse("decompressed"))
+                auditAsync(plugin, "file_decompress", "${req.path} → ${req.destPath}")
+            },
+            onFailure = { e ->
+                call.respond(HttpStatusCode.BadRequest, ErrorResponse(e.message ?: "Decompression failed"))
+            }
+        )
     }
 }
 
