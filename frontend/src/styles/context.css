@@ -1,4 +1,4 @@
-/* ── Context menu ───────────────────────────────────────────── */
+/* -- Context menu --------------------------------------------- */
 .ctx-backdrop { position: fixed; inset: 0; z-index: 199; }
 .ctx-menu {
   position: fixed;
@@ -39,7 +39,7 @@
   padding: 4px 10px 2px;
 }
 
-/* ── Util ───────────────────────────────────────────────────── */
+/* -- Util ----------------------------------------------------- */
 .dim { color: var(--mist); text-align: center; padding: 40px 20px; font-size: 13px; }
 .err { color: var(--red); text-align: center; padding: 40px 20px; font-size: 13px; }
 

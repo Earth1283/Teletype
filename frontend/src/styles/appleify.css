@@ -1,10 +1,10 @@
-/* ── Appleify Easter Egg ─────────────────────────────────────────
+/* -- Appleify Easter Egg -----------------------------------------
    Apple HCI + Liquid Glass design language (iOS 26 / WWDC 2025)
    Scoped to .appleify-root — overrides Teletype tokens automatically.
    Auto-adapts to prefers-color-scheme: dark / light.
-───────────────────────────────────────────────────────────────── */
+----------------------------------------------------------------- */
 
-/* ── Apple semantic tokens (light) ──────────────────────────── */
+/* -- Apple semantic tokens (light) ---------------------------- */
 .appleify-root {
   --a-bg:          #F2F2F7;
   --a-surface:     #FFFFFF;
@@ -81,7 +81,7 @@
   animation: apple-arrive 420ms cubic-bezier(0.32, 0.72, 0, 1);
 }
 
-/* ── Dark mode tokens ────────────────────────────────────────── */
+/* -- Dark mode tokens ------------------------------------------ */
 @media (prefers-color-scheme: dark) {
   .appleify-root {
     --a-bg:          #000000;
@@ -117,7 +117,7 @@
   }
 }
 
-/* ── Liquid Glass material class ─────────────────────────────── */
+/* -- Liquid Glass material class ------------------------------- */
 .apple-glass {
   background: var(--a-glass-bg);
   backdrop-filter: blur(40px) saturate(1.8) brightness(1.04);
@@ -127,7 +127,7 @@
   box-shadow: inset 0 0.5px 0 var(--a-glass-spec);
 }
 
-/* ── Floating pill navigation bar ───────────────────────────── */
+/* -- Floating pill navigation bar ----------------------------- */
 
 /* Outer container: transparent, pointer-events: none so content
    underneath is tappable through the gap around the pill.        */
@@ -264,7 +264,7 @@
   flex-shrink: 0;
 }
 
-/* ── Main content ────────────────────────────────────────────── */
+/* -- Main content ---------------------------------------------- */
 /* top: safe area + 8px gap + 46px pill + 10px breathing room    */
 /* bot: safe area + 12px gap + 58px pill + 10px breathing room   */
 .apple-main {
@@ -276,7 +276,7 @@
   padding-bottom: calc(env(safe-area-inset-bottom, 0px) + 80px);
 }
 
-/* ── Floating pill tab bar ───────────────────────────────────── */
+/* -- Floating pill tab bar ------------------------------------- */
 .apple-tab-bar {
   position: fixed;
   bottom: calc(env(safe-area-inset-bottom, 0px) + 12px);
@@ -319,7 +319,7 @@
   }
 }
 
-/* ── Tab buttons ─────────────────────────────────────────────── */
+/* -- Tab buttons ----------------------------------------------- */
 .apple-tab-btn {
   flex: 1;
   display: flex;
@@ -386,7 +386,7 @@
   line-height: 1;
 }
 
-/* ── Collapsed pill dots ─────────────────────────────────────── */
+/* -- Collapsed pill dots --------------------------------------- */
 
 /* Nav dot — top-right corner, shows connection state */
 .apple-nav-dot {
@@ -458,7 +458,7 @@
   to   { transform: translateX(-50%) scale(1);   opacity: 1; }
 }
 
-/* ── Animations ─────────────────────────────────────────────── */
+/* -- Animations ----------------------------------------------- */
 @keyframes apple-tab-bubble {
   from {
     transform: translate(-50%, -50%) scale(0.3);
@@ -470,7 +470,7 @@
   }
 }
 
-/* ── More sheet ──────────────────────────────────────────────── */
+/* -- More sheet ------------------------------------------------ */
 .apple-sheet-scrim {
   position: fixed;
   inset: 0;
@@ -613,7 +613,7 @@
   flex-shrink: 0;
 }
 
-/* ── Appleify settings card (in Teletype SettingsPage) ───────── */
+/* -- Appleify settings card (in Teletype SettingsPage) --------- */
 .appleify-card {
   display: none; /* shown only on mobile via media query */
   margin: 0 0 16px;
@@ -653,7 +653,7 @@
   line-height: 1.5;
 }
 
-/* ── Animations ──────────────────────────────────────────────── */
+/* -- Animations ------------------------------------------------ */
 @keyframes apple-arrive {
   from {
     opacity: 0;
@@ -672,6 +672,6 @@
   50%       { opacity: 0.4; transform: scale(0.8); }
 }
 
-/* ── Scrollbar adjustments inside apple shell ────────────────── */
+/* -- Scrollbar adjustments inside apple shell ------------------ */
 .appleify-root ::-webkit-scrollbar { width: 0; }
 .appleify-root * { scrollbar-width: none; }

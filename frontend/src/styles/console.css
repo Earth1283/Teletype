@@ -1,4 +1,4 @@
-/* ── Console ────────────────────────────────────────────────── */
+/* -- Console -------------------------------------------------- */
 .console-root {
   display: flex;
   flex-direction: column;
@@ -336,7 +336,7 @@
   }
 }
 
-/* ── Light mode: the log viewport stays a dark terminal ─────────────────────
+/* -- Light mode: the log viewport stays a dark terminal ---------------------
    Server output arrives with ANSI colors tuned for dark backgrounds; the
    surrounding chrome follows the theme, the terminal itself does not. */
 :root[data-mode='light'] .console-log { background: #0D0F13; }

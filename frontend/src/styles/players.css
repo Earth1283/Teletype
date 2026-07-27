@@ -1,4 +1,4 @@
-/* ── Player list ────────────────────────────────────────────── */
+/* -- Player list ---------------------------------------------- */
 .section-root {
   padding: 24px;
   height: 100%;
@@ -100,7 +100,7 @@
 .action-btn.danger { color: var(--red); }
 .action-btn.danger:hover { background: rgba(248,113,113,.1); border-color: rgba(248,113,113,.3); }
 
-/* ── Server stats ───────────────────────────────────────────── */
+/* -- Server stats --------------------------------------------- */
 .stats-grid {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
@@ -174,7 +174,7 @@
   margin-bottom: 4px;
 }
 
-/* ── Stats page ──────────────────────────────────────────────── */
+/* -- Stats page ------------------------------------------------ */
 .stats-range-sel {
   display: flex;
   gap: 2px;
@@ -325,7 +325,7 @@
   line-height: 1.58;
 }
 
-/* ── Z-score overlay ─────────────────────────────────────────── */
+/* -- Z-score overlay ------------------------------------------- */
 .z-legend {
   display: flex;
   gap: 10px;
@@ -356,7 +356,7 @@
 }
 .glance-tooltip-logs-hint:hover { color: var(--amber-glow); }
 
-/* ── Log panel ───────────────────────────────────────────────── */
+/* -- Log panel ------------------------------------------------- */
 .stats-log-panel {
   background: var(--surface);
   border: 1px solid var(--border);
@@ -394,7 +394,7 @@
 }
 .stats-log-line:last-child { padding-bottom: 8px; }
 
-/* ── Correlation table ───────────────────────────────────────── */
+/* -- Correlation table ----------------------------------------- */
 .corr-wrap {
   background: var(--surface);
   border: 1px solid var(--border);
@@ -440,7 +440,7 @@
   transition: background 150ms;
 }
 
-/* ── Mobile ─────────────────────────────────────────────────── */
+/* -- Mobile --------------------------------------------------- */
 @media (max-width: 640px) {
   .section-root {
     padding: 12px 10px calc(18px + env(safe-area-inset-bottom, 0px));
@@ -541,7 +541,7 @@
   }
 }
 
-/* ── Player sort bar ─────────────────────────────────────────── */
+/* -- Player sort bar ------------------------------------------- */
 .player-sort-bar {
   display: flex;
   gap: 4px;
@@ -563,7 +563,7 @@
 .player-sort-btn:hover { color: var(--mist); border-color: var(--border-hi); }
 .player-sort-btn.active { color: var(--amber); border-color: var(--amber-glow); background: var(--amber-dim); }
 
-/* ── Player empty state ──────────────────────────────────────── */
+/* -- Player empty state ---------------------------------------- */
 .player-empty-state {
   display: flex;
   flex-direction: column;
@@ -590,7 +590,7 @@
   margin-top: 3px;
 }
 
-/* ── Multi-select / bulk actions ────────────────────────────────────────── */
+/* -- Multi-select / bulk actions ------------------------------------------ */
 .player-check {
   appearance: none;
   width: 14px;
@@ -653,7 +653,7 @@
 .bulk-btn.danger:hover:not(:disabled) { border-color: var(--status-critical); color: var(--status-critical); }
 .bulk-btn.clear { margin-left: auto; color: var(--ghost); }
 
-/* ── DefaultShell retheme of mac-master-* markup ─────────────────────────────
+/* -- DefaultShell retheme of mac-master-* markup -----------------------------
    PlayerList reuses the macOS master/detail classes; inside the default
    shell (.shell) they must follow the token theme, not the glass look. */
 .shell .mac-master-list { border-right: 1px solid var(--border); }

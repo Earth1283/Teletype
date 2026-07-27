@@ -1,4 +1,4 @@
-/* ── macOS Desktop (fun mode) ─────────────────────────────────────────────── */
+/* -- macOS Desktop (fun mode) ----------------------------------------------- */
 
 .mac-desktop {
   /* Fun Mode is a fixed-dark macOS chrome regardless of Teletype's own
@@ -37,7 +37,7 @@
   to   { background-position: 80px 46px, 120px 69px, 0 0, 0 0, 0 0, 0 0; }
 }
 
-/* ── Menu bar ─────────────────────────────────────────────────────────────── */
+/* -- Menu bar --------------------------------------------------------------- */
 
 .mac-menubar {
   height: 28px;
@@ -117,7 +117,7 @@
 }
 .mac-menubar-signout:hover { background: rgba(248,113,113,0.12); color: var(--red); }
 
-/* ── Desktop area ─────────────────────────────────────────────────────────── */
+/* -- Desktop area ----------------------------------------------------------- */
 
 .mac-desktop-area {
   flex: 1;
@@ -137,7 +137,7 @@
   letter-spacing: 0.01em;
 }
 
-/* ── Windows ──────────────────────────────────────────────────────────────── */
+/* -- Windows ---------------------------------------------------------------- */
 
 @keyframes mac-win-in {
   from { opacity: 0; transform: scale(0.88); }
@@ -180,7 +180,7 @@
   width: 100% !important; height: 100% !important;
 }
 
-/* ── Title bar ────────────────────────────────────────────────────────────── */
+/* -- Title bar -------------------------------------------------------------- */
 
 .mac-titlebar {
   height: 38px;
@@ -205,7 +205,7 @@
   pointer-events: none;
 }
 
-/* ── Traffic lights ───────────────────────────────────────────────────────── */
+/* -- Traffic lights --------------------------------------------------------- */
 
 .mac-traffic {
   display: flex;
@@ -256,7 +256,7 @@
 }
 .mac-window.mac-win-active .mac-titlebar-title { color: rgba(220, 220, 230, 0.88); }
 
-/* ── Window content ───────────────────────────────────────────────────────── */
+/* -- Window content --------------------------------------------------------- */
 
 .mac-window-content {
   flex: 1; min-height: 0;
@@ -266,7 +266,7 @@
   user-select: text;
 }
 
-/* ── Resize handle ────────────────────────────────────────────────────────── */
+/* -- Resize handle ---------------------------------------------------------- */
 
 .mac-resize-handle {
   position: absolute; bottom: 0; right: 0;
@@ -288,7 +288,7 @@
   );
 }
 
-/* ── App icons (squircle) ─────────────────────────────────────────────────── */
+/* -- App icons (squircle) --------------------------------------------------- */
 
 .mac-app-icon {
   width: 52px; height: 52px;
@@ -312,7 +312,7 @@
   display: block;
 }
 
-/* ── Dock ─────────────────────────────────────────────────────────────────── */
+/* -- Dock ------------------------------------------------------------------- */
 
 .mac-dock-container {
   height: 84px;
@@ -423,7 +423,7 @@
   to   { opacity: 1; transform: scale(1) translateY(0); }
 }
 
-/* ── Fun mode card (in settings) ──────────────────────────────────────────── */
+/* -- Fun mode card (in settings) -------------------------------------------- */
 
 .fun-card {
   display: flex;
@@ -463,7 +463,7 @@
   line-height: 1.5;
 }
 
-/* ── Menu bar dropdowns ───────────────────────────────────────────────────── */
+/* -- Menu bar dropdowns ----------------------------------------------------- */
 
 .mac-menu-trigger {
   position: relative;
@@ -564,7 +564,7 @@
   margin: 4px 6px;
 }
 
-/* ── About / system modals ────────────────────────────────────────────────── */
+/* -- About / system modals -------------------------------------------------- */
 
 .mac-system-overlay {
   position: fixed;
@@ -648,7 +648,7 @@
   width: 100%;
 }
 
-/* ── Segmented control ────────────────────────────────────────────────────── */
+/* -- Segmented control ------------------------------------------------------ */
 
 .mac-seg-ctrl {
   display: inline-flex;
@@ -701,7 +701,7 @@
   color: rgba(220, 220, 235, 0.88);
 }
 
-/* ── Master / detail layout (Players) ────────────────────────────────────── */
+/* -- Master / detail layout (Players) -------------------------------------- */
 
 .mac-master-detail {
   display: flex;
@@ -963,7 +963,7 @@
 
 .mac-player-action-btn.danger:hover { background: rgba(255, 59, 48, 0.15); }
 
-/* ── macOS table ──────────────────────────────────────────────────────────── */
+/* -- macOS table ------------------------------------------------------------ */
 
 .mac-tbl-wrap {
   flex: 1;
@@ -1007,7 +1007,7 @@
 .mac-tbl tbody tr:hover td { background: rgba(255, 255, 255, 0.022); }
 .mac-tbl tbody tr.ctx-active td { background: rgba(10, 132, 255, 0.1); }
 
-/* ── Empty state ──────────────────────────────────────────────────────────── */
+/* -- Empty state ------------------------------------------------------------ */
 
 .mac-empty-state {
   display: flex;
@@ -1033,7 +1033,7 @@
   color: rgba(180, 180, 200, 0.28);
 }
 
-/* ── Reduced motion ───────────────────────────────────────────────────────── */
+/* -- Reduced motion --------------------------------------------------------- */
 
 @media (prefers-reduced-motion: reduce) {
   .mac-desktop { animation: none; }

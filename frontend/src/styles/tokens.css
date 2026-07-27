@@ -1,4 +1,4 @@
-/* ── Design tokens ───────────────────────────────────────────────────────────
+/* -- Design tokens -----------------------------------------------------------
    Color VALUES live in themes.css (mode × palette on <html> data attributes).
    This file owns: legacy aliases, accent tints derived from --accent (so any
    palette stays in lockstep via color-mix), type/space/radius/z scales, the
@@ -119,7 +119,7 @@ body {
   -webkit-font-smoothing: antialiased;
 }
 
-/* ── Perforated / paper-tape divider motif ──────────────────────────────── */
+/* -- Perforated / paper-tape divider motif -------------------------------- */
 .tape-divider {
   border: none;
   height: 1px;
@@ -132,7 +132,7 @@ body {
   );
 }
 
-/* ── Scrollbar ──────────────────────────────────────────────── */
+/* -- Scrollbar ------------------------------------------------ */
 ::-webkit-scrollbar { width: 6px; height: 6px; }
 ::-webkit-scrollbar-track { background: transparent; }
 ::-webkit-scrollbar-thumb { background: var(--text-muted); border-radius: 3px; }

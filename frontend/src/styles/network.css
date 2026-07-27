@@ -1,4 +1,4 @@
-/* ── Network & Routing page ─────────────────────────────────── */
+/* -- Network & Routing page ----------------------------------- */
 .net-page {
   display: flex;
   flex-direction: column;
@@ -222,7 +222,7 @@
   flex-shrink: 0;
 }
 
-/* ── Mobile ─────────────────────────────────────────────────── */
+/* -- Mobile --------------------------------------------------- */
 @media (max-width: 640px) {
   .net-page {
     padding: 12px 10px calc(18px + env(safe-area-inset-bottom, 0px));

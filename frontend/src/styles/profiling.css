@@ -1,4 +1,4 @@
-/* ── Profiling page ──────────────────────────────────────────── */
+/* -- Profiling page -------------------------------------------- */
 .prof-page {
   display: flex;
   flex-direction: column;
@@ -67,7 +67,7 @@
   color: var(--yellow);
 }
 
-/* ── Sections ────────────────────────────────────────────────── */
+/* -- Sections -------------------------------------------------- */
 .prof-section {
   background: var(--surface);
   border: 1px solid var(--border);
@@ -100,7 +100,7 @@
   color: var(--mist);
 }
 
-/* ── Status pill ─────────────────────────────────────────────── */
+/* -- Status pill ----------------------------------------------- */
 .prof-status-pill {
   display: inline-flex;
   align-items: center;
@@ -134,7 +134,7 @@
   50%       { opacity: 0.35; }
 }
 
-/* ── Config grid ─────────────────────────────────────────────── */
+/* -- Config grid ----------------------------------------------- */
 .prof-cfg-grid {
   display: flex;
   flex-wrap: wrap;
@@ -158,7 +158,7 @@
   color: var(--ash);
 }
 
-/* ── Actions row ─────────────────────────────────────────────── */
+/* -- Actions row ----------------------------------------------- */
 .prof-actions-row {
   display: flex;
   align-items: center;
@@ -178,7 +178,7 @@
   height: 28px;
 }
 
-/* ── Active recording cards ──────────────────────────────────── */
+/* -- Active recording cards ------------------------------------ */
 .prof-active-list {
   display: flex;
   flex-direction: column;
@@ -218,7 +218,7 @@
   padding: 4px 0;
 }
 
-/* ── Saved recordings table ──────────────────────────────────── */
+/* -- Saved recordings table ------------------------------------ */
 .prof-table-wrap {
   flex: 1;
   overflow-y: auto;
@@ -291,7 +291,7 @@
   font-size: 12px;
 }
 
-/* ── Event summary modal ─────────────────────────────────────── */
+/* -- Event summary modal --------------------------------------- */
 .prof-event-modal {
   background: var(--surface);
   border: 1px solid var(--border-hi);
@@ -368,7 +368,7 @@
   border-bottom: 1px solid var(--border);
 }
 
-/* ── Lock table ──────────────────────────────────────────────── */
+/* -- Lock table ------------------------------------------------ */
 .prof-lock-table {
   width: 100%;
   border-collapse: collapse;
@@ -399,7 +399,7 @@
   color: var(--ghost);
 }
 
-/* ── Mobile ─────────────────────────────────────────────────── */
+/* -- Mobile --------------------------------------------------- */
 @media (max-width: 640px) {
   .prof-page {
     padding: 12px 10px calc(18px + env(safe-area-inset-bottom, 0px));

@@ -1,4 +1,4 @@
-/* ── Chart palettes ──────────────────────────────────────────────────────────
+/* -- Chart palettes ----------------------------------------------------------
    Separate from UI tokens on purpose: chart color is chosen for CVD-safe
    identity/magnitude/polarity, not brand matching. Values are the dataviz
    skill's validated reference set, re-checked against this app's actual

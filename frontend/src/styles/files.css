@@ -1,4 +1,4 @@
-/* ── File Manager ───────────────────────────────────────────── */
+/* -- File Manager --------------------------------------------- */
 .fm-root {
   display: flex;
   flex-direction: column;
@@ -315,7 +315,7 @@
   min-width: 0;
 }
 
-/* ── Finder sidebar ──────────────────────────────────────────────────────── */
+/* -- Finder sidebar -------------------------------------------------------- */
 
 .finder-sidebar {
   width: 178px;
@@ -404,7 +404,7 @@
   margin: 5px 10px;
 }
 
-/* ── Finder toolbar ──────────────────────────────────────────────────────── */
+/* -- Finder toolbar -------------------------------------------------------- */
 
 .finder-toolbar {
   display: flex;
@@ -473,7 +473,7 @@
 .finder-view-btn.active { background: var(--elevated); color: var(--ash); }
 .finder-view-btn:not(.active):hover { background: color-mix(in srgb, var(--text-primary) 4%, transparent); color: var(--ash); }
 
-/* ── Upload progress ─────────────────────────────────────────────────────── */
+/* -- Upload progress ------------------------------------------------------- */
 
 .fm-upload-panel {
   display: grid;
@@ -579,7 +579,7 @@
   text-align: right;
 }
 
-/* ── Finder layout ───────────────────────────────────────────────────────── */
+/* -- Finder layout --------------------------------------------------------- */
 
 .finder-body {
   display: flex;
@@ -601,7 +601,7 @@
   border-right: 1px solid var(--border);
 }
 
-/* ── Icon grid ───────────────────────────────────────────────────────────── */
+/* -- Icon grid ------------------------------------------------------------- */
 
 .finder-icon-grid {
   flex: 1;
@@ -666,7 +666,7 @@
 
 .finder-icon-item.selected .finder-icon-name { color: var(--text-primary); }
 
-/* ── Thread dump view ────────────────────────────────────────────────────── */
+/* -- Thread dump view ------------------------------------------------------ */
 
 .thread-dump-view {
   flex: 1;
@@ -830,7 +830,7 @@
   }
 }
 
-/* ── Decompress modal ─────────────────────────────────────────── */
+/* -- Decompress modal ------------------------------------------- */
 .decompress-modal {
   max-width: 440px;
 }

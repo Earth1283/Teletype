@@ -1,4 +1,4 @@
-/* ── Shell layout ───────────────────────────────────────────── */
+/* -- Shell layout --------------------------------------------- */
 .shell {
   display: flex;
   height: 100vh;
@@ -67,7 +67,7 @@ body.mobile-nav-open {
   outline-offset: 2px;
 }
 
-/* ── Sidebar ────────────────────────────────────────────────── */
+/* -- Sidebar -------------------------------------------------- */
 .sidebar {
   width: 220px;
   flex-shrink: 0;
@@ -253,7 +253,7 @@ body.mobile-nav-open {
 }
 .sidebar-logout:hover { color: var(--red); }
 
-/* ── Main content ───────────────────────────────────────────── */
+/* -- Main content --------------------------------------------- */
 .main {
   flex: 1;
   overflow: hidden;
@@ -261,7 +261,7 @@ body.mobile-nav-open {
   flex-direction: column;
 }
 
-/* ── Mobile shell (≤640px) ──────────────────────────────────── */
+/* -- Mobile shell (≤640px) ------------------------------------ */
 .mobile-header,
 .mobile-bottom-nav,
 .mobile-sheet-backdrop,
@@ -275,7 +275,7 @@ body.mobile-nav-open {
     padding-bottom: calc(58px + env(safe-area-inset-bottom, 0px));
   }
 
-  /* ── Header ──────────────────────────────────────────────── */
+  /* -- Header ------------------------------------------------ */
   .mobile-header {
     display: flex;
     align-items: center;
@@ -356,7 +356,7 @@ body.mobile-nav-open {
     color: var(--ash);
   }
 
-  /* ── Bottom tab bar ──────────────────────────────────────── */
+  /* -- Bottom tab bar ---------------------------------------- */
   .mobile-bottom-nav {
     display: flex;
     position: fixed;
@@ -416,7 +416,7 @@ body.mobile-nav-open {
     line-height: 1;
   }
 
-  /* ── More sheet ──────────────────────────────────────────── */
+  /* -- More sheet -------------------------------------------- */
   .mobile-sheet-backdrop {
     display: block;
     position: fixed;
@@ -524,7 +524,7 @@ body.mobile-nav-open {
   .mobile-sheet-signout:active { color: var(--red); background: rgba(248,113,113,0.07); }
 }
 
-/* ── Force-mobile override (same rules, class-driven) ───────── */
+/* -- Force-mobile override (same rules, class-driven) --------- */
 .shell.force-mobile { flex-direction: column; }
 .shell.force-mobile .sidebar { display: none; }
 .shell.force-mobile .main {
@@ -557,7 +557,7 @@ body.mobile-nav-open {
 }
 .shell.force-mobile .force-mobile-btn { display: none; }
 
-/* ── Toast system ────────────────────────────────────────────── */
+/* -- Toast system ---------------------------------------------- */
 .toast-container {
   position: fixed;
   bottom: 20px;
@@ -635,7 +635,7 @@ body.mobile-nav-open {
 }
 .toast-close:hover { color: var(--ash); }
 
-/* ── Error boundary ──────────────────────────────────────────── */
+/* -- Error boundary -------------------------------------------- */
 .error-boundary {
   display: flex;
   flex-direction: column;
@@ -663,7 +663,7 @@ body.mobile-nav-open {
   line-height: 1.5;
 }
 
-/* ── Skeleton loader ─────────────────────────────────────────── */
+/* -- Skeleton loader ------------------------------------------- */
 .skeleton {
   background: linear-gradient(90deg,
     var(--elevated) 25%,
@@ -675,7 +675,7 @@ body.mobile-nav-open {
   border-radius: var(--r-sm);
 }
 
-/* ── Empty state ─────────────────────────────────────────────── */
+/* -- Empty state ----------------------------------------------- */
 .empty-state {
   display: flex;
   flex-direction: column;

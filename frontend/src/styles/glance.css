@@ -1,4 +1,4 @@
-/* ── Glance Page ────────────────────────────────────────────── */
+/* -- Glance Page ---------------------------------------------- */
 .glance-root {
   display: flex;
   height: 100%;
@@ -485,7 +485,7 @@
   text-align: center;
 }
 
-/* ── Mobile (≤640px) ─────────────────────────────────────────── */
+/* -- Mobile (≤640px) ------------------------------------------- */
 @media (max-width: 640px) {
   .glance-root { flex-direction: column; }
   .glance-right { display: none; }
@@ -548,7 +548,7 @@
 }
 
 
-/* ── Error banner ───────────────────────────────────────────── */
+/* -- Error banner --------------------------------------------- */
 .glance-error-banner {
   display: flex;
   align-items: center;

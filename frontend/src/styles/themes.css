@@ -1,4 +1,4 @@
-/* ── Theme engine ────────────────────────────────────────────────────────────
+/* -- Theme engine ------------------------------------------------------------
    Two axes on <html>, applied by AppearanceApplier (App.tsx):
      data-mode  = "dark" | "light"      (resolved; "system" resolves in JS)
      data-theme = "cobalt" | "signal" | "verdant" | "iris" | "ocean" | "rose"
@@ -11,7 +11,7 @@
    "Signal" is the legacy phosphor-amber console and additionally restores
    its original near-black neutrals in dark mode.                            */
 
-/* ── Neutrals: dark (default) ─────────────────────────────────────────────── */
+/* -- Neutrals: dark (default) ----------------------------------------------- */
 :root,
 :root[data-mode='dark'] {
   color-scheme: dark;
@@ -48,7 +48,7 @@
   --shadow-lg: 0 16px 40px rgba(0, 0, 0, 0.5);
 }
 
-/* ── Neutrals: light ──────────────────────────────────────────────────────── */
+/* -- Neutrals: light -------------------------------------------------------- */
 :root[data-mode='light'] {
   color-scheme: light;
 
@@ -84,7 +84,7 @@
   --chart-div-mid: #d9d9d4;
 }
 
-/* ── Palette accents ──────────────────────────────────────────────────────── */
+/* -- Palette accents -------------------------------------------------------- */
 /* Cobalt — corporate default */
 :root,
 :root[data-theme='cobalt'] {

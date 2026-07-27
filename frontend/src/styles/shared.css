@@ -1,4 +1,4 @@
-/* ── Modal ──────────────────────────────────────────────────── */
+/* -- Modal ---------------------------------------------------- */
 .modal-overlay {
   position: fixed;
   inset: 0;
@@ -60,7 +60,7 @@
   white-space: pre-wrap;
 }
 
-/* ── Shared buttons / inputs ────────────────────────────────── */
+/* -- Shared buttons / inputs ---------------------------------- */
 .btn-primary {
   display: inline-flex;
   align-items: center;
@@ -155,7 +155,7 @@
 
 .modal-field { margin-bottom: 14px; display: flex; flex-direction: column; gap: 5px; }
 
-/* ── Audit Page ──────────────────────────────────────────────── */
+/* -- Audit Page ------------------------------------------------ */
 .audit-root {
   display: flex;
   flex-direction: column;
@@ -279,7 +279,7 @@
   }
 }
 
-/* ── Audit empty state ───────────────────────────────────────── */
+/* -- Audit empty state ----------------------------------------- */
 .audit-empty-state {
   display: flex;
   flex-direction: column;
@@ -290,7 +290,7 @@
 }
 
 
-/* ── Audit pagination ────────────────────────────────────────── */
+/* -- Audit pagination ------------------------------------------ */
 .audit-pagination {
   display: flex;
   align-items: center;
@@ -301,7 +301,7 @@
   justify-content: center;
 }
 
-/* ── Data table (default-shell pages; themed + density-aware) ──────────────── */
+/* -- Data table (default-shell pages; themed + density-aware) ---------------- */
 .data-table-wrap {
   overflow: auto;
   border: 1px solid var(--border);
@@ -338,7 +338,7 @@
 .data-table tbody tr:hover td { background: var(--accent-04); }
 .data-table tbody tr.ctx-active td { background: var(--accent-15); }
 
-/* ── DefaultShell retheme of mac-seg-* segmented controls ────────────────────
+/* -- DefaultShell retheme of mac-seg-* segmented controls --------------------
    Glance / Stats / Actions reuse the macOS segmented control markup; inside
    the default shell they follow the token theme. */
 .shell .mac-seg-ctrl {
