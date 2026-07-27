@@ -64,11 +64,16 @@ class PortForwardManager(private val plugin: Teletype) {
         client.use {
             try {
                 Socket("127.0.0.1", targetPort).use { backend ->
-                    val upstream = executor.submit { pipe(client.getInputStream(), backend.getOutputStream()) }
-                    pipe(backend.getInputStream(), client.getOutputStream())
+                    val done = java.util.concurrent.CountDownLatch(1)
+                    val upstream = executor.submit { pipe(client.getInputStream(), backend.getOutputStream()); done.countDown() }
+                    val downstream = executor.submit { pipe(backend.getInputStream(), client.getOutputStream()); done.countDown() }
+                    // Close both sockets as soon as either direction ends, so the other side
+                    // unblocks instead of leaking a thread+socket when one peer disconnects first.
+                    done.await()
                     runCatching { client.close() }
                     runCatching { backend.close() }
                     upstream.get()
+                    downstream.get()
                 }
             } catch (_: Exception) {}
         }

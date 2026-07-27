@@ -129,15 +129,21 @@ class PortMultiplexer(private val plugin: Teletype) {
                 backendOut.write(prefixBytes, 0, prefixLen)
                 backendOut.flush()
                 val pool = executor ?: return
-                val upstream = pool.submit { relay(client.getInputStream(), backendOut) }
-                relay(backend.getInputStream(), client.getOutputStream())
-                // One direction closed; close both sockets so the other relay unblocks immediately.
-                // Without this, upstream.get() blocks until the browser times out the TCP connection,
-                // which means the browser never receives a TCP close, onclose never fires, and the
-                // WebSocket never reconnects — leaving the console permanently empty.
+                val done = java.util.concurrent.CountDownLatch(1)
+                val upstream = pool.submit { relay(client.getInputStream(), backendOut); done.countDown() }
+                val downstream = pool.submit { relay(backend.getInputStream(), client.getOutputStream()); done.countDown() }
+                // Whichever direction finishes first (EOF/error) means one side is done;
+                // close both sockets so the other relay unblocks immediately instead of
+                // hanging on a half-open connection. Without this, a client that disconnects
+                // first (tab closed, WS dropped) leaves the backend-side relay thread parked
+                // forever waiting on a backend that never closes — a thread+socket leak per
+                // connection — and the browser never receives a TCP close, so onclose never
+                // fires and the WebSocket never reconnects, leaving the console permanently empty.
+                done.await()
                 runCatching { client.close() }
                 runCatching { backend.close() }
                 upstream.get()
+                downstream.get()
             }
         } catch (_: Exception) {}
     }
