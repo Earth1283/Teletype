@@ -829,3 +829,108 @@
     word-break: break-word;
   }
 }
+
+/* ── Decompress modal ─────────────────────────────────────────── */
+.decompress-modal {
+  max-width: 440px;
+}
+.decompress-header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 18px;
+}
+.decompress-header-icon {
+  flex-shrink: 0;
+  width: 34px;
+  height: 34px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: var(--r-md);
+  background: var(--amber-dim);
+  color: var(--amber);
+}
+.decompress-header-text {
+  min-width: 0;
+}
+.decompress-header-sub {
+  margin-top: 3px;
+  font-family: var(--mono);
+  font-size: 11.5px;
+  color: var(--mist);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.decompress-options {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.decompress-option {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 11px 12px;
+  border: 1px solid var(--border);
+  border-radius: var(--r-md);
+  background: var(--elevated);
+  cursor: pointer;
+  transition: border-color 120ms, background 120ms;
+}
+.decompress-option:hover { border-color: var(--border-hi); }
+.decompress-option.selected {
+  border-color: var(--amber-glow);
+  background: var(--amber-dim);
+}
+.decompress-option input[type='radio'] {
+  position: absolute;
+  opacity: 0;
+  pointer-events: none;
+}
+.decompress-option-radio {
+  flex-shrink: 0;
+  width: 15px;
+  height: 15px;
+  margin-top: 1px;
+  border-radius: 50%;
+  border: 1.5px solid var(--border-hi);
+  background: var(--void);
+  transition: border-color 120ms, background 120ms;
+  position: relative;
+}
+.decompress-option.selected .decompress-option-radio {
+  border-color: var(--amber);
+}
+.decompress-option.selected .decompress-option-radio::after {
+  content: '';
+  position: absolute;
+  inset: 3px;
+  border-radius: 50%;
+  background: var(--amber);
+}
+.decompress-option-text {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+  flex: 1;
+}
+.decompress-option-title {
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--ash);
+}
+.decompress-option-desc {
+  font-family: var(--mono);
+  font-size: 11.5px;
+  color: var(--mist);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.decompress-folder-input {
+  margin-top: 2px;
+}

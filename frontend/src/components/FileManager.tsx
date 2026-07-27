@@ -1280,27 +1280,45 @@ export default function FileManager() {
       {/* ── Decompress modal ──────────────────────────────────────────────── */}
       {modal?.type === 'decompress' && (
         <div className="modal-overlay" onClick={() => setModal(null)}>
-          <div className="modal-card" onClick={(e) => e.stopPropagation()}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 16 }}>
-              <IconArchive size={15} />
-              <div className="modal-title" style={{ margin: 0 }}>Decompress "{modal.entry.name}"</div>
+          <div className="modal-card decompress-modal" onClick={(e) => e.stopPropagation()}>
+            <div className="decompress-header">
+              <div className="decompress-header-icon"><IconArchive size={17} /></div>
+              <div className="decompress-header-text">
+                <div className="modal-title" style={{ margin: 0 }}>Decompress archive</div>
+                <div className="decompress-header-sub" title={modal.entry.name}>
+                  {modal.entry.name} · {fmtSize(modal.entry.size)}
+                </div>
+              </div>
             </div>
-            <label style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10, cursor: 'pointer' }}>
-              <input type="radio" name="decompress-mode" checked={decompressMode === 'here'}
-                onChange={() => setDecompressMode('here')} />
-              Decompress contents to current folder
-            </label>
-            <label style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8, cursor: 'pointer' }}>
-              <input type="radio" name="decompress-mode" checked={decompressMode === 'new'}
-                onChange={() => setDecompressMode('new')} />
-              Decompress to a new folder
-            </label>
-            {decompressMode === 'new' && (
-              <input className="text-input" style={{ width: '100%', marginBottom: 4 }}
-                autoFocus placeholder="New folder name"
-                value={decompressFolderName} onChange={(e) => setDecompressFolderName(e.target.value)}
-                onKeyDown={(e) => { if (e.key === 'Enter') doDecompress(); if (e.key === 'Escape') setModal(null) }} />
-            )}
+
+            <div className="decompress-options">
+              <label className={`decompress-option${decompressMode === 'here' ? ' selected' : ''}`}>
+                <input type="radio" name="decompress-mode" checked={decompressMode === 'here'}
+                  onChange={() => setDecompressMode('here')} />
+                <span className="decompress-option-radio" aria-hidden="true" />
+                <span className="decompress-option-text">
+                  <span className="decompress-option-title">Extract to current folder</span>
+                  <span className="decompress-option-desc">/{cwd || '(root)'}</span>
+                </span>
+              </label>
+              <label className={`decompress-option${decompressMode === 'new' ? ' selected' : ''}`}>
+                <input type="radio" name="decompress-mode" checked={decompressMode === 'new'}
+                  onChange={() => setDecompressMode('new')} />
+                <span className="decompress-option-radio" aria-hidden="true" />
+                <span className="decompress-option-text">
+                  <span className="decompress-option-title">Extract to a new folder</span>
+                  {decompressMode === 'new' ? (
+                    <input className="text-input decompress-folder-input" style={{ width: '100%' }}
+                      autoFocus placeholder="New folder name" onClick={(e) => e.stopPropagation()}
+                      value={decompressFolderName} onChange={(e) => setDecompressFolderName(e.target.value)}
+                      onKeyDown={(e) => { if (e.key === 'Enter') doDecompress(); if (e.key === 'Escape') setModal(null) }} />
+                  ) : (
+                    <span className="decompress-option-desc">Choose a folder name</span>
+                  )}
+                </span>
+              </label>
+            </div>
+
             <div className="modal-footer">
               <button className="pill-btn" onClick={() => setModal(null)}>Cancel</button>
               <button className="pill-btn primary" onClick={doDecompress}

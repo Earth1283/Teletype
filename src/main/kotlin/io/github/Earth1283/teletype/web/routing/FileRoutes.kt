@@ -9,6 +9,7 @@ import io.github.Earth1283.teletype.web.model.FileEntry
 import io.github.Earth1283.teletype.web.model.RenameRequest
 import io.github.Earth1283.teletype.web.model.StatusResponse
 import org.apache.commons.compress.archivers.tar.TarArchiveInputStream
+import org.apache.commons.compress.archivers.zip.ZipFile
 import org.apache.commons.compress.compressors.gzip.GzipCompressorInputStream
 import io.ktor.http.ContentDisposition
 import io.ktor.http.ContentType
@@ -36,7 +37,6 @@ import kotlinx.coroutines.withContext
 import java.io.File
 import java.io.InputStream
 import java.util.concurrent.ConcurrentHashMap
-import java.util.zip.ZipInputStream
 
 private const val MAX_UPLOAD_CHUNKS = 100_000
 private val uploadAssemblyLocks = ConcurrentHashMap<String, Any>()
@@ -410,6 +410,7 @@ fun Route.fileRoutes(plugin: Teletype) {
             return@post call.respond(HttpStatusCode.BadRequest, ErrorResponse("Unsupported archive type (only .zip and .tar.gz/.tgz are supported)"))
 
         val maxBytes = cfg.filesMaxDecompressSizeMb * 1024 * 1024L
+        val destDirExisted = destDir.exists()
 
         val result = withContext(Dispatchers.IO) {
             runCatching {
@@ -446,12 +447,16 @@ fun Route.fileRoutes(plugin: Teletype) {
                 }
 
                 if (isZip) {
-                    ZipInputStream(archive.inputStream()).use { zis ->
-                        var entry = zis.nextEntry
-                        while (entry != null) {
-                            extractEntry(entry.name, entry.isDirectory, zis)
-                            zis.closeEntry()
-                            entry = zis.nextEntry
+                    // Random-access ZipFile reads the central directory, unlike the
+                    // streaming java.util.zip.ZipInputStream — that fixes extraction
+                    // failures on zip64 archives, STORED entries written with a data
+                    // descriptor, and archives with non-UTF-8 entry names.
+                    ZipFile.builder().setFile(archive).get().use { zf ->
+                        val entries = zf.entries
+                        while (entries.hasMoreElements()) {
+                            val entry = entries.nextElement()
+                            if (entry.isUnixSymlink || entry.isDirectory.not() && !zf.canReadEntryData(entry)) continue
+                            extractEntry(entry.name, entry.isDirectory, zf.getInputStream(entry))
                         }
                     }
                 } else {
@@ -459,7 +464,11 @@ fun Route.fileRoutes(plugin: Teletype) {
                         TarArchiveInputStream(gz).use { tis ->
                             var entry = tis.nextEntry
                             while (entry != null) {
-                                extractEntry(entry.name, entry.isDirectory, tis)
+                                // Skip symlinks/hardlinks/devices/FIFOs: they aren't
+                                // regular file content, so reading them as one silently
+                                // produced empty/garbage files instead of real content.
+                                if (entry.isDirectory || (entry.isFile && tis.canReadEntryData(entry)))
+                                    extractEntry(entry.name, entry.isDirectory, tis)
                                 entry = tis.nextEntry
                             }
                         }
@@ -474,6 +483,9 @@ fun Route.fileRoutes(plugin: Teletype) {
                 auditAsync(plugin, "file_decompress", "${req.path} → ${req.destPath}")
             },
             onFailure = { e ->
+                // Clean up any partial extraction so a retry starts from a clean slate
+                // instead of merging into a half-extracted folder.
+                if (!destDirExisted) destDir.deleteRecursively()
                 call.respond(HttpStatusCode.BadRequest, ErrorResponse(e.message ?: "Decompression failed"))
             }
         )
