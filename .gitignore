@@ -30,3 +30,4 @@ run
 # Frontend build output bundled into the JAR — generated, not source
 src/main/resources/webroot/assets/
 src/main/resources/webroot/index.html
+*.log
