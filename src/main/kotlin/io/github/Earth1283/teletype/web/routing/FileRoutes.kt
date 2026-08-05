@@ -419,14 +419,10 @@ fun Route.fileRoutes(plugin: Teletype) {
                 var totalBytes = 0L
                 var entryCount = 0
 
-                fun extractEntry(name: String, isDirectory: Boolean, input: InputStream) {
+                fun extractEntry(target: File, isDirectory: Boolean, input: InputStream) {
                     entryCount++
                     if (entryCount > MAX_DECOMPRESS_ENTRIES)
                         throw java.io.IOException("Archive has too many entries (max $MAX_DECOMPRESS_ENTRIES)")
-
-                    val target = File(destRoot, name).canonicalFile
-                    if (target.path != destRoot.path && !target.path.startsWith(destRoot.path + File.separator))
-                        throw java.io.IOException("Archive entry escapes destination folder: $name")
 
                     if (isDirectory) {
                         target.mkdirs()
@@ -447,16 +443,18 @@ fun Route.fileRoutes(plugin: Teletype) {
                 }
 
                 if (isZip) {
-                    // Random-access ZipFile reads the central directory, unlike the
-                    // streaming java.util.zip.ZipInputStream — that fixes extraction
-                    // failures on zip64 archives, STORED entries written with a data
-                    // descriptor, and archives with non-UTF-8 entry names.
                     ZipFile.builder().setFile(archive).get().use { zf ->
                         val entries = zf.entries
                         while (entries.hasMoreElements()) {
                             val entry = entries.nextElement()
                             if (entry.isUnixSymlink || entry.isDirectory.not() && !zf.canReadEntryData(entry)) continue
-                            extractEntry(entry.name, entry.isDirectory, zf.getInputStream(entry))
+                            // Zip slip guard: resolve the entry against destRoot and verify the
+                            // canonicalized result is still contained within it before any write
+                            // moved here to calm code ql down
+                            val target = File(destRoot, entry.name).canonicalFile
+                            if (target.path != destRoot.path && !target.path.startsWith(destRoot.path + File.separator))
+                                throw java.io.IOException("Archive entry escapes destination folder: ${entry.name}")
+                            extractEntry(target, entry.isDirectory, zf.getInputStream(entry))
                         }
                     }
                 } else {
@@ -464,11 +462,13 @@ fun Route.fileRoutes(plugin: Teletype) {
                         TarArchiveInputStream(gz).use { tis ->
                             var entry = tis.nextEntry
                             while (entry != null) {
-                                // Skip symlinks/hardlinks/devices/FIFOs: they aren't
-                                // regular file content, so reading them as one silently
-                                // produced empty/garbage files instead of real content.
-                                if (entry.isDirectory || (entry.isFile && tis.canReadEntryData(entry)))
-                                    extractEntry(entry.name, entry.isDirectory, tis)
+                                // Skip symlinks/hardlinks/devices/FIFOs since they output garbage
+                                if (entry.isDirectory || (entry.isFile && tis.canReadEntryData(entry))) {
+                                    val target = File(destRoot, entry.name).canonicalFile
+                                    if (target.path != destRoot.path && !target.path.startsWith(destRoot.path + File.separator))
+                                        throw java.io.IOException("Archive entry escapes destination folder: ${entry.name}")
+                                    extractEntry(target, entry.isDirectory, tis)
+                                }
                                 entry = tis.nextEntry
                             }
                         }
