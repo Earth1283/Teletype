@@ -210,7 +210,31 @@ Teletype is a legitimate **Minecraft server administration panel** that:
 - ✓ No hidden configuration options
 - ✓ All features are toggleable
 
-## Possible Sources Of The Allegation
+## Why This Allegation Is Unfounded
+
+### The Irony: Anti-Malware Features
+
+A real backdoor would **not** include:
+
+1. **Comprehensive audit logging** - Every admin action logged with actor, IP, and timestamp
+   - Malware hides its activities
+   - This project explicitly logs everything
+   - Bad actors can be caught and held accountable
+
+2. **SQLite WAL mode** (Write-Ahead Logging) - Database integrity protection
+   - Malware doesn't care about data consistency
+   - This ensures audit log can't be corrupted
+   - Protects against data loss even during crashes
+
+3. **Aggressive TLS/HTTPS nagging**
+   - Frontend constantly prompts to use encryption
+   - Project documentation emphasizes security
+   - Malware would hide its communications, not encrypt them
+   - The warnings exist to protect users from themselves
+
+**These three things together are the opposite of malware.** They're proof of security-first design.
+
+### Possible Sources Of The Allegation
 
 This allegation may have arisen from:
 
@@ -224,15 +248,17 @@ This allegation may have arisen from:
    - MetricsCollector polling system stats (which is what monitoring does)
    - Socket connections (which are only to 127.0.0.1)
 
-3. **Confusion with legitimate security features:**
-   - JWT authentication (security best practice)
-   - HTTPS/TLS (security best practice)
-   - Audit logging (security best practice)
-
-4. **Unfamiliarity with Minecraft plugin development:**
+3. **Unfamiliarity with Minecraft plugin development:**
    - Reflection is common for plugin compatibility
    - Admin panels are common in Minecraft ecosystem
    - Port multiplexing is legitimate networking feature
+
+4. **Not recognizing security best practices as such:**
+   - JWT authentication (secure, doesn't leak passwords)
+   - Audit logging (catches bad actors)
+   - TLS enforcement (prevents eavesdropping)
+   - WAL mode (protects against corruption)
+   - Optional features (users control what runs)
 
 ## Recommendations
 
