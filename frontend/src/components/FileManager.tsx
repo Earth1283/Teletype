@@ -226,6 +226,7 @@ function archiveBaseName(name: string) {
 type Modal = { type: 'rename'; entry: FileEntry } | { type: 'mkdir' } | { type: 'fetch' } | { type: 'decompress'; entry: FileEntry } | null
 type UploadStatus = 'queued' | 'uploading' | 'done' | 'error'
 type FileClipboard = { action: 'copy' | 'cut'; entries: FileEntry[] } | null
+type UploadConflict = { file: File; step: 'choice' | 'rename'; renameValue: string } | null
 type PromptState = {
   title: string
   message: React.ReactNode
@@ -273,9 +274,11 @@ export default function FileManager() {
   const [uploadRunning, setUploadRunning] = useState(false)
   const [viewMode, setViewMode] = useState<'icons' | 'list'>('list')
   const [prompt, setPrompt] = useState<PromptState>(null)
+  const [conflict, setConflict] = useState<UploadConflict>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
   const uploadItemsRef = useRef<UploadItem[]>([])
   const uploadFrameRef = useRef<number | null>(null)
+  const conflictResolveRef = useRef<((file: File | null) => void) | null>(null)
   const qc = useQueryClient()
   const { settings } = useSettings()
   const { openContextMenu } = useContextMenu()
@@ -633,9 +636,46 @@ export default function FileManager() {
     } finally { setDecompressLoading(false) }
   }
 
+  function askConflict(file: File): Promise<File | null> {
+    return new Promise((resolve) => {
+      conflictResolveRef.current = resolve
+      setConflict({ file, step: 'choice', renameValue: file.name })
+    })
+  }
+
+  function resolveConflict(file: File | null) {
+    const resolve = conflictResolveRef.current
+    conflictResolveRef.current = null
+    setConflict(null)
+    resolve?.(file)
+  }
+
+  function confirmConflictRename() {
+    if (!conflict) return
+    const newName = conflict.renameValue.trim()
+    if (!newName) return
+    resolveConflict(new File([conflict.file], newName, { type: conflict.file.type, lastModified: conflict.file.lastModified }))
+  }
+
   async function upload(files: FileList | null) {
     if (!files || files.length === 0) return
-    const selectedFiles = Array.from(files)
+    const existingNames = new Set(entries.map(e => e.name))
+    const resolvedFiles: File[] = []
+    for (const file of Array.from(files)) {
+      if (existingNames.has(file.name)) {
+        const outcome = await askConflict(file)
+        if (!outcome) continue
+        existingNames.add(outcome.name)
+        resolvedFiles.push(outcome)
+      } else {
+        resolvedFiles.push(file)
+      }
+    }
+    if (resolvedFiles.length === 0) {
+      if (fileInputRef.current) fileInputRef.current.value = ''
+      return
+    }
+    const selectedFiles = resolvedFiles
     const items = selectedFiles.map((file, index) => ({
       id: `${Date.now()}-${index}-${file.name}`,
       index,
@@ -1325,6 +1365,44 @@ export default function FileManager() {
                 disabled={decompressLoading || (decompressMode === 'new' && !decompressFolderName.trim())}>
                 <IconArchive size={13} />{decompressLoading ? 'Decompressing…' : 'Decompress'}
               </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── Upload conflict modal ────────────────────────────────────────── */}
+      {conflict?.step === 'choice' && (
+        <div className="modal-overlay" onClick={() => resolveConflict(null)}>
+          <div className="modal-card" onClick={(e) => e.stopPropagation()}>
+            <div className="modal-title">File already exists</div>
+            <div className="modal-label" style={{ marginBottom: 16 }}>
+              "{conflict.file.name}" already exists in this folder. Replace the existing file, or save this upload under a different name.
+            </div>
+            <div className="modal-footer">
+              <button className="pill-btn" onClick={() => resolveConflict(null)}>Cancel</button>
+              <button className="pill-btn" onClick={() => setConflict(c => c && { ...c, step: 'rename' })}>Save As...</button>
+              <button className="pill-btn primary" onClick={() => resolveConflict(conflict.file)}>Replace</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {conflict?.step === 'rename' && (
+        <div className="modal-overlay" onClick={() => resolveConflict(null)}>
+          <div className="modal-card" onClick={(e) => e.stopPropagation()}>
+            <div className="modal-title">Save as</div>
+            <div className="modal-label">New name</div>
+            <input className="text-input" style={{ width: '100%' }} autoFocus
+              value={conflict.renameValue}
+              onFocus={(e) => {
+                const dot = conflict.renameValue.lastIndexOf('.')
+                e.target.setSelectionRange(0, dot > 0 ? dot : conflict.renameValue.length)
+              }}
+              onChange={(e) => setConflict(c => c && { ...c, renameValue: e.target.value })}
+              onKeyDown={(e) => { if (e.key === 'Enter') confirmConflictRename(); if (e.key === 'Escape') resolveConflict(null) }} />
+            <div className="modal-footer">
+              <button className="pill-btn" onClick={() => resolveConflict(null)}>Cancel</button>
+              <button className="pill-btn primary" disabled={!conflict.renameValue.trim()} onClick={confirmConflictRename}>Save</button>
             </div>
           </div>
         </div>
