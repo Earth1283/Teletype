@@ -3,7 +3,6 @@ package io.github.Earth1283.teletype.web.routing
 import io.github.Earth1283.teletype.Teletype
 import io.github.Earth1283.teletype.multiplex.PortForward
 import io.github.Earth1283.teletype.multiplex.RouteMapping
-import io.github.Earth1283.teletype.web.model.ErrorResponse
 import io.github.Earth1283.teletype.web.model.NetworkStatus
 import io.github.Earth1283.teletype.web.model.StatusResponse
 import io.ktor.http.HttpStatusCode
@@ -17,10 +16,42 @@ import io.ktor.server.routing.put
 import io.ktor.server.routing.route
 import java.util.UUID
 
+private val VALID_PORTS = 1..65535
+
 fun Route.networkRoutes(plugin: Teletype) {
     val store = plugin.routeStore
     val fwdStore = plugin.portForwardStore
     val cfg = plugin.teletypeConfig
+
+    fun validatedRoute(req: RouteMapping, id: String): RouteMapping {
+        if (!req.prefix.startsWith("/")) badRequest("Prefix must start with /")
+        if (req.shadowsPanel) badRequest("Prefix ${req.prefix} would hide the Teletype panel (/, /api, /ws, /assets are reserved)")
+        if (req.targetPort !in VALID_PORTS) badRequest("Invalid port")
+        val rateLimit = req.rateLimitPerMinute.takeIf { it > 0 } ?: cfg.networkDefaultRateLimitPerMinute
+        return req.copy(id = id, rateLimitPerMinute = rateLimit)
+    }
+
+    fun reservedPorts(): Map<Int, String> = buildMap {
+        put(cfg.port, "the Teletype web port")
+        if (cfg.tlsEnabled) put(cfg.tlsHttpsPort, "the Teletype HTTPS port")
+        put(plugin.server.port, "the Minecraft port")
+        if (cfg.multiplexGamePort) put(cfg.multiplexPort, "the multiplexer port")
+    }
+
+    fun validatedForward(req: PortForward, id: String): PortForward {
+        if (req.externalPort !in VALID_PORTS) badRequest("Invalid external port")
+        if (req.targetPort !in VALID_PORTS) badRequest("Invalid target port")
+        reservedPorts()[req.externalPort]?.let { conflict("Port ${req.externalPort} is already used by $it") }
+        fwdStore.getForwards().find { it.id != id && it.externalPort == req.externalPort }
+            ?.let { conflict("Port ${req.externalPort} is already forwarded by ${it.label.ifBlank { it.id }}") }
+        return req.copy(id = id)
+    }
+
+    fun bindOrFail(forward: PortForward) {
+        plugin.portForwardManager.bind(forward).onFailure { e ->
+            conflict("Could not listen on port ${forward.externalPort}: ${e.message ?: "bind failed"}")
+        }
+    }
 
     get("/status") {
         call.respond(NetworkStatus(
@@ -36,110 +67,64 @@ fun Route.networkRoutes(plugin: Teletype) {
     }
 
     route("/routes") {
-        get {
-            call.respond(store.getRoutes())
-        }
+        get { call.respond(store.getRoutes()) }
 
         post {
-            val req = call.receive<RouteMapping>()
-            if (req.prefix.isBlank() || !req.prefix.startsWith("/")) {
-                call.respond(HttpStatusCode.BadRequest, ErrorResponse("Prefix must start with /")); return@post
-            }
-            if (req.targetPort !in 1..65535) {
-                call.respond(HttpStatusCode.BadRequest, ErrorResponse("Invalid port")); return@post
-            }
-            if (store.getRoutes().size >= cfg.networkMaxRoutes) {
-                call.respond(HttpStatusCode.BadRequest,
-                    ErrorResponse("Route limit reached (max ${cfg.networkMaxRoutes})")); return@post
-            }
-            val effectiveRateLimit = if (req.rateLimitPerMinute <= 0)
-                cfg.networkDefaultRateLimitPerMinute else req.rateLimitPerMinute
-            val route = req.copy(id = UUID.randomUUID().toString(), rateLimitPerMinute = effectiveRateLimit)
+            if (store.getRoutes().size >= cfg.networkMaxRoutes) badRequest("Route limit reached (max ${cfg.networkMaxRoutes})")
+            val route = validatedRoute(call.receive(), UUID.randomUUID().toString())
             store.addRoute(route)
             call.respond(HttpStatusCode.Created, route)
             auditAsync(plugin, "network_route_create", "${route.prefix} → :${route.targetPort}")
         }
 
         put("/{id}") {
-            val id = call.parameters["id"]
-                ?: return@put call.respond(HttpStatusCode.BadRequest, ErrorResponse("Missing id"))
-            store.getRoute(id)
-                ?: return@put call.respond(HttpStatusCode.NotFound, ErrorResponse("Not found"))
-            val req = call.receive<RouteMapping>()
-            if (req.prefix.isBlank() || !req.prefix.startsWith("/")) {
-                call.respond(HttpStatusCode.BadRequest, ErrorResponse("Prefix must start with /")); return@put
-            }
-            if (req.targetPort !in 1..65535) {
-                call.respond(HttpStatusCode.BadRequest, ErrorResponse("Invalid port")); return@put
-            }
-            val effectiveRateLimit = if (req.rateLimitPerMinute <= 0)
-                cfg.networkDefaultRateLimitPerMinute else req.rateLimitPerMinute
-            val updated = req.copy(id = id, rateLimitPerMinute = effectiveRateLimit)
+            val id = call.pathParam("id")
+            store.getRoute(id) ?: notFound()
+            val updated = validatedRoute(call.receive(), id)
             store.updateRoute(updated)
             call.respond(updated)
             auditAsync(plugin, "network_route_update", "${updated.prefix} → :${updated.targetPort}")
         }
 
         delete("/{id}") {
-            val id = call.parameters["id"]
-                ?: return@delete call.respond(HttpStatusCode.BadRequest, ErrorResponse("Missing id"))
-            if (!store.removeRoute(id)) {
-                return@delete call.respond(HttpStatusCode.NotFound, ErrorResponse("Not found"))
-            }
+            val id = call.pathParam("id")
+            if (!store.removeRoute(id)) notFound()
             call.respond(StatusResponse("deleted"))
             auditAsync(plugin, "network_route_delete", id)
         }
     }
 
     route("/forwards") {
-        get {
-            call.respond(fwdStore.getForwards())
-        }
+        get { call.respond(fwdStore.getForwards()) }
 
         post {
-            val req = call.receive<PortForward>()
-            if (req.externalPort !in 1..65535) {
-                call.respond(HttpStatusCode.BadRequest, ErrorResponse("Invalid external port")); return@post
-            }
-            if (req.targetPort !in 1..65535) {
-                call.respond(HttpStatusCode.BadRequest, ErrorResponse("Invalid target port")); return@post
-            }
-            if (fwdStore.getForwards().size >= cfg.networkMaxPortForwards) {
-                call.respond(HttpStatusCode.BadRequest,
-                    ErrorResponse("Port forward limit reached (max ${cfg.networkMaxPortForwards})")); return@post
-            }
-            val forward = req.copy(id = java.util.UUID.randomUUID().toString())
+            if (fwdStore.getForwards().size >= cfg.networkMaxPortForwards)
+                badRequest("Port forward limit reached (max ${cfg.networkMaxPortForwards})")
+            val forward = validatedForward(call.receive(), UUID.randomUUID().toString())
+            bindOrFail(forward)
             fwdStore.addForward(forward)
-            plugin.portForwardManager.bind(forward)
             call.respond(HttpStatusCode.Created, forward)
             auditAsync(plugin, "network_forward_create", ":${forward.externalPort} → :${forward.targetPort}")
         }
 
         put("/{id}") {
-            val id = call.parameters["id"]
-                ?: return@put call.respond(HttpStatusCode.BadRequest, ErrorResponse("Missing id"))
-            fwdStore.getForward(id)
-                ?: return@put call.respond(HttpStatusCode.NotFound, ErrorResponse("Not found"))
-            val req = call.receive<PortForward>()
-            if (req.externalPort !in 1..65535) {
-                call.respond(HttpStatusCode.BadRequest, ErrorResponse("Invalid external port")); return@put
+            val id = call.pathParam("id")
+            val previous = fwdStore.getForward(id) ?: notFound()
+            val updated = validatedForward(call.receive(), id)
+            try {
+                bindOrFail(updated)
+            } catch (e: ApiException) {
+                plugin.portForwardManager.bind(previous)
+                throw e
             }
-            if (req.targetPort !in 1..65535) {
-                call.respond(HttpStatusCode.BadRequest, ErrorResponse("Invalid target port")); return@put
-            }
-            val updated = req.copy(id = id)
             fwdStore.updateForward(updated)
-            plugin.portForwardManager.bind(updated)
             call.respond(updated)
             auditAsync(plugin, "network_forward_update", ":${updated.externalPort} → :${updated.targetPort}")
         }
 
         delete("/{id}") {
-            val id = call.parameters["id"]
-                ?: return@delete call.respond(HttpStatusCode.BadRequest, ErrorResponse("Missing id"))
-            if (!fwdStore.removeForward(id)) {
-                return@delete call.respond(HttpStatusCode.NotFound, ErrorResponse("Not found"))
-            }
+            val id = call.pathParam("id")
+            if (!fwdStore.removeForward(id)) notFound()
             plugin.portForwardManager.unbind(id)
             call.respond(StatusResponse("deleted"))
             auditAsync(plugin, "network_forward_delete", id)

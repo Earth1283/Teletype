@@ -10,6 +10,9 @@ import io.ktor.server.routing.Route
 import io.ktor.server.routing.get
 
 fun Route.glanceRoutes(plugin: Teletype) {
+    fun servedFromMemory(windowMinutes: Int) =
+        windowMinutes * 60 <= plugin.teletypeConfig.metricsInMemoryWindowSeconds || !plugin.teletypeConfig.metricsSqliteEnabled
+
     get("/config") {
         val cfg = plugin.teletypeConfig
         call.respond(GlanceConfig(
@@ -32,19 +35,18 @@ fun Route.glanceRoutes(plugin: Teletype) {
     }
 
     get("/history") {
-        // window is in minutes. Larger windows use SQLite, but always merge in
-        // the live in-memory tail so partial uptime windows still chart fully.
         val window = call.request.queryParameters["window"]?.toIntOrNull()?.coerceIn(1, 525_600) ?: 5
+        val since = call.request.queryParameters["since"]?.toLongOrNull()
         val memory = plugin.metricsCollector.history(window)
-        val data = if (window <= 15) memory else mergeHistory(plugin.metricsDatabase.history(window), memory)
-        call.respond(data)
+        val data = if (servedFromMemory(window)) memory else mergeHistory(plugin.metricsDatabase.history(window), memory)
+        call.respond(if (since == null) data else data.filter { it.timestamp > since })
     }
 
     get("/gc-events") {
         val window = call.request.queryParameters["window"]?.toIntOrNull()?.coerceIn(1, 43_200) ?: 5
         val memory = plugin.metricsCollector.gcEvents(window)
         val from = System.currentTimeMillis() - window * 60_000L
-        val data = if (window <= 15 || !plugin.teletypeConfig.metricsSqliteEnabled) {
+        val data = if (servedFromMemory(window)) {
             memory
         } else {
             (plugin.metricsDatabase.gcEvents(from, System.currentTimeMillis()) + memory)

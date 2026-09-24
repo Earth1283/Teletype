@@ -60,6 +60,11 @@ server:
   # to join because Paper will read the PROXY header as invalid Minecraft data.
   forward-minecraft-player-addresses: false
 
+  # Cap on simultaneous connections through the multiplexer (players + browsers).
+  # Each connection uses two threads; new connections beyond this are refused so a
+  # connection flood can't exhaust server threads. (Only used when multiplex-game-port is true.)
+  multiplex-max-connections: 1024
+
   tls:
     # Enable HTTPS. A self-signed certificate is generated automatically on first
     # start (stored in plugins/Teletype/keystore.jks). Browsers will show a
@@ -218,6 +223,10 @@ files:
   # Guard against zip/tar bombs: decompressing an archive aborts once the total
   # uncompressed size written would exceed this many MB.
   max-decompress-size-mb: 1024
+
+  # "Fetch from URL" aborts once the download exceeds this many MB. Only public
+  # http(s) URLs are allowed; localhost, LAN and cloud-metadata addresses are refused.
+  max-fetch-size-mb: 2048
 
 # ── Profiling / Java Flight Recorder ─────────────────────────────────────────
 # JFR is built into the JVM (JDK 9+) with no extra dependencies or commercial

@@ -10,8 +10,8 @@ authors: [ Earth1283 ]
 
 commands:
   tty:
-    description: Teletype web server control
-    usage: /tty <verify|status|start|stop|reload|doctor>
+    description: Teletype web panel control — run /tty help for every subcommand
+    usage: /<command> help
     permission: teletype.admin
     aliases: ["teletype", "teletypewriter"]
 

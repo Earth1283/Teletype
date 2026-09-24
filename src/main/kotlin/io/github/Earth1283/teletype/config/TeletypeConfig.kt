@@ -2,7 +2,8 @@ package io.github.Earth1283.teletype.config
 
 import io.github.Earth1283.teletype.Teletype
 import java.io.File
-import java.util.UUID
+import java.security.SecureRandom
+import java.util.HexFormat
 
 class TeletypeConfig(private val plugin: Teletype) {
     private val config get() = plugin.config
@@ -25,6 +26,7 @@ class TeletypeConfig(private val plugin: Teletype) {
     val multiplexGamePort: Boolean get() = bool("server.multiplex-game-port", false)
     val multiplexPort: Int get() = config.getInt("server.multiplex-port", 25565)
     val forwardMinecraftPlayerAddresses: Boolean get() = bool("server.forward-minecraft-player-addresses", false)
+    val multiplexMaxConnections: Int get() = config.getInt("server.multiplex-max-connections", 1024).coerceAtLeast(1)
 
     // ── TLS ───────────────────────────────────────────────────────────────────
     val tlsEnabled: Boolean get() = bool("server.tls.enabled", false)
@@ -46,8 +48,7 @@ class TeletypeConfig(private val plugin: Teletype) {
     val jwtSecret: String by lazy {
         var secret = str("auth.jwt-secret", "jwt-secret", "")
         if (secret.isBlank()) {
-            secret = UUID.randomUUID().toString().replace("-", "") +
-                    UUID.randomUUID().toString().replace("-", "")
+            secret = generateJwtSecret()
             config.set("auth.jwt-secret", secret)
             plugin.saveConfig()
         }
@@ -101,6 +102,7 @@ class TeletypeConfig(private val plugin: Teletype) {
     val filesEditableExtensions: Set<String> get() =
         config.getStringList("files.editable-extensions").map { it.lowercase() }.toSet()
     val filesMaxDecompressSizeMb: Int get() = config.getInt("files.max-decompress-size-mb", 1024)
+    val filesMaxFetchSizeMb: Int get() = config.getInt("files.max-fetch-size-mb", 2048)
 
     // ── Network routing ───────────────────────────────────────────────────────
     val networkEnabled: Boolean get() = bool("network.enabled", true)
@@ -129,4 +131,8 @@ class TeletypeConfig(private val plugin: Teletype) {
     val anomalyTpsSigma: Double    get() = double("glance.anomaly.tps-sigma", 2.0)
     val anomalyTickSigma: Double   get() = double("glance.anomaly.tick-sigma", 2.0)
     val anomalyMemorySigma: Double get() = double("glance.anomaly.memory-sigma", 2.5)
+
+    companion object {
+        fun generateJwtSecret(): String = HexFormat.of().formatHex(ByteArray(32).also(SecureRandom()::nextBytes))
+    }
 }

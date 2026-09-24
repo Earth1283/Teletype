@@ -8,18 +8,50 @@ prefix: "<bold><aqua>Teletype</aqua></bold> <dark_gray>»</dark_gray> "
 
 # ── Lifecycle (console-only) ─────────────────────────────────────────────────
 # {version} {url}
-startup: "{prefix}<green>v{version} ready <dark_gray>—</dark_gray> <white>{url}"
+startup: "{prefix}<green>v{version} ready <dark_gray>—</dark_gray> <white>{url}</white> <dark_gray>·</dark_gray> <gray>/tty help"
 # (no placeholders)
 shutdown: "{prefix}<yellow>stopped"
 
 # ── /tty command ─────────────────────────────────────────────────────────────
 command:
-  usage: "{prefix}<yellow>Usage: <gray>/tty [verify|status|start|stop|reload|doctor]"
-  unknown-subcommand: "{prefix}<red>Unknown subcommand. <dark_gray>Usage: <gray>/tty [verify|status|start|stop|reload|doctor]"
+  # {input} {label}
+  unknown-subcommand: "{prefix}<red>Unknown subcommand <white>{input}</white>. <gray>Run <aqua>/{label} help</aqua> to see every command."
+  # {command} — clickable, fills the suggestion into chat
+  did-you-mean: "{prefix}<gray>Did you mean <aqua><u>{command}</u></aqua>?"
+
+  help:
+    # {version} {port} {state}
+    header: "{prefix}<white><bold>Commands</bold></white> <dark_gray>·</dark_gray> <gray>v{version}, web panel {state} on port {port}"
+    # {command} {usage} — the description below is appended, and the whole line is clickable
+    entry: "  <aqua>{command}</aqua> <gray>{usage}</gray> <dark_gray>— "
+    # {command}
+    hover: "<gray>Click to put <aqua>{command}</aqua> in chat"
+    # {label}
+    footer: "<dark_gray>Click a command to fill it in. <gray>/{label} help</gray> followed by a command name explains it in detail."
+    admin-only: "<dark_gray>You need to be a Teletype admin to run this one."
+    descriptions:
+      help: "<white>Show this list, or details for one command"
+      status: "<white>Show whether the web panel is running"
+      verify: "<white>Approve a web login with the code from the browser"
+      start: "<white>Start the web panel"
+      stop: "<white>Stop the web panel"
+      reload: "<white>Reload config.yml and messages.yml, then restart the panel"
+      doctor: "<white>Check ports, files, TLS and security settings"
+      revoke: "<white>Log out every web session"
+    # {label}
+    details:
+      help: "<gray>Lists every <aqua>/{label}</aqua> command you can run. Add a command name for details, e.g. <aqua>/{label} help verify</aqua>."
+      status: "<gray>Prints whether the embedded web server is running and which port it listens on."
+      verify: "<gray>Open the panel in a browser, copy the code it shows, then run <aqua>/{label} verify</aqua> followed by that code here. The browser logs in as you, and everything it does is recorded under your name in the audit log.<newline><yellow>Only approve codes you just opened yourself.</yellow>"
+      start: "<gray>Starts the web server if it was stopped with <aqua>/{label} stop</aqua>."
+      stop: "<gray>Stops the web server. Metrics, schedules and port forwards keep running."
+      reload: "<gray>Re-reads config.yml and messages.yml and restarts the web server if it was running. Some settings (metrics sampling, the multiplexer) still need a full server restart."
+      doctor: "<gray>Runs a health check: web assets, ports, TLS keystore, JWT secret, data files and security guards. Each line is PASS, WARN or FAIL."
+      revoke: "<gray>Generates a new signing secret, which invalidates every issued login and download link, and disconnects open consoles. Everyone has to <aqua>/{label} verify</aqua> again."
   no-permission: "{prefix}<red>No permission."
 
   verify:
-    no-permission: "{prefix}<red>Only operators or console can verify challenges."
+    no-permission: "{prefix}<red>Only console or Teletype admins (operators when auth.require-op is true) can verify challenges."
     teletype-denied: "{prefix}<red>For security, <white>/tty verify</white><red> cannot be run from Teletype. Use the real server console or an operator in-game."
     player-denied: "{prefix}<red>For security, players cannot run <white>/tty verify</white><red>. Use the real server console."
     # {player_ip} {http_ip}
@@ -42,6 +74,10 @@ command:
     success: "{prefix}<green>Web server started."
     # {error}
     failed: "{prefix}<red>Failed to start web server: <white>{error}"
+
+  revoke:
+    # (no placeholders)
+    success: "{prefix}<green>All web sessions revoked. Everyone must log in again with <white>/tty verify</white><green>."
 
   stop:
     not-running: "{prefix}<yellow>Web server is not running."
@@ -70,11 +106,6 @@ metrics:
   retention-done: "{prefix}<gray>Metrics retention complete."
   # {error}
   retention-failed: "{prefix}<red>Retention job failed: <white>{error}"
-
-# ── Web server (console-only) ─────────────────────────────────────────────────
-web:
-  # {error}
-  error: "{prefix}<red>Unhandled exception: <white>{error}"
 
 # ── Data file errors (console-only) ──────────────────────────────────────────
 data:

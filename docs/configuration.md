@@ -18,6 +18,7 @@ server:
   multiplex-game-port: false   # Enable single-port mux (see docs/multiplexer.md)
   multiplex-port: 25565        # Port the mux binds to when enabled
   forward-minecraft-player-addresses: false # Send HAProxy PROXY protocol to Minecraft backend
+  multiplex-max-connections: 1024 # Concurrent mux connections (players + browsers); extras are refused
 ```
 
 `cors-origins` example for a specific origin:
@@ -112,10 +113,12 @@ auth:
   jwt-secret: ""               # Auto-generated 64-char hex on first start. Changing this invalidates all active sessions.
   jwt-expiry-minutes: 1440     # 24 hours. Set 0 for non-expiring tokens.
   challenge-ttl-seconds: 300   # How long a /tty verify UUID stays valid (5 minutes)
-  require-op: true             # If true, only /op players can run /tty verify
+  require-op: true             # Players also need op (not just teletype.admin) to use /tty verify|start|stop|reload|doctor|revoke. Console is always allowed.
 ```
 
 > **Security note:** The `jwt-secret` is stored in plaintext in `config.yml`. Restrict file read access on the server.
+
+To log everyone out (for example after a laptop is lost), run `/tty revoke`. It writes a fresh `jwt-secret`, invalidates every issued token and download link, and closes open console connections.
 
 Expired challenges are swept every 30 seconds, so with a very small `challenge-ttl-seconds` a challenge may remain pollable for up to ~30 extra seconds past the configured TTL before it's actually removed.
 
@@ -146,7 +149,7 @@ metrics:
 
     retention:
       enabled: true                   # Master switch for the nightly retention job. false = rows accumulate forever.
-      downsample-1s-after-hours: 24    # 1s rows older than this are averaged → 1m rows, raw rows deleted
+      downsample-1s-after-hours: 48    # 1s rows older than this are averaged → 1m rows, raw rows deleted
       downsample-1m-after-days: 7      # 1m rows older than this are averaged → 15m rows, minute rows deleted
       delete-15m-after-days: 90        # 15m rows older than this are deleted outright
       player-events-days: 30          # Hardcoded: player join/leave events pruned at 30 days
@@ -154,23 +157,22 @@ metrics:
 
 ### Resolution tiers
 
-| Window requested | Table used | Row interval |
-|-----------------|------------|-------------|
-| ≤ 15 minutes | In-memory ring buffer | 1 second |
-| ≤ 60 minutes | SQLite `metrics_1s` | 1 second |
-| ≤ 7 days | SQLite `metrics_1m` | 1 minute |
-| > 7 days | SQLite `metrics_15m` | 15 minutes |
+| Window requested | Source | Returned resolution |
+|-----------------|--------|---------------------|
+| ≤ `in-memory-window-seconds` (15 min default) | In-memory ring buffer | 1 second |
+| ≤ 60 minutes | SQLite, all three tables | Raw rows |
+| > 60 minutes | SQLite, all three tables | ~600 averaged buckets |
 
-The ≤ 15 minute window is served entirely from RAM. Windows from 16–60 minutes read the same 1-second data from SQLite. The frontend automatically selects the appropriate tier.
+SQLite queries always read `metrics_1s`, `metrics_1m` and `metrics_15m` together. Each sample lives in exactly one table at a time, so charts have no gaps whatever the retention settings are.
 
 ### Retention schedule
 
 Set `metrics.sqlite.retention.enabled: false` to disable the job entirely — all three tables then keep every row forever (1s rows grow at roughly 86 KB/day).
 
-When enabled, the job runs once per day at midnight (server system timezone). Each of the three retention keys is read fresh from `config.yml` on every run, so changing them takes effect the next time the job fires (no restart needed) — although reload only picks up config edits made via `/tty stop` + `/tty start` or a full restart, per the note at the top of this doc. At each run it:
+When enabled, the job runs five minutes after startup and then every day at midnight (server system timezone). Each of the three retention keys is read fresh from `config.yml` on every run, so changing them takes effect the next time the job fires (no restart needed) — although reload only picks up config edits made via `/tty stop` + `/tty start` or a full restart, per the note at the top of this doc. At each run it:
 
-1. Averages 1-second rows older than `downsample-1s-after-hours` (default 48h) into `metrics_1m`, deletes the source raw rows. The averaged window is exactly the one day of rows that crossed the threshold since the previous run.
-2. Averages 1-minute rows older than `downsample-1m-after-days` (default 7d) into `metrics_15m`, deletes the source minute rows, same one-day-wide window logic.
+1. Averages **every** 1-second row older than `downsample-1s-after-hours` (default 48h) into `metrics_1m` and deletes the raw rows. Because it isn't limited to a one-day slice, days missed while the server was down are caught up on the next run.
+2. Averages every 1-minute row older than `downsample-1m-after-days` (default 7d) into `metrics_15m` and deletes the minute rows.
 3. Deletes `metrics_15m` rows older than `delete-15m-after-days` (default 90d). Set to `0` to keep 15-minute rows forever.
 4. Deletes player events and GC events older than 30 days (fixed, not configurable).
 
@@ -206,12 +208,16 @@ files:
   enabled: true                  # false = /api/files/* returns 403 Forbidden entirely
   root: "."                      # Root directory exposed. Relative to server working directory.
   max-edit-size-mb: 4            # Files larger than this open as download-only in the editor
-  editable-extensions: []        # Restrict editable extensions. Empty = auto-detect text files.
+  editable-extensions: []        # Restrict editable extensions (read and write). Empty = auto-detect text files.
+  max-decompress-size-mb: 1024   # Zip/tar bomb guard for "Decompress"
+  max-fetch-size-mb: 2048        # Size cap for "Fetch from URL"
 ```
 
 ### Path security
 
 All file operations canonicalize the requested path and verify it falls within `files.root`. Requests that would escape the root (e.g., `../../etc/passwd`) are rejected with `403 Forbidden`. This check cannot be disabled.
+
+The root folder itself can't be deleted, renamed or overwritten through the API. File search doesn't follow symlinked folders. "Fetch from URL" only downloads public `http(s)` URLs: `file:` URLs and localhost, LAN, link-local and cloud-metadata addresses are refused, and every redirect is checked again.
 
 ### `editable-extensions` example
 

@@ -20,7 +20,7 @@ class JwtServiceTest {
 
     @Test
     fun `tokens do not verify with a different secret`() {
-        val token = JwtService("first-secret").issueToken()
+        val token = JwtService("first-secret").issueToken(subject = "console")
 
         assertNull(JwtService("second-secret").verify(token))
     }
@@ -28,7 +28,7 @@ class JwtServiceTest {
     @Test
     fun `expired tokens are rejected`() {
         val service = JwtService("test-secret")
-        val token = service.issueToken(expiryMinutes = -1)
+        val token = service.issueToken(subject = "console", expiryMinutes = -1)
 
         assertNull(service.verify(token))
     }

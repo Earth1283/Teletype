@@ -1,11 +1,12 @@
 import { useEffect, useRef, useState, useMemo } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { api } from './api/client'
-import { useLogs } from './LogContext'
+import { useLogApi } from './LogContext'
 import { IconTerminal, IconZap, IconPlay, IconSearch, IconCommand } from './Icons'
 import { TABS, type Tab } from './shell/tabs'
 import { cx } from './design'
 import type { Snippet } from './components/actions/actionTypes'
+import { useQuickActionsCategoryId } from './components/actions/useActions'
 
 interface PaletteItem {
   id: string
@@ -75,7 +76,8 @@ export default function CommandPalette({ open, onClose, onNavigate }: Props) {
   const [recents, setRecents] = useState<Recent[]>([])
   const inputRef = useRef<HTMLInputElement>(null)
   const listRef = useRef<HTMLDivElement>(null)
-  const { send } = useLogs()
+  const { send } = useLogApi()
+  const quickActionsId = useQuickActionsCategoryId()
 
   const { data: snippets = [] } = useQuery<Snippet[]>({
     queryKey: ['snippets'],
@@ -147,7 +149,7 @@ export default function CommandPalette({ open, onClose, onNavigate }: Props) {
     }))
 
     const qa = snippets
-      .filter(s => s.categoryId === 'quick-actions')
+      .filter(s => s.categoryId === quickActionsId)
       .map(s => ({
         id: `qa-${s.id}`,
         label: s.name,
@@ -166,7 +168,7 @@ export default function CommandPalette({ open, onClose, onNavigate }: Props) {
       }))
 
     const other = snippets
-      .filter(s => s.categoryId !== 'quick-actions')
+      .filter(s => s.categoryId !== quickActionsId)
       .map(s => ({
         id: `snip-${s.id}`,
         label: s.name,
@@ -185,7 +187,7 @@ export default function CommandPalette({ open, onClose, onNavigate }: Props) {
       }))
 
     return [...recent, ...nav, ...qa, ...other]
-  }, [snippets, recents, consoleCmd, onNavigate, onClose, send])
+  }, [snippets, recents, consoleCmd, onNavigate, onClose, send, quickActionsId])
 
   const filtered = useMemo(() => {
     if (consoleCmd) return allItems
@@ -206,15 +208,20 @@ export default function CommandPalette({ open, onClose, onNavigate }: Props) {
   // Flat index mapping for keyboard nav
   const flatItems = useMemo(() => filtered, [filtered])
 
-  useEffect(() => { setSelectedIndex(0) }, [query])
-
-  useEffect(() => {
+  const [wasOpen, setWasOpen] = useState(open)
+  if (open !== wasOpen) {
+    setWasOpen(open)
     if (open) {
       setQuery('')
       setSelectedIndex(0)
       setRecents(loadRecents())
-      setTimeout(() => inputRef.current?.focus(), 30)
     }
+  }
+
+  useEffect(() => {
+    if (!open) return
+    const timer = setTimeout(() => inputRef.current?.focus(), 30)
+    return () => clearTimeout(timer)
   }, [open])
 
   useEffect(() => {
@@ -259,7 +266,7 @@ export default function CommandPalette({ open, onClose, onNavigate }: Props) {
             className="min-w-0 flex-1 bg-transparent font-sans text-[13px] text-text-primary placeholder:text-text-muted focus:outline-none"
             placeholder="Search commands, snippets, or type run <cmd>…"
             value={query}
-            onChange={e => setQuery(e.target.value)}
+            onChange={e => { setQuery(e.target.value); setSelectedIndex(0) }}
             spellCheck={false}
             autoComplete="off"
           />

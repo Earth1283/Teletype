@@ -4,13 +4,14 @@ import {
 } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { api } from '../api/client'
-import { useLogs } from '../LogContext'
+import { useLogApi } from '../LogContext'
 import { useContextMenu, type ContextMenuItem } from '../ContextMenu'
 import { useSettings } from '../SettingsContext'
 import { useToast } from '../ToastContext'
 import { CONTEXT_WHEEL_ACTIONS } from '../contextWheelActions'
 import type { Snippet } from '../components/actions/actionTypes'
 import { TABS, type Tab } from './tabs'
+import { useQuickActionsCategoryId } from '../components/actions/useActions'
 
 const PHONE_VIEWPORT_QUERY = '(max-width: 640px)'
 const COARSE_POINTER_QUERY = '(hover: none) and (pointer: coarse)'
@@ -106,6 +107,7 @@ function ContextWheelBinding({ tab, onNavigate, onOpenPalette }: {
   onOpenPalette: () => void
 }) {
   const { setFallbackContextMenu } = useContextMenu()
+  const quickActionsId = useQuickActionsCategoryId()
   const { settings } = useSettings()
   const { data: snippets = [] } = useQuery<Snippet[]>({
     queryKey: ['snippets'],
@@ -117,7 +119,7 @@ function ContextWheelBinding({ tab, onNavigate, onOpenPalette }: {
     const selected = settings.contextWheel.actions.length > 0
       ? settings.contextWheel.actions
       : CONTEXT_WHEEL_ACTIONS.map(a => a.id)
-    const quickActions = snippets.filter(s => s.categoryId === 'quick-actions')
+    const quickActions = snippets.filter(s => s.categoryId === quickActionsId)
 
     return selected.flatMap<ContextMenuItem>(id => {
       if (id === 'palette') {
@@ -143,7 +145,7 @@ function ContextWheelBinding({ tab, onNavigate, onOpenPalette }: {
         action: () => onNavigate(tabDef.id),
       }]
     })
-  }, [onNavigate, onOpenPalette, settings.contextWheel.actions, snippets, tab])
+  }, [onNavigate, onOpenPalette, quickActionsId, settings.contextWheel.actions, snippets, tab])
 
   useEffect(() => {
     setFallbackContextMenu(items)
@@ -162,7 +164,7 @@ export function ShellKernel({ children }: { children: ReactNode }) {
   const [forceMobile, setForceMobile] = useState(false)
   const [tpsHistory, setTpsHistory] = useState<number[]>([])
   const { settings, update } = useSettings()
-  const { connected } = useLogs()
+  const { connected } = useLogApi()
   const isPhoneViewport = useIsPhoneViewport()
   const toast = useToast()
 
@@ -171,11 +173,11 @@ export function ShellKernel({ children }: { children: ReactNode }) {
     queryFn: () => api.get('/glance/current').then(r => r.data),
     refetchInterval: 5000,
   })
-  useEffect(() => {
-    if (glanceCurrent?.tps1 != null) {
-      setTpsHistory(h => [...h.slice(-19), glanceCurrent.tps1])
-    }
-  }, [glanceCurrent])
+  const [lastSample, setLastSample] = useState(glanceCurrent)
+  if (glanceCurrent !== lastSample) {
+    setLastSample(glanceCurrent)
+    if (glanceCurrent?.tps1 != null) setTpsHistory(h => [...h.slice(-19), glanceCurrent.tps1])
+  }
 
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
@@ -219,9 +221,7 @@ export function ShellKernel({ children }: { children: ReactNode }) {
     }
   }, [mobileMoreOpen])
 
-  useEffect(() => {
-    setVisitedTabs(prev => prev.has(tab) ? prev : new Set([...prev, tab]))
-  }, [tab])
+  if (!visitedTabs.has(tab)) setVisitedTabs(new Set([...visitedTabs, tab]))
 
   useEffect(() => {
     if (isPhoneViewport && settings.fun) update({ fun: false })

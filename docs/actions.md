@@ -76,9 +76,9 @@ Runs the snippet a fixed number of times, separated by a regular interval.
 }
 ```
 
-`intervalMs`: milliseconds between executions. `repeatCount`: total number of times to run. The action is deleted after `repeatCount` executions.
+`intervalMs`: milliseconds between executions (minimum 1000). `repeatCount`: total number of times to run. After the last run the action stays in the list as paused, with `runsRemaining: 0`.
 
-### `repeat` — run forever, on interval or cron
+### `forever` — run forever, on interval or cron
 
 Runs the snippet indefinitely until paused or deleted.
 
@@ -87,7 +87,7 @@ Runs the snippet indefinitely until paused or deleted.
 {
   "snippetId": "s1",
   "label": "Hourly save",
-  "mode": "repeat",
+  "mode": "forever",
   "trigger": "interval",
   "intervalMs": 3600000
 }
@@ -98,9 +98,9 @@ Runs the snippet indefinitely until paused or deleted.
 {
   "snippetId": "s1",
   "label": "Nightly restart warning",
-  "mode": "repeat",
+  "mode": "forever",
   "trigger": "cron",
-  "cronExpr": "0 55 23 * * *"
+  "cronExpr": "55 23 * * *"
 }
 ```
 
@@ -108,29 +108,27 @@ Runs the snippet indefinitely until paused or deleted.
 
 ## Cron Expressions
 
-Teletype uses a **6-field** cron format (seconds included):
+Teletype uses the standard **5-field** cron format (minute resolution):
 
 ```
-┌───── second (0–59)
-│ ┌──── minute (0–59)
-│ │ ┌─── hour (0–23)
-│ │ │ ┌── day of month (1–31)
-│ │ │ │ ┌─ month (1–12)
-│ │ │ │ │ ┌ day of week (0–7, 0 and 7 = Sunday)
-│ │ │ │ │ │
-* * * * * *
+┌───── minute (0–59)
+│ ┌──── hour (0–23)
+│ │ ┌─── day of month (1–31)
+│ │ │ ┌── month (1–12)
+│ │ │ │ ┌─ day of week (0–7, 0 and 7 = Sunday)
+│ │ │ │ │
+* * * * *
 ```
 
 ### Examples
 
 | Expression | Meaning |
 |------------|---------|
-| `0 0 * * * *` | Every hour, on the hour |
-| `0 */30 * * * *` | Every 30 minutes |
-| `0 55 23 * * *` | Every night at 23:55:00 |
-| `0 0 8 * * 1` | Every Monday at 08:00:00 |
-| `0 0 12 1 * *` | First of every month at noon |
-| `*/30 * * * * *` | Every 30 seconds |
+| `0 * * * *` | Every hour, on the hour |
+| `*/30 * * * *` | Every 30 minutes |
+| `55 23 * * *` | Every night at 23:55 |
+| `0 8 * * 1` | Every Monday at 08:00 |
+| `0 12 1 * *` | First of every month at noon |
 
 ### Supported syntax
 
@@ -145,6 +143,14 @@ Teletype uses a **6-field** cron format (seconds included):
 Cron expressions are evaluated in the JVM's system timezone. Validation happens on save; invalid expressions are rejected with `400 Bad Request`.
 
 ---
+
+## Timing
+
+Schedules run on wall-clock time, not server ticks, so a lagging server (low TPS) doesn't push cron jobs or one-off runs later. When a schedule fires, its commands are dispatched on the main server thread. `lastRunOk` is `false` if any command in the snippet failed or the snippet no longer exists.
+
+After a restart, interval and `ntimes` schedules continue from their last run (`lastRunMs + intervalMs`) instead of starting over. A `once` action whose `runAt` passed while the server was down runs as soon as the plugin starts.
+
+Schedules look up their snippet each time they fire, so edits to a snippet apply to its schedules straight away. Deleting a snippet also deletes its schedules.
 
 ## Pause and Resume
 

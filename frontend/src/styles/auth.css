@@ -122,6 +122,17 @@
   font-size: 12px;
   color: var(--mist);
 }
+.auth-hint {
+  margin-top: 12px;
+  font-family: var(--sans);
+  font-size: 11.5px;
+  line-height: 1.5;
+  color: var(--mist);
+}
+.auth-hint code {
+  font-family: var(--mono);
+  color: var(--ash);
+}
 .auth-spinner {
   width: 14px;
   height: 14px;

@@ -129,3 +129,6 @@ data class ErrorResponse(val error: String)
 
 @Serializable
 data class StatusResponse(val status: String)
+
+@Serializable
+data class DownloadTokenResponse(val token: String, val url: String)

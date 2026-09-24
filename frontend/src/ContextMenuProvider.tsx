@@ -103,7 +103,7 @@ export function ContextMenuProvider({ children }: { children: ReactNode }) {
     }
     document.addEventListener('contextmenu', onContextMenu)
     return () => document.removeEventListener('contextmenu', onContextMenu)
-  }, [openMenuAt])
+  }, [openMenuAt, openWheelAt])
 
   useEffect(() => {
     const sectorForPointer = (event: globalThis.MouseEvent, current: ContextWheelState) => {

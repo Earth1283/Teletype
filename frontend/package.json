@@ -9,13 +9,15 @@
     "lint": "eslint .",
     "preview": "vite preview",
     "testFrontend": "concurrently -n mock,vite -c cyan,green \"node scripts/mock-server.mjs\" \"vite\"",
-    "e2e": "node scripts/e2e-mobile.mjs"
+    "e2e": "node scripts/e2e-mobile.mjs",
+    "test": "vitest run"
   },
   "dependencies": {
     "@monaco-editor/react": "^4.7.0",
     "@tanstack/react-query": "^5.101.0",
     "ansi-to-html": "^0.7.2",
     "axios": "^1.18.0",
+    "monaco-editor": "^0.55.1",
     "react": "^19.2.6",
     "react-dom": "^19.2.6",
     "react-virtuoso": "^4.18.7",
@@ -33,11 +35,13 @@
     "eslint-plugin-react-hooks": "^7.1.1",
     "eslint-plugin-react-refresh": "^0.5.2",
     "globals": "^17.6.0",
+    "jsdom": "^30.1.1",
     "puppeteer-core": "^25.2.1",
     "tailwindcss": "^4.3.2",
     "typescript": "~6.0.2",
     "typescript-eslint": "^8.59.2",
     "vite": "^8.0.12",
+    "vitest": "^5.0.1",
     "ws": "^8.21.0"
   }
 }

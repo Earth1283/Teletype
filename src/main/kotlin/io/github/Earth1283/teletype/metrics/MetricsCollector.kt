@@ -11,6 +11,8 @@ import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.withTimeoutOrNull
 import org.bukkit.Bukkit
 import org.bukkit.scheduler.BukkitRunnable
 import java.lang.management.ManagementFactory
@@ -160,29 +162,26 @@ class MetricsCollector(private val plugin: Teletype, private val db: MetricsData
                 }
             }.runTaskTimer(plugin, 0L, sampleIntervalTicks)
 
-            // Coroutine: drain the channel and write to SQLite every 15 seconds.
             if (plugin.teletypeConfig.metricsSqliteEnabled) scope.launch {
-                val batch = mutableListOf<MetricSnapshot>()
-                val gcBatch = mutableListOf<GcEvent>()
                 while (isActive) {
                     delay(flushIntervalMs)
-                    while (true) {
-                        batch += flushChannel.tryReceive().getOrNull() ?: break
-                    }
-                    while (true) {
-                        gcBatch += gcFlushChannel.tryReceive().getOrNull() ?: break
-                    }
-                    if (batch.isNotEmpty()) {
-                        db.insert(batch.toList())
-                        batch.clear()
-                    }
-                    if (gcBatch.isNotEmpty()) {
-                        db.insertGcEvents(gcBatch.toList())
-                        gcBatch.clear()
+                    try {
+                        flushPending()
+                    } catch (e: Exception) {
+                        plugin.logger.warning("[Teletype] Metrics flush failed, samples from this interval were dropped: ${e.message}")
                     }
                 }
             }
         }
+    }
+
+    private suspend fun flushPending() {
+        db.insert(drain(flushChannel))
+        db.insertGcEvents(drain(gcFlushChannel))
+    }
+
+    private fun <T> drain(channel: Channel<T>): List<T> = buildList {
+        while (true) add(channel.tryReceive().getOrNull() ?: break)
     }
 
     private fun installGcListeners() {
@@ -270,6 +269,9 @@ class MetricsCollector(private val plugin: Teletype, private val db: MetricsData
     }
 
     fun close() {
+        if (plugin.teletypeConfig.metricsSqliteEnabled) {
+            runCatching { runBlocking { withTimeoutOrNull(5_000) { flushPending() } } }
+        }
         gcListeners.forEach { (emitter, listener) ->
             runCatching { emitter.removeNotificationListener(listener) }
         }

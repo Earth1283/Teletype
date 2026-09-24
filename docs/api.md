@@ -12,6 +12,8 @@ Errors always return JSON:
 { "error": "Human-readable error message" }
 ```
 
+Validation problems return `400`, conflicts (existing files, ports in use, a file changed on disk) return `409`, and unexpected server errors return `500` with a generic message — the full stack trace goes to the server console, never to the client. Unknown `/api/...` paths return `404`; every other unknown path serves the panel so client-side routes work.
+
 > **Rate limiting order:** Spam-check runs before authentication on all routes. An IP that exceeds its rate limit never reaches JWT verification. Auth routes (`/api/auth/*`) and the WebSocket endpoint (`/ws/console`) each have their own IP-keyed limits.
 
 ---
@@ -30,7 +32,9 @@ Request a new login challenge. No authentication required.
 }
 ```
 
-Rate limited: 10 requests/minute per IP (configurable).
+Rate limited: 10 requests/minute per IP (configurable). At most 1000 challenges can be pending at once; beyond that the endpoint returns `429` until older ones expire.
+
+The issued JWT's subject is the name of whoever ran `/tty verify` (a player name, or `CONSOLE`). That name is recorded as the actor on every audit entry the session produces. Run `/tty revoke` to invalidate every issued token at once.
 
 ---
 
@@ -63,27 +67,31 @@ Long-poll: the server holds the request open for up to 30 seconds before returni
 
 ## WebSocket — Console
 
-### `GET /ws/console?token=<jwt>`
+### `GET /ws/console`
 
-Bidirectional console stream. The JWT is passed as a query parameter (browsers cannot set custom WebSocket headers).
+Bidirectional console stream. Browsers cannot set custom WebSocket headers, so the JWT is sent in the **first message** after the socket opens:
 
-Rate limited at the connection upgrade using the **auth** rate limit bucket (same as `/api/auth/*`, default 10 req/min per IP). Once connected, message exchange is not rate limited. The server closes idle connections after 60 seconds without a pong response to its 30-second ping.
+```json
+{ "type": "auth", "payload": "<jwt>", "seq": 1234, "epoch": "9d0c…" }
+```
+
+`seq` and `epoch` are optional. When a client reconnects it sends back the last `seq`/`epoch` it received and the server only replays lines it hasn't seen yet. If the plugin restarted in between (a different `epoch`), the full replay buffer is sent.
+
+The upgrade is rate limited by its own IP-keyed bucket (20/min). The server pings every 30 seconds and drops connections that miss pongs for 60 seconds. When the token expires, or `/tty revoke` is run, the server closes the socket with code `1008` and reason `Unauthorized`.
 
 **Server → Client messages:**
 
-| `type` | `payload` | Description |
-|--------|-----------|-------------|
-| `log` | Log line string | Console output. On connect, the last N lines are replayed (default 1000). |
-| `tab_complete` | JSON-encoded `string[]` | Response to a `tab_complete` request. Empty array = no completions. |
+| `type` | Fields | Description |
+|--------|--------|-------------|
+| `log_batch` | `payload`: JSON-encoded `string[]`, `seq`, `epoch` | Console output, batched every ~40 ms (max 500 lines per frame). On connect, the replay buffer (default 1000 lines) is sent the same way. Stack traces arrive as one line per frame of the trace. |
+| `tab_complete` | `payload`: JSON-encoded `string[]` | Response to a `tab_complete` request. Empty array = no completions. |
 
 **Client → Server messages:**
 
 | `type` | `payload` | Description |
 |--------|-----------|-------------|
-| `command` | Command string | Execute as console sender. Equivalent to typing in server console. |
+| `command` | Command string | Execute as console sender. Audited as `console_command`. |
 | `tab_complete` | Partial command string | Request tab completions. Server responds with a `tab_complete` message. |
-
-All messages are JSON objects: `{ "type": "...", "payload": "..." }`.
 
 Tab completions are fetched via `CommandMap.tabComplete()` on the Bukkit main thread with a 500 ms timeout. Max concurrent connections: 8 (configurable via `server.max-websocket-connections`).
 
@@ -214,20 +222,21 @@ Latest metric snapshot. Returns `503 Service Unavailable` if the sampler has not
 | `pingP50`, `pingP95` | Player ping percentiles in milliseconds. `null` if no players are online or if `Player.getPing()` is unavailable (Spigot before 1.17, or non-Paper forks). P50 is the midpoint of the sorted ping list; P95 is the 95th percentile by index. |
 | `playerCount`, `entityCount`, `loadedChunks` | Sampled once per second on the Bukkit main thread. `entityCount` and `loadedChunks` are totals across all loaded worlds. |
 
-### `GET /api/glance/history?window=<minutes>`
+### `GET /api/glance/history?window=<minutes>[&since=<ts>]`
 
 Historical metric series. `window` range: 1–525600 (1 year). Default: `5`.
 
-Returns an array of `MetricSnapshot` objects (same schema as `/glance/current`). Resolution is selected automatically:
+Returns an array of `MetricSnapshot` objects (same schema as `/glance/current`), oldest first.
 
-| `window` | Source | Interval |
-|----------|--------|----------|
-| ≤ 15 | In-memory ring buffer | 1 second |
-| ≤ 60 | SQLite `metrics_1s` | 1 second |
-| ≤ 10080 (7d) | SQLite `metrics_1m` | 1 minute |
-| > 10080 | SQLite `metrics_15m` | 15 minutes |
+| `window` | Source | Resolution |
+|----------|--------|------------|
+| ≤ `in-memory-window-seconds` (15 min default) | In-memory ring buffer | 1 second |
+| ≤ 60 | SQLite, all tiers | Raw rows (1 s where available) |
+| > 60 | SQLite, all tiers | Averaged into ~600 buckets |
 
-The ≤ 15 tier uses the in-memory ring buffer (no disk I/O). The ≤ 60 tier is the same 1-second resolution data read from SQLite, which holds up to 24 hours of raw rows before downsampling.
+Every SQLite query reads `metrics_1s`, `metrics_1m` and `metrics_15m` together, so the chart has no gaps however the retention settings are configured.
+
+`since` (Unix ms) returns only snapshots newer than that timestamp. The panel uses it to poll short windows incrementally instead of re-downloading the whole series every couple of seconds.
 
 ### `GET /api/glance/gc-events?window=<minutes>`
 
@@ -342,8 +351,8 @@ The `special: true` flag marks built-in categories (e.g., `quick-actions`) which
 | `GET` | `/api/actions/schedule` | — | List scheduled actions |
 | `POST` | `/api/actions/schedule` | `CreateScheduleRequest` | Create scheduled action. Audited. |
 | `DELETE` | `/api/actions/schedule/{id}` | — | Remove scheduled action. Audited. |
-| `PATCH` | `/api/actions/schedule/{id}/pause` | — | Pause |
-| `PATCH` | `/api/actions/schedule/{id}/resume` | — | Resume |
+| `PATCH` | `/api/actions/schedule/{id}/pause` | — | Pause. Audited. |
+| `PATCH` | `/api/actions/schedule/{id}/resume` | — | Resume. Audited. |
 
 See [actions.md](actions.md) for scheduling modes and cron format.
 
@@ -351,21 +360,30 @@ See [actions.md](actions.md) for scheduling modes and cron format.
 
 ## File Manager
 
-All paths are relative to `files.root` in `config.yml`. Path traversal (`../`) is blocked server-side. All `/api/files/*` routes return `403 Forbidden` if `files.enabled: false`.
+All paths are relative to `files.root` in `config.yml`. Paths are canonicalized server-side, so `../` traversal and symlinks pointing outside the root are rejected with `403`. The root folder itself can never be deleted, renamed or overwritten. All `/api/files/*` routes return `403 Forbidden` if `files.enabled: false`.
+
+Writes (editor saves, uploads, chunk assembly, fetches) go to a temp file first and are then renamed into place, so an interrupted write never leaves a truncated file.
 
 | Method | Path | Params | Description |
 |--------|------|--------|-------------|
 | `GET` | `/api/files/list` | `?path=` | List directory (dirs first, then alpha) |
-| `GET` | `/api/files/read` | `?path=` | Read file text (max 2 MB; binary → 415) |
-| `PUT` | `/api/files/write` | `?path=` | Write file (plain text body). Audited. |
-| `GET` | `/api/files/download` | `?path=` | Download file as attachment |
-| `POST` | `/api/files/upload` | `?path=` multipart | Upload files to directory. Audited. |
-| `POST` | `/api/files/upload-chunk` | `?path=&uploadId=&filename=&chunkIndex=&totalChunks=&totalSize=` binary body | Upload one file chunk; server assembles when all chunks arrive. Audited on completion. |
+| `GET` | `/api/files/read` | `?path=` | Read file text (limit: `files.max-edit-size-mb`; binary → 415). Returns the file's modification time in the `X-Last-Modified` header. |
+| `PUT` | `/api/files/write` | `?path=&expectedLastModified=` | Write file (plain text body). Same size and extension limits as `read`. If `expectedLastModified` is given and the file changed on disk since, returns `409`. Returns the new `X-Last-Modified`. Audited. |
+| `GET` | `/api/files/download` | `?path=` | Download file as attachment (requires the `Authorization` header) |
+| `POST` | `/api/files/download-token` | `?path=` | Returns `{"token","url"}` — a single-use link valid for 60 seconds that downloads the file without an `Authorization` header, so the browser can stream it straight to disk. Audited as `file_download`. |
+| `POST` | `/api/files/upload` | `?path=&overwrite=` multipart | Upload files to directory. Existing files are skipped unless `overwrite=true`; if every file was skipped the response is `409`. Audited. |
+| `POST` | `/api/files/upload-chunk` | `?path=&uploadId=&filename=&chunkIndex=&totalChunks=&totalSize=&overwrite=` binary body | Upload one file chunk; server assembles when all chunks arrive. `409` if the target exists and `overwrite` isn't `true`. Chunks of uploads abandoned for 24 hours are cleaned up automatically. Audited on completion. |
 | `DELETE` | `/api/files` | `?path=` | Delete file or directory recursively. Audited. |
-| `POST` | `/api/files/mkdir` | `?path=` | Create directory |
+| `POST` | `/api/files/mkdir` | `?path=` | Create directory. Audited. |
 | `PATCH` | `/api/files/rename` | — | Move/rename. Body: `{"from":"...","to":"..."}`. Audited. |
 | `POST` | `/api/files/copy` | — | Copy file or directory. Body: `{"from":"...","to":"..."}`. Audited. |
-| `POST` | `/api/files/fetch` | — | Download URL to server. Body: `{"url":"...","destPath":"...","fileName":"..."}` |
+| `GET` | `/api/files/search` | `?q=&scope=local\|global&path=&fuzzyLevel=` | Name search. Does not follow symlinked folders and stops after 50,000 entries / 200 results. |
+| `POST` | `/api/files/fetch` | — | Download a URL to the server. Body: `{"url":"...","destPath":"...","fileName":"..."}`. Only public `http(s)` URLs are accepted — `file:`, localhost, private/LAN, link-local and cloud-metadata addresses are refused, including after redirects. Size limit: `files.max-fetch-size-mb`. `409` if the target file exists. Audited. |
+| `POST` | `/api/files/decompress` | — | Extract a `.zip`/`.tar.gz` archive. Body: `{"path":"...","destPath":"..."}`. Audited. |
+
+### `GET /api/download/{token}`
+
+Redeems a download token from `/api/files/download-token` or `/api/profiling/recording/{id}/download-token`. No `Authorization` header needed; each token works once.
 
 **`FileEntry` object:**
 ```json
@@ -414,16 +432,19 @@ Query the persistent audit log.
 
 | Action | Trigger |
 |--------|---------|
+| `auth_verify` | `/tty verify` approved a web login (IP = the browser's address) |
+| `auth_revoke_all` | `/tty revoke` |
 | `execute_command` | `POST /api/execute` |
+| `console_command` | `command` message on `/ws/console` |
+| `server_restart` | `POST /api/system/restart` |
 | `run_snippet` | `POST /api/actions/execute/{id}` |
-| `schedule_create` | `POST /api/actions/schedule` |
-| `schedule_delete` | `DELETE /api/actions/schedule/{id}` |
-| `category_create` | `POST /api/actions/categories` |
-| `category_delete` | `DELETE /api/actions/categories/{id}` |
-| `file_write` | `PUT /api/files/write` |
-| `file_delete` | `DELETE /api/files` |
-| `file_rename` | `PATCH /api/files/rename` |
-| `file_copy` | `POST /api/files/copy` |
-| `file_upload` | `POST /api/files/upload` |
+| `snippet_create` / `snippet_update` / `snippet_delete` | Snippet CRUD (deleting a snippet also removes its schedules) |
+| `schedule_create` / `schedule_delete` / `schedule_pause` / `schedule_resume` | Schedule changes |
+| `category_create` / `category_delete` | Category changes |
+| `file_write` / `file_delete` / `file_rename` / `file_copy` / `file_upload` / `file_mkdir` / `file_decompress` | File manager changes |
+| `file_fetch` | `POST /api/files/fetch` |
+| `file_download` | Download token issued |
+| `network_route_*` / `network_forward_*` | Route and port-forward create/update/delete |
+| `profiling_*` | Continuous start/stop, dumps, recording start/stop/delete |
 
 The `detail` field contains action-specific context: the command run, the snippet name and vars, the file path, etc.

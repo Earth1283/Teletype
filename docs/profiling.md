@@ -48,6 +48,7 @@ All endpoints require JWT authentication (same as all other `/api` routes), and 
 | `POST` | `/api/profiling/recording/{id}/stop` | Stop a running manual recording |
 | `DELETE` | `/api/profiling/recording/{id}` | Delete a recording and its file |
 | `GET` | `/api/profiling/recording/{id}/download` | Download raw `.jfr` file |
+| `POST` | `/api/profiling/recording/{id}/download-token` | Single-use, 60-second download link (see [api.md](api.md#get-apidownloadtoken)); the file is streamed, not loaded into memory |
 | `GET` | `/api/profiling/recording/{id}/events` | Parsed event summary (GC, CPU, locks, heap) |
 
 ### `POST /api/profiling/continuous/start` body (all fields optional)

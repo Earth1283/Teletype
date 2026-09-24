@@ -5,5 +5,7 @@ import kotlinx.serialization.Serializable
 @Serializable
 data class WsMessage(
     val type: String,
-    val payload: String
+    val payload: String,
+    val seq: Long? = null,
+    val epoch: String? = null,
 )

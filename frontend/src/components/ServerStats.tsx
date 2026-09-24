@@ -1,12 +1,15 @@
 import { useState, useMemo, useCallback, memo } from 'react'
-import { useQuery } from '@tanstack/react-query'
+import { useQuery, useQueryClient } from '@tanstack/react-query'
 import {
   ComposedChart, Area, Line, XAxis, YAxis, CartesianGrid, Tooltip,
   ResponsiveContainer, ReferenceLine,
 } from 'recharts'
 import { api } from '../api/client'
+import { fetchHistory, historyQueryKey } from '../api/history'
 import { useSettings } from '../SettingsContext'
-import { useLogs } from '../LogContext'
+import { useLogApi } from '../LogContext'
+import { pointAtActiveIndex, type ChartTooltipProps } from './charts/chartTypes'
+import { usePollInterval } from '../shell/PageActivity'
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -451,28 +454,35 @@ interface MiniChartProps {
   extraLine?: { key: keyof Snap; color: string; label: string }
 }
 
+interface MiniChartTooltipProps extends ChartTooltipProps<Snap> {
+  label: string
+  dataKey: keyof Snap
+  fmt: (v: number) => string
+  extraLine?: MiniChartProps['extraLine']
+}
+
+function MiniChartTooltip({ active, payload, label, dataKey, fmt, extraLine }: MiniChartTooltipProps) {
+  const snap = payload?.[0]?.payload
+  if (!active || !snap) return null
+  return (
+    <div className="glance-tooltip">
+      <div className="glance-tooltip-time">{fmtTimeFull(snap.timestamp)}</div>
+      <div className="glance-tooltip-metrics">
+        <div className="tooltip-metric-row">
+          <span className="tm-sigma" />
+          <span className="tm-label">{label}</span>
+          <span className="tm-value">{fmt(Number(snap[dataKey] ?? 0))}</span>
+          {extraLine && <span className="tm-mean">{extraLine.label} {fmt(Number(snap[extraLine.key] ?? 0))}</span>}
+        </div>
+      </div>
+    </div>
+  )
+}
+
 const MiniChart = memo(function MiniChart({ data, dataKey, color, label, guideId, onGuide, yDomain, yFmt, events, extraLine }: MiniChartProps) {
   const fmt = yFmt ?? ((v: number) => String(v))
   const current = data[data.length - 1]
   const markers = useMemo(() => downsampleEvents(events), [events])
-
-  function ChartTooltip({ active, payload }: any) {
-    if (!active || !payload?.length) return null
-    const snap = payload[0].payload as Snap
-    return (
-      <div className="glance-tooltip">
-        <div className="glance-tooltip-time">{fmtTimeFull(snap.timestamp)}</div>
-        <div className="glance-tooltip-metrics">
-          <div className="tooltip-metric-row">
-            <span className="tm-sigma" />
-            <span className="tm-label">{label}</span>
-            <span className="tm-value">{fmt(Number(snap[dataKey] ?? 0))}</span>
-            {extraLine && <span className="tm-mean">{extraLine.label} {fmt(Number(snap[extraLine.key] ?? 0))}</span>}
-          </div>
-        </div>
-      </div>
-    )
-  }
 
   return (
     <div className="glance-chart-card">
@@ -497,7 +507,7 @@ const MiniChart = memo(function MiniChart({ data, dataKey, color, label, guideId
           <YAxis domain={yDomain ?? ['auto', 'auto']} width={38}
             tick={{ fill: 'var(--mist)', fontFamily: 'var(--mono)', fontSize: 9 }}
             tickLine={false} axisLine={false} tickCount={3} tickFormatter={fmt} />
-          <Tooltip content={<ChartTooltip />} cursor={{ stroke: 'var(--border-hi)', strokeWidth: 1 }} />
+          <Tooltip content={props => <MiniChartTooltip {...props} label={label} dataKey={dataKey} fmt={fmt} extraLine={extraLine} />} cursor={{ stroke: 'var(--border-hi)', strokeWidth: 1 }} />
           {markers.map(ev => (
             <ReferenceLine key={`${ev.ts}-${ev.uuid}`} x={ev.ts}
               stroke={ev.action === 'join' ? 'var(--green)' : 'var(--red)'}
@@ -524,6 +534,55 @@ interface ZSeries {
   label: string
   color: string
   extract?: (s: Snap) => number | null
+}
+
+function zScoreOf(pt: Record<string, unknown>, key: keyof Snap): number | null {
+  const v = pt[`z_${String(key)}`]
+  return typeof v === 'number' && isFinite(v) ? v : null
+}
+
+interface ZScoreTooltipProps extends ChartTooltipProps<Record<string, unknown> & { _snap: Snap }> {
+  series: ZSeries[]
+  threshold: number
+  showMarkers: boolean
+  onAnomalyClick: (ts: number) => void
+}
+
+function ZScoreTooltip({ active, payload, series, threshold, showMarkers, onAnomalyClick }: ZScoreTooltipProps) {
+  const pt = payload?.[0]?.payload
+  if (!active || !pt) return null
+  const snap = pt._snap
+  return (
+    <div className="glance-tooltip">
+      <div className="glance-tooltip-time">{fmtTimeFull(snap.timestamp)}</div>
+      <div className="glance-tooltip-metrics">
+        {series.map(s => {
+          const z = zScoreOf(pt, s.key)
+          if (z === null) return null
+          const isAnomaly = Math.abs(z) >= threshold
+          return (
+            <div key={String(s.key)} className={`tooltip-metric-row${isAnomaly ? ' anomaly' : ''}`}>
+              <span className="tm-sigma" style={{ color: s.color }}>
+                {isAnomaly ? (z > 0 ? '+' : '') + z.toFixed(1) + 'σ' : ''}
+              </span>
+              <span className="tm-label">{s.label}</span>
+              <span className="tm-value" style={{ color: isAnomaly ? s.color : undefined }}>
+                {z > 0 ? '+' : ''}{z.toFixed(2)}σ
+              </span>
+            </div>
+          )
+        })}
+      </div>
+      {showMarkers && series.some(s => {
+        const z = zScoreOf(pt, s.key)
+        return z !== null && Math.abs(z) >= threshold
+      }) && (
+        <div className="glance-tooltip-logs-hint" onClick={() => onAnomalyClick(snap.timestamp)}>
+          ⚡ Click to see nearby logs
+        </div>
+      )}
+    </div>
+  )
 }
 
 interface ZOverlayProps {
@@ -556,63 +615,16 @@ const ZOverlay = memo(function ZOverlay({ data, series, title, guideId, showMark
     })
   }, [data, series])
 
-  function getZVal(pt: Record<string, unknown>, key: keyof Snap): number | null {
-    const v = pt[`z_${String(key)}`]
-    return typeof v === 'number' && isFinite(v) ? v : null
-  }
-
   // Find anomaly timestamps (any series exceeds threshold)
   const anomalyTs = useMemo(() => {
     if (!showMarkers) return []
     return zData
       .filter(pt => series.some(s => {
-        const z = getZVal(pt, s.key)
+        const z = zScoreOf(pt, s.key)
         return z !== null && Math.abs(z) >= threshold
       }))
       .map(pt => pt.timestamp as number)
   }, [zData, series, showMarkers, threshold])
-
-  function getZ(pt: Record<string, unknown>, key: keyof Snap): number | null {
-    const v = pt[`z_${String(key)}`]
-    return typeof v === 'number' && isFinite(v) ? v : null
-  }
-
-  function ZTooltip({ active, payload }: any) {
-    if (!active || !payload?.length) return null
-    const pt = payload[0].payload as Record<string, unknown> & { _snap: Snap }
-    const snap = pt._snap
-    return (
-      <div className="glance-tooltip">
-        <div className="glance-tooltip-time">{fmtTimeFull(snap.timestamp)}</div>
-        <div className="glance-tooltip-metrics">
-          {series.map(s => {
-            const z = getZ(pt, s.key)
-            if (z === null) return null
-            const isAnomaly = Math.abs(z) >= threshold
-            return (
-              <div key={String(s.key)} className={`tooltip-metric-row${isAnomaly ? ' anomaly' : ''}`}>
-                <span className="tm-sigma" style={{ color: s.color }}>
-                  {isAnomaly ? (z > 0 ? '+' : '') + z.toFixed(1) + 'σ' : ''}
-                </span>
-                <span className="tm-label">{s.label}</span>
-                <span className="tm-value" style={{ color: isAnomaly ? s.color : undefined }}>
-                  {z > 0 ? '+' : ''}{z.toFixed(2)}σ
-                </span>
-              </div>
-            )
-          })}
-        </div>
-        {showMarkers && series.some(s => {
-          const z = getZ(pt, s.key)
-          return z !== null && Math.abs(z) >= threshold
-        }) && (
-          <div className="glance-tooltip-logs-hint" onClick={() => onAnomalyClick(snap.timestamp)}>
-            ⚡ Click to see nearby logs
-          </div>
-        )}
-      </div>
-    )
-  }
 
   if (data.length < 3) return null
 
@@ -632,11 +644,11 @@ const ZOverlay = memo(function ZOverlay({ data, series, title, guideId, showMark
       </div>
       <ResponsiveContainer width="100%" height={140}>
         <ComposedChart data={zData} margin={{ top: 4, right: 8, bottom: 0, left: 0 }}
-          onClick={(e: any) => {
-            const pt = e?.activePayload?.[0]?.payload as Record<string, unknown> | undefined
+          onClick={(state) => {
+            const pt = pointAtActiveIndex(zData, state)
             if (pt && showMarkers) {
               const hasAnomaly = series.some(s => {
-                const z = getZVal(pt, s.key)
+                const z = zScoreOf(pt, s.key)
                 return z !== null && Math.abs(z) >= threshold
               })
               if (hasAnomaly) onAnomalyClick(pt.timestamp as number)
@@ -652,7 +664,7 @@ const ZOverlay = memo(function ZOverlay({ data, series, title, guideId, showMark
             tick={{ fill: 'var(--mist)', fontFamily: 'var(--mono)', fontSize: 9 }}
             tickLine={false} axisLine={false} tickCount={5}
             tickFormatter={v => `${v > 0 ? '+' : ''}${v.toFixed(0)}σ`} />
-          <Tooltip content={<ZTooltip />} cursor={{ stroke: 'var(--border-hi)', strokeWidth: 1 }} />
+          <Tooltip content={props => <ZScoreTooltip {...props} series={series} threshold={threshold} showMarkers={showMarkers} onAnomalyClick={onAnomalyClick} />} cursor={{ stroke: 'var(--border-hi)', strokeWidth: 1 }} />
 
           {/* threshold bands */}
           <ReferenceLine y={threshold} stroke="var(--red)" strokeOpacity={0.25} strokeDasharray="3 3" strokeWidth={1} />
@@ -830,7 +842,8 @@ interface Props { onNavigate?: (tab: string) => void }
 
 export default function ServerStats({ onNavigate }: Props) {
   const { settings, update } = useSettings()
-  const { getLogsAround } = useLogs()
+  const { getLogsAround } = useLogApi()
+  const qc = useQueryClient()
   const ss = settings.stats
   const [range, setRange] = useState<Range>(ss.defaultRange)
   const [logPanelTs, setLogPanelTs] = useState<number | null>(null)
@@ -839,27 +852,27 @@ export default function ServerStats({ onNavigate }: Props) {
   const { data, isLoading } = useQuery<Status>({
     queryKey: ['status'],
     queryFn: () => api.get('/status').then(r => r.data),
-    refetchInterval: 3000,
+    refetchInterval: usePollInterval(3000),
   })
 
   const { data: snap } = useQuery<Snap>({
     queryKey: ['glance-current'],
     queryFn: () => api.get('/glance/current').then(r => r.data),
-    refetchInterval: 2000,
+    refetchInterval: usePollInterval(2000),
   })
 
   const windowMin = RANGE_MINUTES[range]
 
   const { data: historyRaw = [] } = useQuery<Snap[]>({
-    queryKey: ['stats-history', windowMin],
-    queryFn: () => api.get(`/glance/history?window=${windowMin}`).then(r => r.data),
-    refetchInterval: 30_000,
+    queryKey: historyQueryKey(windowMin),
+    queryFn: () => fetchHistory<Snap>(qc, windowMin),
+    refetchInterval: usePollInterval(30_000),
   })
 
   const { data: eventsRaw = [] } = useQuery<PlayerEvent[]>({
     queryKey: ['player-events', windowMin],
     queryFn: () => api.get(`/stats/player-events?minutes=${windowMin}`).then(r => r.data),
-    refetchInterval: 30_000,
+    refetchInterval: usePollInterval(30_000),
     enabled: ss.showChartPlayers,
   })
 

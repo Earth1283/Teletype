@@ -14,6 +14,7 @@ import {
   TeletypeLogo, IconLogOut, IconChevronLeft, IconChevronRight, IconCommand, IconDots,
   IconSearch, IconZap,
 } from '../Icons'
+import { useQuickActionsCategoryId } from '../components/actions/useActions'
 
 function LogoutButton({ onLogout }: { onLogout: () => void }) {
   return (
@@ -30,12 +31,13 @@ function LogoutButton({ onLogout }: { onLogout: () => void }) {
 /* Up to three parameterless quick-action snippets, one click from anywhere */
 function TopbarQuickActions() {
   const toast = useToast()
+  const quickActionsId = useQuickActionsCategoryId()
   const { data: snippets = [] } = useQuery<Snippet[]>({
     queryKey: ['snippets'],
     queryFn: () => api.get('/actions/snippets').then(r => r.data),
     staleTime: 60_000,
   })
-  const pinned = snippets.filter(s => s.categoryId === 'quick-actions' && s.vars.length === 0).slice(0, 3)
+  const pinned = snippets.filter(s => s.categoryId === quickActionsId && s.vars.length === 0).slice(0, 3)
   if (pinned.length === 0) return null
   return (
     <span className="flex items-center gap-1.5">

@@ -1,12 +1,13 @@
 import { useState, useMemo, useRef } from 'react'
 import { useQuery } from '@tanstack/react-query'
-import { api } from '../api/client'
+import { api, apiError } from '../api/client'
 import { useContextMenu } from '../ContextMenu'
 import { useToast } from '../ToastContext'
 import { writeClipboard } from '../clipboard'
 import { IconRefresh } from '../Icons'
 import PromptModal, { type PromptVariant } from './PromptModal'
 import { Skeleton } from '../Skeleton'
+import { usePollInterval } from '../shell/PageActivity'
 
 interface Player {
   name: string
@@ -77,7 +78,7 @@ export default function PlayerList() {
   const { data, isLoading, error, refetch, isFetching } = useQuery<Player[]>({
     queryKey: ['players'],
     queryFn: () => api.get('/players').then((r) => r.data),
-    refetchInterval: 5000,
+    refetchInterval: usePollInterval(5000),
   })
   const [selected, setSelected] = useState<string | null>(null)
   const [sortBy, setSortBy] = useState<SortKey>('name')
@@ -99,8 +100,8 @@ export default function PlayerList() {
     try {
       await api.post('/execute', { command })
       if (successMsg) toast.success(successMsg)
-    } catch (e: any) {
-      const msg = e.response?.data?.error ?? `Command failed: ${command}`
+    } catch (e) {
+      const msg = apiError(e, `Command failed: ${command}`)
       toast.error(msg)
       showPrompt('Command failed', msg, 'error')
       throw e

@@ -8,6 +8,8 @@ import jdk.jfr.RecordingState
 import jdk.jfr.consumer.RecordedObject
 import jdk.jfr.consumer.RecordingFile
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 import java.io.File
 import java.time.Duration
@@ -28,6 +30,7 @@ class JfrManager(private val plugin: Teletype) {
     private val recordings = ConcurrentHashMap<String, JfrRecording>()
     private val activeManual = ConcurrentHashMap<String, Recording>()
     private val parseCache = ConcurrentHashMap<String, ParsedProfile>()
+    private val parseLocks = ConcurrentHashMap<String, Mutex>()
 
     val isAvailable: Boolean get() = jfrAvailable
 
@@ -149,8 +152,6 @@ class JfrManager(private val plugin: Teletype) {
     }
 
     fun stopContinuous() = lock.withLock {
-        // The next line should not even be shown because it requires startContinuous to even call this function
-        // But it's still here
         check(jfrAvailable) { "JFR not available on this JVM" }
         continuousRecording?.stop()
         continuousRecording?.close()
@@ -236,6 +237,7 @@ class JfrManager(private val plugin: Teletype) {
         val rec = recordings.remove(id) ?: return false
         activeManual.remove(id)?.let { r -> runCatching { r.stop(); r.close() } }
         parseCache.remove(id)
+        parseLocks.remove(id)
         runCatching { File(rec.path).delete() }
         return true
     }
@@ -264,8 +266,14 @@ class JfrManager(private val plugin: Teletype) {
         return File(rec.path).takeIf { it.exists() }
     }
 
-    suspend fun parseEvents(id: String): ParsedProfile = withContext(Dispatchers.IO) {
-        parseCache[id]?.let { return@withContext it }
+    suspend fun parseEvents(id: String): ParsedProfile {
+        parseCache[id]?.let { return it }
+        return parseLocks.computeIfAbsent(id) { Mutex() }.withLock {
+            parseCache[id] ?: withContext(Dispatchers.IO) { parseRecording(id) }.also { parseCache[id] = it }
+        }
+    }
+
+    private fun parseRecording(id: String): ParsedProfile {
 
         val rec = checkNotNull(recordings[id]) { "Recording $id not found" }
         check(rec.status == RecordingStatus.COMPLETE) { "Recording $id is not complete yet" }
@@ -327,7 +335,7 @@ class JfrManager(private val plugin: Teletype) {
         val firstMs = gcPauses.firstOrNull()?.startMs ?: cpuSamples.firstOrNull()?.timeMs ?: 0L
         val lastMs = gcPauses.lastOrNull()?.startMs ?: cpuSamples.lastOrNull()?.timeMs ?: 0L
 
-        val result = ParsedProfile(
+        return ParsedProfile(
             durationMs = if (lastMs > firstMs) lastMs - firstMs else 0L,
             gcPauses = gcPauses,
             cpuSamples = cpuSamples,
@@ -335,8 +343,6 @@ class JfrManager(private val plugin: Teletype) {
             heapSummary = lastHeap,
             threadCount = maxThreadCount,
         )
-        parseCache[id] = result
-        result
     }
 
     private fun evictOldManualIfNeeded() {

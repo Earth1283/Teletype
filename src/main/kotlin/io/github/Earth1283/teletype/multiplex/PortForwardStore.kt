@@ -1,52 +1,16 @@
 package io.github.Earth1283.teletype.multiplex
 
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.withContext
-import kotlinx.serialization.encodeToString
-import kotlinx.serialization.json.Json
+import io.github.Earth1283.teletype.util.JsonListStore
 import java.io.File
-import java.util.concurrent.CopyOnWriteArrayList
+import java.util.logging.Logger
 
-class PortForwardStore(private val dataFolder: File) {
-    private val file = File(dataFolder, "port-forwards.json")
-    private val forwards = CopyOnWriteArrayList<PortForward>()
-    private val json = Json { prettyPrint = true; ignoreUnknownKeys = true }
+class PortForwardStore(dataFolder: File, logger: Logger? = null) {
+    private val store = JsonListStore(File(dataFolder, "port-forwards.json"), PortForward.serializer(), PortForward::id, logger)
 
-    fun load() {
-        if (!file.exists()) return
-        runCatching {
-            val list = json.decodeFromString<List<PortForward>>(file.readText())
-            forwards.clear()
-            forwards.addAll(list)
-        }
-    }
-
-    fun getForwards(): List<PortForward> = forwards.toList()
-
-    fun getForward(id: String): PortForward? = forwards.find { it.id == id }
-
-    suspend fun addForward(forward: PortForward) {
-        forwards.add(forward)
-        save()
-    }
-
-    suspend fun updateForward(forward: PortForward): Boolean {
-        val idx = forwards.indexOfFirst { it.id == forward.id }
-        if (idx == -1) return false
-        forwards[idx] = forward
-        save()
-        return true
-    }
-
-    suspend fun removeForward(id: String): Boolean {
-        val removed = forwards.removeIf { it.id == id }
-        if (removed) save()
-        return removed
-    }
-
-    // Off the Ktor request thread — every forward mutation rewrites the whole file.
-    private suspend fun save() = withContext(Dispatchers.IO) {
-        dataFolder.mkdirs()
-        file.writeText(json.encodeToString(forwards.toList()))
-    }
+    fun load() = store.load()
+    fun getForwards(): List<PortForward> = store.all()
+    fun getForward(id: String): PortForward? = store.find(id)
+    suspend fun addForward(forward: PortForward) = store.add(forward)
+    suspend fun updateForward(forward: PortForward): Boolean = store.update(forward)
+    suspend fun removeForward(id: String): Boolean = store.remove(id)
 }

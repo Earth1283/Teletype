@@ -7,6 +7,8 @@ import io.github.Earth1283.teletype.config.TeletypeConfig
 import io.github.Earth1283.teletype.util.TeletypeCommandOrigin
 import net.kyori.adventure.text.Component
 import net.kyori.adventure.text.TextComponent
+import net.kyori.adventure.text.event.ClickEvent
+import net.kyori.adventure.text.event.HoverEvent
 import net.kyori.adventure.text.format.NamedTextColor
 import net.kyori.adventure.text.format.TextDecoration
 import org.bukkit.command.Command
@@ -25,24 +27,70 @@ class TtyCommand(private val plugin: Teletype) : CommandExecutor, TabCompleter {
     private enum class Level { PASS, WARN, FAIL }
 
     override fun onCommand(sender: CommandSender, command: Command, label: String, args: Array<String>): Boolean {
-        if (args.isEmpty()) {
-            plugin.messages.send(sender, "command.usage")
-            return true
-        }
-        when (args[0].lowercase()) {
-            "verify" -> handleVerify(sender, args)
-            "status" -> handleStatus(sender)
-            "start"  -> handleStart(sender)
-            "stop"   -> handleStop(sender)
-            "reload" -> handleReload(sender)
-            "doctor" -> handleDoctor(sender)
-            else     -> plugin.messages.send(sender, "command.unknown-subcommand")
+        val subcommand = args.firstOrNull()?.let { TtySubcommand.find(it) }
+        when {
+            args.isEmpty() -> sendHelpMenu(sender, label)
+            subcommand == null -> sendUnknownSubcommand(sender, label, args[0])
+            else -> when (subcommand) {
+                TtySubcommand.HELP   -> handleHelp(sender, label, args.getOrNull(1))
+                TtySubcommand.VERIFY -> handleVerify(sender, args)
+                TtySubcommand.STATUS -> handleStatus(sender)
+                TtySubcommand.START  -> handleStart(sender)
+                TtySubcommand.STOP   -> handleStop(sender)
+                TtySubcommand.RELOAD -> handleReload(sender)
+                TtySubcommand.DOCTOR -> handleDoctor(sender)
+                TtySubcommand.REVOKE -> handleRevoke(sender)
+            }
         }
         return true
     }
 
+    private fun availableSubcommands(sender: CommandSender): List<TtySubcommand> =
+        TtySubcommand.entries.filter { !it.requiresAdmin || isAuthorizedAdmin(sender) }
+
+    private fun handleHelp(sender: CommandSender, label: String, topic: String?) {
+        if (topic == null) return sendHelpMenu(sender, label)
+        val subcommand = TtySubcommand.find(topic) ?: return sendUnknownSubcommand(sender, label, topic)
+        sendHelpDetails(sender, label, subcommand)
+    }
+
+    private fun sendHelpMenu(sender: CommandSender, label: String) {
+        val panelState = if (plugin.webServer.isRunning) "running" else "stopped"
+        plugin.messages.send(
+            sender, "command.help.header",
+            "version" to plugin.pluginMeta.version, "port" to plugin.teletypeConfig.port.toString(), "state" to panelState,
+        )
+        availableSubcommands(sender).forEach { sender.sendMessage(helpEntry(it, label)) }
+        plugin.messages.send(sender, "command.help.footer", "label" to label)
+    }
+
+    private fun sendHelpDetails(sender: CommandSender, label: String, subcommand: TtySubcommand) {
+        sender.sendMessage(helpEntry(subcommand, label))
+        plugin.messages.send(sender, "command.help.details.${subcommand.id}", "label" to label)
+        if (subcommand.requiresAdmin && !isAuthorizedAdmin(sender)) plugin.messages.send(sender, "command.help.admin-only")
+    }
+
+    private fun helpEntry(subcommand: TtySubcommand, label: String): Component {
+        val typed = "/$label ${subcommand.id}"
+        return plugin.messages.get("command.help.entry", "command" to typed, "usage" to subcommand.usage)
+            .append(plugin.messages.get("command.help.descriptions.${subcommand.id}"))
+            .clickEvent(ClickEvent.suggestCommand(if (subcommand.usage.isEmpty()) typed else "$typed "))
+            .hoverEvent(HoverEvent.showText(plugin.messages.get("command.help.hover", "command" to typed)))
+    }
+
+    private fun sendUnknownSubcommand(sender: CommandSender, label: String, input: String) {
+        plugin.messages.send(sender, "command.unknown-subcommand", "input" to input, "label" to label)
+        val suggestion = TtySubcommand.closestTo(input, availableSubcommands(sender)) ?: return
+        val typed = "/$label ${suggestion.id}"
+        sender.sendMessage(
+            plugin.messages.get("command.did-you-mean", "command" to typed)
+                .clickEvent(ClickEvent.suggestCommand(typed))
+                .hoverEvent(HoverEvent.showText(plugin.messages.get("command.help.hover", "command" to typed)))
+        )
+    }
+
     private fun handleVerify(sender: CommandSender, args: Array<String>) {
-        if (!sender.isOp && sender !is ConsoleCommandSender) {
+        if (!isAuthorizedAdmin(sender)) {
             plugin.messages.send(sender, "command.verify.no-permission")
             return
         }
@@ -84,12 +132,26 @@ class TtyCommand(private val plugin: Teletype) : CommandExecutor, TabCompleter {
             }
         }
 
-        val jwt = plugin.jwtService.issueToken(expiryMinutes = plugin.teletypeConfig.jwtExpiryMinutes)
+        val jwt = plugin.jwtService.issueToken(subject = sender.name, expiryMinutes = plugin.teletypeConfig.jwtExpiryMinutes)
         if (plugin.challengeStore.verify(uuid, jwt)) {
             plugin.messages.send(sender, "command.verify.success")
+            plugin.auditAsync("auth_verify", "web login approved", sender.name, challenge.remoteAddress)
         } else {
             plugin.messages.send(sender, "command.verify.not-found")
         }
+    }
+
+    private fun isAuthorizedAdmin(sender: CommandSender): Boolean =
+        sender is ConsoleCommandSender ||
+            (sender.hasPermission("teletype.admin") && (!plugin.teletypeConfig.requireOp || sender.isOp))
+
+    private fun handleRevoke(sender: CommandSender) {
+        if (!isAuthorizedAdmin(sender)) {
+            plugin.messages.send(sender, "command.no-permission"); return
+        }
+        plugin.revokeAllSessions()
+        plugin.messages.send(sender, "command.revoke.success")
+        plugin.auditAsync("auth_revoke_all", "all web sessions revoked", sender.name, "server")
     }
 
     private fun handleStatus(sender: CommandSender) {
@@ -101,7 +163,7 @@ class TtyCommand(private val plugin: Teletype) : CommandExecutor, TabCompleter {
     }
 
     private fun handleStart(sender: CommandSender) {
-        if (!sender.isOp && sender !is ConsoleCommandSender) {
+        if (!isAuthorizedAdmin(sender)) {
             plugin.messages.send(sender, "command.no-permission"); return
         }
         if (plugin.webServer.isRunning) {
@@ -118,7 +180,7 @@ class TtyCommand(private val plugin: Teletype) : CommandExecutor, TabCompleter {
     }
 
     private fun handleStop(sender: CommandSender) {
-        if (!sender.isOp && sender !is ConsoleCommandSender) {
+        if (!isAuthorizedAdmin(sender)) {
             plugin.messages.send(sender, "command.no-permission"); return
         }
         if (!plugin.webServer.isRunning) {
@@ -135,7 +197,7 @@ class TtyCommand(private val plugin: Teletype) : CommandExecutor, TabCompleter {
     }
 
     private fun handleReload(sender: CommandSender) {
-        if (!sender.isOp && sender !is ConsoleCommandSender) {
+        if (!isAuthorizedAdmin(sender)) {
             plugin.messages.send(sender, "command.no-permission"); return
         }
 
@@ -158,7 +220,7 @@ class TtyCommand(private val plugin: Teletype) : CommandExecutor, TabCompleter {
     }
 
     private fun handleDoctor(sender: CommandSender) {
-        if (!sender.isOp && sender !is ConsoleCommandSender) {
+        if (!isAuthorizedAdmin(sender)) {
             plugin.messages.send(sender, "command.no-permission"); return
         }
 
@@ -328,9 +390,9 @@ class TtyCommand(private val plugin: Teletype) : CommandExecutor, TabCompleter {
     override fun onTabComplete(
         sender: CommandSender, command: Command, alias: String, args: Array<String>
     ): List<String> {
-        if (args.size == 1) return listOf("verify", "status", "start", "stop", "reload", "doctor").filter {
-            it.startsWith(args[0].lowercase())
-        }
-        return emptyList()
+        val completingHelpTopic = args.size == 2 && TtySubcommand.find(args[0]) == TtySubcommand.HELP
+        if (args.size != 1 && !completingHelpTopic) return emptyList()
+        val typed = args.last().lowercase()
+        return availableSubcommands(sender).map { it.id }.filter { it.startsWith(typed) }
     }
 }

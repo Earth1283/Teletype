@@ -4,7 +4,6 @@ import io.github.Earth1283.teletype.Teletype
 import java.io.ByteArrayOutputStream
 import java.io.File
 import java.io.InputStream
-import java.io.OutputStream
 import java.net.Inet4Address
 import java.net.Inet6Address
 import java.net.ServerSocket
@@ -12,6 +11,7 @@ import java.net.Socket
 import java.util.Properties
 import java.util.concurrent.ExecutorService
 import java.util.concurrent.Executors
+import java.util.concurrent.Semaphore
 
 class PortMultiplexer(private val plugin: Teletype) {
 
@@ -21,9 +21,7 @@ class PortMultiplexer(private val plugin: Teletype) {
 
     fun install() {
         val publicPort = plugin.teletypeConfig.multiplexPort
-        val gamePort   = plugin.server.port
-        val ktorPort   = plugin.teletypeConfig.port
-        val forwardPlayerAddresses = plugin.teletypeConfig.forwardMinecraftPlayerAddresses
+        val gamePort = plugin.server.port
 
         if (publicPort == gamePort) {
             val internalPort = gamePort + 1
@@ -36,29 +34,41 @@ class PortMultiplexer(private val plugin: Teletype) {
         }
 
         try {
-            startListening(publicPort, ktorPort, gamePort, forwardPlayerAddresses)
+            startListening(publicPort, gamePort)
         } catch (e: Exception) {
             plugin.logger.severe("[Teletype] Multiplexer failed to bind :$publicPort — ${e.message}")
         }
     }
 
-    private fun startListening(publicPort: Int, ktorPort: Int, gamePort: Int, forwardPlayerAddresses: Boolean) {
+    private fun startListening(publicPort: Int, gamePort: Int) {
+        val cfg = plugin.teletypeConfig
+        val targets = Targets(
+            ktorPort = cfg.port,
+            httpsPort = cfg.tlsHttpsPort.takeIf { cfg.tlsEnabled },
+            gamePort = gamePort,
+            forwardPlayerAddresses = cfg.forwardMinecraftPlayerAddresses,
+        )
+        val slots = Semaphore(cfg.multiplexMaxConnections)
         val ss = ServerSocket(publicPort)
         serverSocket = ss
-        val pool = Executors.newCachedThreadPool { r ->
-            Thread(r, "teletype-mux").also { it.isDaemon = true }
-        }
+        val pool = Executors.newCachedThreadPool { r -> Thread(r, "teletype-mux").also { it.isDaemon = true } }
         executor = pool
 
         pool.submit {
             plugin.logger.info(
-                "[Teletype] Port multiplexer on :$publicPort — HTTP → :$ktorPort, " +
-                    "Minecraft → :$gamePort, player IP forwarding=${if (forwardPlayerAddresses) "on" else "off"}"
+                "[Teletype] Port multiplexer on :$publicPort — HTTP → :${targets.ktorPort}, " +
+                    "Minecraft → :$gamePort, player IP forwarding=${if (targets.forwardPlayerAddresses) "on" else "off"}"
             )
             while (!ss.isClosed) {
                 try {
                     val client = ss.accept()
-                    pool.submit { handleConnection(client, ktorPort, gamePort, forwardPlayerAddresses) }
+                    if (!slots.tryAcquire()) {
+                        runCatching { client.close() }
+                        continue
+                    }
+                    pool.submit {
+                        try { handleConnection(client, targets) } finally { slots.release() }
+                    }
                 } catch (e: Exception) {
                     if (!ss.isClosed) plugin.logger.warning("[Teletype] Multiplexer accept error: ${e.message}")
                 }
@@ -74,78 +84,67 @@ class PortMultiplexer(private val plugin: Teletype) {
         executor = null
     }
 
-    private fun handleConnection(client: Socket, ktorPort: Int, gamePort: Int, forwardPlayerAddresses: Boolean) {
-        client.use {
-            val header = ByteArray(4)
-            val n = readExact(client.getInputStream(), header)
-            if (n < 4) return
+    private data class Targets(val ktorPort: Int, val httpsPort: Int?, val gamePort: Int, val forwardPlayerAddresses: Boolean)
 
-            if (!isHttp(header)) {
-                val proxyHeader = if (forwardPlayerAddresses) proxyProtocolHeader(client) else null
-                proxyTo(client, gamePort, header, n, proxyHeader)
+    private fun handleConnection(client: Socket, targets: Targets) {
+        client.use {
+            client.tcpNoDelay = true
+            client.soTimeout = SNIFF_TIMEOUT_MS
+            val input = client.getInputStream()
+            val header = ByteArray(4)
+            if (runCatching { readExact(input, header) }.getOrDefault(0) < 4) return
+
+            val protocol = classify(header)
+            val httpsPort = targets.httpsPort
+            when {
+                protocol == Protocol.HTTP -> Unit
+                protocol == Protocol.TLS && httpsPort != null -> {
+                    client.soTimeout = 0
+                    relay(client, httpsPort, header)
+                    return
+                }
+                else -> {
+                    client.soTimeout = 0
+                    val proxyHeader = if (targets.forwardPlayerAddresses) proxyProtocolHeader(client) else ByteArray(0)
+                    relay(client, targets.gamePort, proxyHeader + header)
+                    return
+                }
+            }
+
+            val head = runCatching { readRequestHead(input, header) }.getOrNull() ?: return
+            client.soTimeout = 0
+            val request = HttpRequestHead.parse(head) ?: return
+            val route = if (plugin.teletypeConfig.networkEnabled) plugin.routeStore.findMatch(request.path) else null
+            val clientIp = client.inetAddress.hostAddress
+
+            if (route != null && !rateLimiter.allow(route.id, clientIp, route.rateLimitPerMinute)) {
+                runCatching { client.getOutputStream().write(TOO_MANY_REQUESTS) }
                 return
             }
 
-            // HTTP — read rest of first line to determine path for route matching
-            val lineRest = readUntilCRLF(client.getInputStream(), maxBytes = 8192)
-            val firstLine = String(header, Charsets.ISO_8859_1) + String(lineRest, Charsets.ISO_8859_1)
-            val buffered = header.copyOf(4) + lineRest
-
-            val path = parsePath(firstLine)
-            val route = if (path != null && plugin.teletypeConfig.networkEnabled)
-                plugin.routeStore.findMatch(path) else null
-
-            val targetPort = if (route != null) {
-                val clientIp = client.inetAddress.hostAddress
-                if (!rateLimiter.allow(route.id, clientIp, route.rateLimitPerMinute)) {
-                    runCatching {
-                        client.getOutputStream().write(
-                            "HTTP/1.1 429 Too Many Requests\r\nContent-Length: 0\r\nConnection: close\r\n\r\n"
-                                .toByteArray(Charsets.ISO_8859_1)
-                        )
-                    }
-                    return
-                }
-                route.targetPort
-            } else {
-                ktorPort
-            }
-
-            proxyTo(client, targetPort, buffered, buffered.size)
+            val forwarded = request.rewriteForProxy(clientIp)
+            relay(client, route?.targetPort ?: targets.ktorPort, forwarded)
         }
     }
 
-    private fun proxyTo(
-        client: Socket,
-        targetPort: Int,
-        prefixBytes: ByteArray,
-        prefixLen: Int,
-        prefaceBytes: ByteArray? = null,
-    ) {
+    private fun relay(client: Socket, targetPort: Int, preface: ByteArray) {
         try {
             Socket("127.0.0.1", targetPort).use { backend ->
+                backend.tcpNoDelay = true
                 val backendOut = backend.getOutputStream()
-                if (prefaceBytes != null) backendOut.write(prefaceBytes)
-                backendOut.write(prefixBytes, 0, prefixLen)
+                backendOut.write(preface)
                 backendOut.flush()
                 val pool = executor ?: return
-                val done = java.util.concurrent.CountDownLatch(1)
-                val upstream = pool.submit { relay(client.getInputStream(), backendOut); done.countDown() }
-                val downstream = pool.submit { relay(backend.getInputStream(), client.getOutputStream()); done.countDown() }
-                // Whichever direction finishes first (EOF/error) means one side is done;
-                // close both sockets so the other relay unblocks immediately instead of
-                // hanging on a half-open connection. Without this, a client that disconnects
-                // first (tab closed, WS dropped) leaves the backend-side relay thread parked
-                // forever waiting on a backend that never closes — a thread+socket leak per
-                // connection — and the browser never receives a TCP close, so onclose never
-                // fires and the WebSocket never reconnects, leaving the console permanently empty.
-                done.await()
-                runCatching { client.close() }
-                runCatching { backend.close() }
+                val upstream = pool.submit { pipe(client.getInputStream(), backendOut) { closeBoth(client, backend) } }
+                pipe(backend.getInputStream(), client.getOutputStream()) { closeBoth(client, backend) }
                 upstream.get()
-                downstream.get()
             }
         } catch (_: Exception) {}
+    }
+
+    private fun closeBoth(a: Socket, b: Socket) {
+        runCatching { a.close() }
+        runCatching { b.close() }
     }
 
     private fun proxyProtocolHeader(client: Socket): ByteArray {
@@ -154,39 +153,31 @@ class PortMultiplexer(private val plugin: Teletype) {
         val family = when {
             source is Inet4Address && destination is Inet4Address -> "TCP4"
             source is Inet6Address && destination is Inet6Address -> "TCP6"
-            else -> "UNKNOWN"
+            else -> null
         }
-
-        val line = if (family == "UNKNOWN") {
-            "PROXY UNKNOWN\r\n"
-        } else {
+        val line = if (family == null) "PROXY UNKNOWN\r\n" else
             "PROXY $family ${cleanAddress(source.hostAddress)} ${cleanAddress(destination.hostAddress)} " +
                 "${client.port} ${client.localPort}\r\n"
-        }
         return line.toByteArray(Charsets.US_ASCII)
     }
 
     private fun cleanAddress(value: String): String = value.substringBefore('%')
 
-    private fun readUntilCRLF(input: InputStream, maxBytes: Int): ByteArray {
-        val buf = ByteArrayOutputStream()
-        var prev = -1
-        var count = 0
-        while (count < maxBytes) {
+    private fun readRequestHead(input: InputStream, alreadyRead: ByteArray): ByteArray? {
+        val buf = ByteArrayOutputStream().apply { write(alreadyRead) }
+        var matched = 0
+        while (buf.size() < MAX_REQUEST_HEAD_BYTES) {
             val b = input.read()
-            if (b == -1) break
+            if (b == -1) return null
             buf.write(b)
-            count++
-            if (prev == '\r'.code && b == '\n'.code) break
-            prev = b
+            matched = when {
+                b == HEAD_TERMINATOR[matched].code -> matched + 1
+                b == HEAD_TERMINATOR[0].code -> 1
+                else -> 0
+            }
+            if (matched == HEAD_TERMINATOR.length) return buf.toByteArray()
         }
-        return buf.toByteArray()
-    }
-
-    private fun parsePath(firstLine: String): String? {
-        val parts = firstLine.trim().split(" ")
-        if (parts.size < 2) return null
-        return parts[1].substringBefore('?').ifEmpty { "/" }
+        return null
     }
 
     private fun readExact(input: InputStream, buf: ByteArray): Int {
@@ -199,41 +190,87 @@ class PortMultiplexer(private val plugin: Teletype) {
         return total
     }
 
-    private fun relay(input: InputStream, output: OutputStream) {
-        val buf = ByteArray(8192)
+    private fun pipe(input: InputStream, output: java.io.OutputStream, onDone: () -> Unit) {
+        val buf = ByteArray(16 * 1024)
         try {
-            var n: Int
-            while (input.read(buf).also { n = it } != -1) {
+            while (true) {
+                val n = input.read(buf)
+                if (n == -1) break
                 output.write(buf, 0, n)
                 output.flush()
             }
-        } catch (_: Exception) {}
-    }
-
-    /*
-    HTTP detection logic -- if it starts with the following 4 chars, we know it's HTTP.
-    Minecraft packets are VarInts, none of which collide with this
-     */
-    private fun isHttp(bytes: ByteArray): Boolean {
-        val s = String(bytes, Charsets.ISO_8859_1)
-        return s.startsWith("GET ") || s.startsWith("POST") || s.startsWith("PUT ") ||
-               s.startsWith("DELE") || s.startsWith("HEAD") || s.startsWith("OPTI") ||
-               s.startsWith("PATC") || s.startsWith("CONN")
+        } catch (_: Exception) {
+        } finally {
+            onDone()
+        }
     }
 
     private fun patchServerPort(oldPort: Int, newPort: Int) {
         val file = File(System.getProperty("user.dir"), "server.properties")
         if (!file.exists()) return
-        val patched = file.readText().replace("server-port=$oldPort", "server-port=$newPort")
+        val patched = file.readText().replace(Regex("(?m)^server-port=$oldPort\\s*$"), "server-port=$newPort")
         file.writeText(patched)
     }
 
+    enum class Protocol { HTTP, TLS, MINECRAFT }
+
     companion object {
+        const val CLIENT_ADDRESS_HEADER = "X-Teletype-Mux-Client"
+        private const val SNIFF_TIMEOUT_MS = 10_000
+        private const val MAX_REQUEST_HEAD_BYTES = 16 * 1024
+        private const val HEAD_TERMINATOR = "\r\n\r\n"
+        private val HTTP_METHOD_PREFIXES = setOf("GET ", "POST", "PUT ", "DELE", "HEAD", "OPTI", "PATC", "CONN")
+        private val TOO_MANY_REQUESTS =
+            "HTTP/1.1 429 Too Many Requests\r\nContent-Length: 0\r\nConnection: close\r\n\r\n".toByteArray(Charsets.ISO_8859_1)
+
+        private const val TLS_HANDSHAKE_RECORD: Byte = 0x16
+        private const val TLS_MAJOR_VERSION: Byte = 0x03
+
+        fun classify(firstBytes: ByteArray): Protocol = when {
+            String(firstBytes, Charsets.ISO_8859_1) in HTTP_METHOD_PREFIXES -> Protocol.HTTP
+            firstBytes.size >= 2 && firstBytes[0] == TLS_HANDSHAKE_RECORD && firstBytes[1] == TLS_MAJOR_VERSION -> Protocol.TLS
+            else -> Protocol.MINECRAFT
+        }
+
         fun readGamePort(): Int {
             val props = Properties()
             val file = File(System.getProperty("user.dir"), "server.properties")
             if (file.exists()) file.inputStream().use { props.load(it) }
             return props.getProperty("server-port", "25565").toIntOrNull() ?: 25565
+        }
+    }
+}
+
+internal class HttpRequestHead(val requestLine: String, val headers: List<Pair<String, String>>) {
+    val path: String = requestLine.split(' ').getOrNull(1)?.substringBefore('?')?.ifEmpty { "/" } ?: "/"
+
+    private val isUpgrade: Boolean =
+        headers.any { (name, value) -> name.equals("Connection", true) && value.contains("upgrade", ignoreCase = true) }
+
+    fun rewriteForProxy(clientIp: String): ByteArray {
+        val kept = headers.filterNot { (name, _) ->
+            name.equals(PortMultiplexer.CLIENT_ADDRESS_HEADER, true) || (!isUpgrade && name.equals("Connection", true))
+        }
+        val added = buildList {
+            add(PortMultiplexer.CLIENT_ADDRESS_HEADER to clientIp)
+            if (!isUpgrade) add("Connection" to "close")
+        }
+        return buildString {
+            append(requestLine).append("\r\n")
+            (kept + added).forEach { (name, value) -> append(name).append(": ").append(value).append("\r\n") }
+            append("\r\n")
+        }.toByteArray(Charsets.ISO_8859_1)
+    }
+
+    companion object {
+        fun parse(head: ByteArray): HttpRequestHead? {
+            val lines = String(head, Charsets.ISO_8859_1).split("\r\n").filter { it.isNotEmpty() }
+            val requestLine = lines.firstOrNull()?.takeIf { it.split(' ').size >= 3 } ?: return null
+            val headers = lines.drop(1).mapNotNull { line ->
+                val colon = line.indexOf(':')
+                if (colon <= 0) null else line.substring(0, colon).trim() to line.substring(colon + 1).trim()
+            }
+            return HttpRequestHead(requestLine, headers)
         }
     }
 }

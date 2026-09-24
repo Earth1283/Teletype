@@ -2,7 +2,7 @@ import { useEffect, useRef, useState, useCallback, useMemo } from 'react'
 import { Virtuoso, type VirtuosoHandle } from 'react-virtuoso'
 import AnsiConvert from 'ansi-to-html'
 import { useQuery } from '@tanstack/react-query'
-import { useLogs } from '../LogContext'
+import { useLogApi, useLogLines } from '../LogContext'
 import { useSettings } from '../SettingsContext'
 import { useContextMenu, type ContextMenuItem } from '../ContextMenu'
 import { api } from '../api/client'
@@ -11,17 +11,14 @@ import { useToast } from '../ToastContext'
 import type { Snippet } from './actions/actionTypes'
 import RunModal from './actions/RunModal'
 import { IconSearch, IconX } from '../Icons'
+import { useQuickActionsCategoryId } from './actions/useActions'
+import { stripAnsi, stripLogPrefix } from '../logText'
+import { tryWriteStorage } from '../storage'
 
 const convert = new AnsiConvert({ escapeXML: true, newline: true })
 
 type LogLevel = 'info' | 'warn' | 'error' | 'debug'
 
-function stripAnsi(line: string): string {
-  return line.replace(/\x1b\[[0-9;]*m/g, '')
-}
-function stripLogPrefix(line: string): string {
-  return line.replace(/^(?:\[[^\]]*\]\s*)+:?\s*/, '')
-}
 function lineClass(raw: string): LogLevel {
   const upper = raw.toUpperCase()
   if (upper.includes('[WARN]') || upper.includes('[WARNING]')) return 'warn'
@@ -41,7 +38,8 @@ function matchLine(line: string, q: string, fuzzyLevel: number): boolean {
 }
 
 export default function Console() {
-  const { lines, connected, send: socketSend, tabComplete } = useLogs()
+  const { lines } = useLogLines()
+  const { connected, send: socketSend, tabComplete } = useLogApi()
   const { settings } = useSettings()
   const { fontSize, displayLines, wordWrap, showTimestamps } = settings.console
   const [input, setInput] = useState('')
@@ -63,6 +61,7 @@ export default function Console() {
   const draftRef = useRef<string>('')
   const { openContextMenu, isOpen: isMenuOpen } = useContextMenu()
   const toast = useToast()
+  const quickActionsId = useQuickActionsCategoryId()
 
   const clearCompletions = () => { setCompletions([]); setCompletionIdx(0) }
 
@@ -89,7 +88,7 @@ export default function Console() {
     queryFn: () => api.get('/actions/snippets').then(r => r.data),
     staleTime: 30_000,
   })
-  const quickActions = allSnippets.filter(s => s.categoryId === 'quick-actions')
+  const quickActions = allSnippets.filter(s => s.categoryId === quickActionsId)
 
   const scrollToBottom = useCallback((behavior: 'auto' | 'smooth' = 'auto') => {
     const lastIndex = filteredLines.length - 1
@@ -101,12 +100,10 @@ export default function Console() {
     })
   }, [filteredLines.length])
 
+  const followingTail = filteredLines.length === 0 || isAtBottom
+
   useEffect(() => {
-    if (filteredLines.length === 0) {
-      setIsAtBottom(true)
-      return
-    }
-    if (!isAtBottom || isMenuOpen) return
+    if (filteredLines.length === 0 || !isAtBottom || isMenuOpen) return
     const frame = requestAnimationFrame(() => scrollToBottom('auto'))
     return () => cancelAnimationFrame(frame)
   }, [filteredLines.length, scrollToBottom, isAtBottom, isMenuOpen])
@@ -119,7 +116,7 @@ export default function Console() {
     if (h[h.length - 1] !== cmd) {
       const next = [...h.slice(-99), cmd]
       historyRef.current = next
-      try { localStorage.setItem('teletype_console_history', JSON.stringify(next)) } catch {}
+      tryWriteStorage('teletype_console_history', JSON.stringify(next))
     }
     histCursorRef.current = -1
     try {
@@ -272,7 +269,7 @@ export default function Console() {
           <IconX size={13} />
         </button>
         <button
-          className={`console-bottom-btn${isAtBottom ? '' : ' active'}`}
+          className={`console-bottom-btn${followingTail ? '' : ' active'}`}
           onClick={() => scrollToBottom('smooth')}
           title="Scroll to bottom"
           disabled={filteredLines.length === 0}

@@ -22,6 +22,7 @@ import io.github.Earth1283.teletype.multiplex.PortMultiplexer
 import io.github.Earth1283.teletype.multiplex.RouteStore
 import io.github.Earth1283.teletype.profiling.JfrManager
 import io.github.Earth1283.teletype.web.WebServer
+import io.github.Earth1283.teletype.web.routing.ConsoleSessions
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -67,11 +68,7 @@ class Teletype : JavaPlugin() {
         jwtService = JwtService(teletypeConfig.jwtSecret)
         startupLine("AUTH", "JWT service initialized", "expiry=${teletypeConfig.jwtExpiryMinutes}m, require-op=${enabled(teletypeConfig.requireOp)}")
 
-        consoleBroadcaster = ConsoleBroadcaster(
-            pluginScope,
-            teletypeConfig.consoleReplayBufferLines,
-            teletypeConfig.consoleMaxLineLength
-        )
+        consoleBroadcaster = ConsoleBroadcaster(teletypeConfig.consoleReplayBufferLines, teletypeConfig.consoleMaxLineLength)
         startupLine(
             "CONSOLE",
             "Console stream prepared",
@@ -96,8 +93,8 @@ class Teletype : JavaPlugin() {
         )
 
         auditLog = AuditLog(dataFolder)
-        routeStore = RouteStore(dataFolder).also { it.load() }
-        portForwardStore = PortForwardStore(dataFolder).also { it.load() }
+        routeStore = RouteStore(dataFolder, logger).also { it.load() }
+        portForwardStore = PortForwardStore(dataFolder, logger).also { it.load() }
         portForwardManager = PortForwardManager(this).also { it.start(portForwardStore.getForwards()) }
         startupLine(
             "NETWORK",
@@ -141,7 +138,7 @@ class Teletype : JavaPlugin() {
             it.setExecutor(ttyCommand)
             it.tabCompleter = ttyCommand
         }
-        startupLine("COMMAND", "Registered /tty command", "aliases=/teletype, /teletypewriter")
+        startupLine("COMMAND", "Registered /tty command", "run /tty help for subcommands, aliases=/teletype, /teletypewriter")
 
         val url = if (teletypeConfig.tlsEnabled) "https://localhost:${teletypeConfig.tlsHttpsPort}"
                   else "http://localhost:${teletypeConfig.port}"
@@ -160,6 +157,15 @@ class Teletype : JavaPlugin() {
         metricsDatabase.close()
         auditLog.close()
         messages.console("shutdown")
+    }
+
+    fun revokeAllSessions() {
+        config.set("auth.jwt-secret", TeletypeConfig.generateJwtSecret())
+        saveConfig()
+        teletypeConfig = TeletypeConfig(this)
+        jwtService = JwtService(teletypeConfig.jwtSecret)
+        if (::webServer.isInitialized) webServer.downloadTokens.clear()
+        ConsoleSessions.closeAllUnauthorized(this)
     }
 
     fun auditAsync(action: String, detail: String, actor: String, ip: String) {

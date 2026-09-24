@@ -1,57 +1,21 @@
 package io.github.Earth1283.teletype.multiplex
 
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.withContext
-import kotlinx.serialization.encodeToString
-import kotlinx.serialization.json.Json
+import io.github.Earth1283.teletype.util.JsonListStore
 import java.io.File
-import java.util.concurrent.CopyOnWriteArrayList
+import java.util.logging.Logger
 
-class RouteStore(private val dataFolder: File) {
-    private val file = File(dataFolder, "routes.json")
-    private val routes = CopyOnWriteArrayList<RouteMapping>()
-    private val json = Json { prettyPrint = true; ignoreUnknownKeys = true }
+class RouteStore(dataFolder: File, logger: Logger? = null) {
+    private val store = JsonListStore(File(dataFolder, "routes.json"), RouteMapping.serializer(), RouteMapping::id, logger)
 
-    fun load() {
-        if (!file.exists()) return
-        runCatching {
-            val list = json.decodeFromString<List<RouteMapping>>(file.readText())
-            routes.clear()
-            routes.addAll(list)
-        }
-    }
-
-    fun getRoutes(): List<RouteMapping> = routes.toList()
-
-    fun getRoute(id: String): RouteMapping? = routes.find { it.id == id }
-
-    suspend fun addRoute(route: RouteMapping) {
-        routes.add(route)
-        save()
-    }
-
-    suspend fun updateRoute(route: RouteMapping): Boolean {
-        val idx = routes.indexOfFirst { it.id == route.id }
-        if (idx == -1) return false
-        routes[idx] = route
-        save()
-        return true
-    }
-
-    suspend fun removeRoute(id: String): Boolean {
-        val removed = routes.removeIf { it.id == id }
-        if (removed) save()
-        return removed
-    }
+    fun load() = store.load()
+    fun getRoutes(): List<RouteMapping> = store.all()
+    fun getRoute(id: String): RouteMapping? = store.find(id)
+    suspend fun addRoute(route: RouteMapping) = store.add(route)
+    suspend fun updateRoute(route: RouteMapping): Boolean = store.update(route)
+    suspend fun removeRoute(id: String): Boolean = store.remove(id)
 
     fun findMatch(path: String): RouteMapping? =
-        routes
-            .filter { it.enabled && path.startsWith(it.prefix) }
+        store.all()
+            .filter { it.enabled && it.matches(path) }
             .maxByOrNull { it.prefix.length }
-
-    // Off the Ktor request thread — every route mutation rewrites the whole file.
-    private suspend fun save() = withContext(Dispatchers.IO) {
-        dataFolder.mkdirs()
-        file.writeText(json.encodeToString(routes.toList()))
-    }
 }

@@ -37,6 +37,8 @@ To be honest, the fact that you made Minecraft 1.21+ run on Java 8 (which Mojang
 
 That's the whole setup. No YAML novel to write before it does anything useful. It works out of the box because it should.
 
+Run `/tty help` for every other server-side control: status, start/stop, reload, a `doctor` health check, and `revoke` to log everyone out. The entries are clickable.
+
 ## Documentation
 
 | Doc | Contents |

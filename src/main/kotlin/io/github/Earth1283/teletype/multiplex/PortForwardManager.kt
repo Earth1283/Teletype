@@ -20,20 +20,16 @@ class PortForwardManager(private val plugin: Teletype) {
         forwards.filter { it.enabled }.forEach { bind(it) }
     }
 
-    fun bind(forward: PortForward) {
+    fun bind(forward: PortForward): Result<Unit> {
         unbind(forward.id)
-        if (!forward.enabled || !plugin.teletypeConfig.networkEnabled) return
-        try {
+        if (!forward.enabled || !plugin.teletypeConfig.networkEnabled) return Result.success(Unit)
+        return runCatching {
             val ss = ServerSocket(forward.externalPort)
             sockets[forward.id] = ss
             executor.submit { accept(ss, forward) }
-            plugin.logger.info(
-                "[Teletype] Port forward :${forward.externalPort} → :${forward.targetPort}"
-            )
-        } catch (e: Exception) {
-            plugin.logger.warning(
-                "[Teletype] Port forward failed to bind :${forward.externalPort} — ${e.message}"
-            )
+            plugin.logger.info("[Teletype] Port forward :${forward.externalPort} → :${forward.targetPort}")
+        }.onFailure { e ->
+            plugin.logger.warning("[Teletype] Port forward failed to bind :${forward.externalPort} — ${e.message}")
         }
     }
 
@@ -53,9 +49,7 @@ class PortForwardManager(private val plugin: Teletype) {
                 val client = ss.accept()
                 executor.submit { relay(client, forward.targetPort) }
             } catch (e: Exception) {
-                if (!ss.isClosed) plugin.logger.warning(
-                    "[Teletype] Forward accept error :${forward.externalPort}: ${e.message}"
-                )
+                if (!ss.isClosed) plugin.logger.warning("[Teletype] Forward accept error :${forward.externalPort}: ${e.message}")
             }
         }
     }
@@ -64,29 +58,29 @@ class PortForwardManager(private val plugin: Teletype) {
         client.use {
             try {
                 Socket("127.0.0.1", targetPort).use { backend ->
-                    val done = java.util.concurrent.CountDownLatch(1)
-                    val upstream = executor.submit { pipe(client.getInputStream(), backend.getOutputStream()); done.countDown() }
-                    val downstream = executor.submit { pipe(backend.getInputStream(), client.getOutputStream()); done.countDown() }
-                    // Close both sockets as soon as either direction ends, so the other side
-                    // unblocks instead of leaking a thread+socket when one peer disconnects first.
-                    done.await()
-                    runCatching { client.close() }
-                    runCatching { backend.close() }
+                    client.tcpNoDelay = true
+                    backend.tcpNoDelay = true
+                    val closeBoth = { runCatching { client.close() }; runCatching { backend.close() }; Unit }
+                    val upstream = executor.submit { pipe(client.getInputStream(), backend.getOutputStream(), closeBoth) }
+                    pipe(backend.getInputStream(), client.getOutputStream(), closeBoth)
                     upstream.get()
-                    downstream.get()
                 }
             } catch (_: Exception) {}
         }
     }
 
-    private fun pipe(input: InputStream, output: OutputStream) {
-        val buf = ByteArray(8192)
+    private fun pipe(input: InputStream, output: OutputStream, onDone: () -> Unit) {
+        val buf = ByteArray(16 * 1024)
         try {
-            var n: Int
-            while (input.read(buf).also { n = it } != -1) {
+            while (true) {
+                val n = input.read(buf)
+                if (n == -1) break
                 output.write(buf, 0, n)
                 output.flush()
             }
-        } catch (_: Exception) {}
+        } catch (_: Exception) {
+        } finally {
+            onDone()
+        }
     }
 }

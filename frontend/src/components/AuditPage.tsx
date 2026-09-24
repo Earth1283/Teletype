@@ -6,6 +6,7 @@ import { useToast } from '../ToastContext'
 import { writeClipboard } from '../clipboard'
 import { Skeleton } from '../Skeleton'
 import { Eyebrow } from '../design'
+import { usePollInterval } from '../shell/PageActivity'
 
 interface AuditEntry {
   id: number
@@ -16,25 +17,51 @@ interface AuditEntry {
   detail: string
 }
 
+const DANGER = 'var(--red)'
+const CAUTION = 'var(--amber)'
+const CREATE = 'var(--green)'
+const NEUTRAL = 'var(--ash)'
+
 const ACTION_COLORS: Record<string, string> = {
-  execute_command:  'var(--amber)',
-  run_snippet:      'var(--green)',
-  file_write:       'var(--amber)',
-  file_delete:      'var(--red)',
-  file_rename:      'var(--ash)',
-  file_upload:      'var(--ash)',
-  schedule_create:  'var(--green)',
-  schedule_delete:  'var(--red)',
-  category_create:  'var(--ash)',
-  category_delete:  'var(--ash)',
+  execute_command:            CAUTION,
+  console_command:            CAUTION,
+  run_snippet:                CREATE,
+  server_restart:             DANGER,
+  auth_verify:                NEUTRAL,
+  auth_revoke_all:            DANGER,
+  file_write:                 CAUTION,
+  file_delete:                DANGER,
+  file_rename:                NEUTRAL,
+  file_copy:                  NEUTRAL,
+  file_upload:                NEUTRAL,
+  file_download:              NEUTRAL,
+  file_fetch:                 CAUTION,
+  file_mkdir:                 NEUTRAL,
+  file_decompress:            NEUTRAL,
+  snippet_create:             CREATE,
+  snippet_update:             NEUTRAL,
+  snippet_delete:             DANGER,
+  schedule_create:            CREATE,
+  schedule_delete:            DANGER,
+  schedule_pause:             NEUTRAL,
+  schedule_resume:            NEUTRAL,
+  category_create:            NEUTRAL,
+  category_delete:            NEUTRAL,
+  network_route_create:       CREATE,
+  network_route_update:       NEUTRAL,
+  network_route_delete:       DANGER,
+  network_forward_create:     CREATE,
+  network_forward_update:     NEUTRAL,
+  network_forward_delete:     DANGER,
+  profiling_continuous_start: NEUTRAL,
+  profiling_continuous_stop:  CAUTION,
+  profiling_dump:             NEUTRAL,
+  profiling_recording_start:  NEUTRAL,
+  profiling_recording_stop:   NEUTRAL,
+  profiling_recording_delete: DANGER,
 }
 
-const KNOWN_ACTIONS = [
-  'execute_command', 'run_snippet',
-  'file_write', 'file_delete', 'file_rename', 'file_upload',
-  'schedule_create', 'schedule_delete',
-  'category_create', 'category_delete',
-]
+const KNOWN_ACTIONS = Object.keys(ACTION_COLORS)
 
 const PAGE_SIZE = 100
 
@@ -67,7 +94,7 @@ export default function AuditPage() {
   const { data: entries = [], dataUpdatedAt, isFetching } = useQuery<AuditEntry[]>({
     queryKey: ['audit', actorFilter, actionFilter, sinceMs, offset],
     queryFn: () => api.get(`/audit?${params}`).then(r => r.data),
-    refetchInterval: 30_000,
+    refetchInterval: usePollInterval(30_000),
     staleTime: 5_000,
   })
 

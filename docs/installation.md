@@ -62,11 +62,29 @@ The shaded JAR is at `build/libs/teletype-<version>.jar`. Copy it to `plugins/`.
 
 ### Multiple admins
 
-Each admin goes through the same flow independently — each gets their own JWT. There is no shared password. To revoke all sessions, change `auth.jwt-secret` in `config.yml` and reload the plugin.
+Each admin goes through the same flow independently, and each gets their own JWT named after whoever ran `/tty verify`, so the audit log shows who did what. There is no shared password. To revoke all sessions at once, run `/tty revoke` from the console or in-game. It rotates `auth.jwt-secret` and disconnects every open panel.
 
 ### `require-op`
 
-By default only operators can verify. Set `auth.require-op: false` to allow any player to authenticate (not recommended for public servers).
+By default, players need to be operators to use the admin subcommands (`verify`, `start`, `stop`, `reload`, `doctor`, `revoke`). With `auth.require-op: false`, anyone with the `teletype.admin` permission can use them, so you can grant it through a permissions plugin without opping. The console can always use them. Even with operator rights, in-game `verify` is still limited by `auth.disallow-player-verify` (see [configuration.md](configuration.md#authentication)).
+
+---
+
+## Commands
+
+`/tty` (aliases `/teletype`, `/teletypewriter`) with no arguments, or `/tty help`, prints the list below in chat. Each entry is clickable: clicking fills the command into your chat box. `/tty help <command>` explains a single command. Typos get a "did you mean" suggestion, and tab completion only offers the subcommands you're allowed to run.
+
+| Command | What it does |
+|---------|--------------|
+| `/tty help [command]` | Show all commands, or details for one |
+| `/tty status` | Whether the web panel is running, and on which port |
+| `/tty verify <code>` | Approve a web login using the code shown in the browser |
+| `/tty start` / `/tty stop` | Start or stop the embedded web server |
+| `/tty reload` | Re-read `config.yml` and `messages.yml` and restart the web server |
+| `/tty doctor` | Health check: ports, TLS, web assets, secrets, data files |
+| `/tty revoke` | Log out every web session (rotates the JWT secret) |
+
+All help text is in `messages.yml` under `command.help`, so it can be translated or reworded.
 
 ---
 

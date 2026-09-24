@@ -25,7 +25,8 @@ class ChallengeStore(private val plugin: Teletype) {
         }.runTaskTimerAsynchronously(plugin, 600L, 600L)
     }
 
-    fun createChallenge(remoteAddress: String): PendingChallenge {
+    fun createChallenge(remoteAddress: String): PendingChallenge? {
+        if (store.size >= MAX_PENDING_CHALLENGES) return null
         val challenge = PendingChallenge(
             uuid = UUID.randomUUID(),
             createdAt = Instant.now(),
@@ -45,5 +46,9 @@ class ChallengeStore(private val plugin: Teletype) {
 
     fun remove(uuid: UUID) {
         store.remove(uuid)
+    }
+
+    private companion object {
+        const val MAX_PENDING_CHALLENGES = 1_000
     }
 }

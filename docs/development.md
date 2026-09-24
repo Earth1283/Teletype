@@ -145,6 +145,16 @@ npm run build       # TypeScript compile → Vite bundle → dist/
 
 Output goes to `frontend/dist/`; the Gradle task then copies it to `webroot/`.
 
+### Tests and lint
+
+```bash
+./gradlew test                  # Kotlin unit tests (JUnit 5)
+cd frontend && npm test         # Vitest unit tests
+cd frontend && npm run lint     # ESLint (must pass in CI)
+```
+
+GitHub Actions (`.github/workflows/ci.yml`) runs frontend lint and tests, then `./gradlew build`, on every push to `main` and on pull requests.
+
 ### Plugin only (skip frontend rebuild)
 
 ```bash
@@ -185,8 +195,9 @@ Ktor (embedded, netty)     Minecraft server (internal port)
 - **Ktor I/O threads** — all HTTP route handlers run on `Dispatchers.IO` or the Ktor dispatcher. JDBC calls (`MetricsDatabase`, `AuditLog`) must explicitly `withContext(Dispatchers.IO)`.
 - **`pluginScope`** — `SupervisorJob + Dispatchers.Default`, `internal` visibility, lives from `onEnable` to `onDisable`. Fire-and-forget audit inserts and player event writes use `pluginScope.launch(Dispatchers.IO)`.
 - **`AuditLog`** — single JDBC `Connection`, `@Synchronized` on every public method to guard against concurrent `Dispatchers.IO` threads.
-- **Tab completion** — `ConsoleWebSocket` receives `tab_complete` WS messages, calls `Bukkit.getScheduler().callSyncMethod()` inside `withContext(Dispatchers.IO)` with a 500 ms timeout to marshal onto the Bukkit main thread, then sends the result back.
-- **PortMultiplexer** — dedicated `CachedThreadPool` of daemon threads; independent of `pluginScope`. Shuts down via `executor.shutdownNow()` on `uninstall()`.
+- **Tab completion** — `ConsoleWebSocket` receives `tab_complete` WS messages and runs `Bukkit.getCommandMap().tabComplete()` through `onServerThread` with a 500 ms timeout.
+- **`SnippetScheduler`** — each active schedule is a coroutine in `pluginScope` that waits on wall-clock time, then hops onto the main thread with `onServerThread` to dispatch commands.
+- **PortMultiplexer** — dedicated `CachedThreadPool` of daemon threads (two per connection, capped by `server.multiplex-max-connections`); independent of `pluginScope`. Shuts down via `executor.shutdownNow()` on `uninstall()`.
 
 ### Data persistence
 
@@ -194,7 +205,7 @@ Ktor (embedded, netty)     Minecraft server (internal port)
 |------|--------|---------|
 | `teletype-metrics.db` | SQLite WAL | Three resolution tiers: `metrics_1s`, `metrics_1m`, `metrics_15m`; `player_events` join/leave log |
 | `teletype-audit.db` | SQLite WAL | `audit_log` table with indexes on `ts`, `actor`, `action` |
-| `schedule.json` | JSON | Serialized scheduled action list (survives restarts) |
+| `schedule.json`, `snippets.json`, `routes.json`, `port-forwards.json` | JSON | Written atomically (temp file + rename). An unreadable file is renamed to `*.corrupt-<timestamp>` rather than being overwritten. |
 | `config.yml` | YAML | User config; never overwritten by the plugin |
 
 ### MetricSnapshot fields
@@ -218,11 +229,11 @@ Sampled once per second on the Bukkit main thread. All fields present in all thr
 ### WebSocket console
 
 `LogContext.tsx` is the **single WebSocket connection** for the whole frontend. It:
-1. Opens one WS connection on mount (or on tab focus after disconnect)
-2. Pushes log lines into a `useState` rolling buffer (capped at 5000 lines)
-3. Exposes `lines`, `send`, `tabComplete`, and `getLogsAround` via React context
+1. Opens one WS connection on mount and reconnects with backoff. On reconnect it sends back the last `seq`/`epoch` so the server only replays lines the client hasn't seen.
+2. Buffers incoming `log_batch` frames and flushes them into state every 50 ms (capped at 5000 lines), so a burst of logs costs one render instead of one per line.
+3. Exposes two contexts. `useLogLines()` returns `lines` and `tsLogs` and changes on every flush. `useLogApi()` returns `connected`, `send`, `tabComplete` and `getLogsAround`, which are stable. Components that only need to send commands or look up logs on demand use `useLogApi()`, so they don't re-render on every log line.
 
-All components that need logs read from `LogContext` — they don't open their own connections. Tab completion uses a one-shot callback registered before `sendTabComplete` fires; the callback is cleared after the first response or on WS disconnect.
+If the server closes the socket with `1008 Unauthorized` (expired or revoked token), the client logs out, just like a `401` from the REST API.
 
 **Keep-alive settings** (configured in `WebServer.kt`):
 
@@ -263,7 +274,11 @@ The server sends a WebSocket ping every 30 seconds. If no pong is received withi
 3. Add corresponding fetch in `frontend/src/` using TanStack Query.
 4. Add a stub handler in `frontend/scripts/mock-server.mjs` so `testFrontend` works.
 
-For audited endpoints, call `auditAsync(plugin, "action_name", detail)` inside the handler (the `RoutingContext` extension in `AuditExt.kt`).
+For audited endpoints, call `auditAsync(plugin, "action_name", detail)` inside the handler (the `RoutingContext` extension in `AuditExt.kt`), and add the action to `ACTION_COLORS` in `AuditPage.tsx`.
+
+For validation failures, throw with the helpers in `RouteHelpers.kt` (`badRequest(...)`, `notFound()`, `conflict(...)`, `forbidden(...)`, `call.pathParam("id")`) instead of responding and returning by hand. `StatusPages` turns them into `{"error": ...}` responses with the right status code.
+
+Pages that poll should wrap their interval in `usePollInterval(ms)` (from `shell/PageActivity.tsx`) so hidden tabs and minimized windows stop polling.
 
 ### Route registration order
 

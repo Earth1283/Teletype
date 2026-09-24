@@ -27,7 +27,8 @@ hs_err_pid*
 # Common working directory
 run
 
-# Frontend build output bundled into the JAR — generated, not source
+# Frontend build output bundled into the JAR. gnerated, not src
 src/main/resources/webroot/assets/
 src/main/resources/webroot/index.html
 *.log
+

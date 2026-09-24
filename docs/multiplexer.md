@@ -89,7 +89,25 @@ For those who enjoy reading about thread pools.
 
 **`PortMultiplexer.kt`** owns a `CachedThreadPool` named `teletype-mux` with daemon threads. Daemon threads don't prevent JVM shutdown — if the server stops, the threads stop, no ceremony required.
 
-Each accepted connection spawns two relay goroutines: one copying `client → target`, one copying `target → client`. Both run until the connection closes or an IOException is thrown. The 4 peek bytes are buffered and prepended to a `SequenceInputStream` before the relay starts, so the target server sees a complete, unmodified stream.
+Each connection uses two threads: the handler thread copies `target → client` and one pool thread copies `client → target`. When either direction ends, both sockets are closed so neither thread can hang on a half-open connection. `TCP_NODELAY` is set on both sockets so small Minecraft packets aren't delayed by Nagle's algorithm.
+
+The first bytes must arrive within 10 seconds or the connection is dropped, and at most `server.multiplex-max-connections` (default 1024) connections are handled at once. Beyond that, new connections are refused. This stops idle-connection floods on the game port from exhausting server threads.
+
+**Protocol detection:**
+
+| First bytes | Routed to |
+|-------------|-----------|
+| An HTTP method token (below) | Teletype web panel, or a matching network route |
+| `0x16 0x03` (TLS ClientHello) | Teletype's HTTPS port when `server.tls.enabled: true`; otherwise Minecraft |
+| Anything else | Minecraft |
+
+**HTTP requests:** The multiplexer reads the full request head (up to 16 KB), then:
+
+- picks the target by the request path. Route prefixes match on path-segment boundaries, so `/map` matches `/map` and `/map/tiles` but not `/mapping`.
+- adds an `X-Teletype-Mux-Client` header with the real client IP. Ktor only trusts that header on connections from loopback, so audit entries and per-IP rate limits see real addresses instead of `127.0.0.1`. Any copy of the header sent by the client is stripped.
+- sets `Connection: close` (WebSocket upgrades are left alone). Each connection then carries exactly one request, so a browser can't reuse a panel connection for a request that belongs to a different route.
+
+HTTPS connections are relayed as raw TCP, so the multiplexer can't read their path or add the client-IP header. Ktor sees them as coming from `127.0.0.1`.
 
 **Supported HTTP prefix tokens:**
 
@@ -112,7 +130,9 @@ CONNECT is included because some WebSocket upgrade handshakes travel through CON
 
 ## Limitations
 
-**TLS termination:** The multiplexer operates at the raw TCP layer, before TLS. If you want HTTPS + Minecraft on the same port, the multiplexer handles it fine — but only because TLS starts with a ClientHello record byte (`0x16`), which is not an HTTP method prefix. Ktor then handles TLS internally. The routing decision happens before any handshake, so TLS and plaintext HTTP land on the Ktor side while Minecraft protocol lands on the game side.
+**TLS termination:** The multiplexer works at the raw TCP layer. TLS connections are spotted by their ClientHello and passed through to Teletype's HTTPS port untouched, so HTTPS routes and client IPs aren't available on that path. For per-route proxying and real client IPs, put a TLS-terminating reverse proxy in front instead and enable `server.trust-proxy-headers`.
+
+**Reserved route prefixes:** Network routes can't use `/`, `/api`, `/ws` or `/assets` (or anything under them), because those would hide the panel itself.
 
 **Minecraft Bedrock:** The multiplexer is TCP-only. Bedrock uses UDP. If you need Bedrock support, Geyser handles that on a separate port and the multiplexer ignores it.
 

@@ -1,8 +1,9 @@
 import { useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { api } from '../api/client'
+import { api, apiError } from '../api/client'
 import { useToast } from '../ToastContext'
 import { IconNetwork, IconPencil, IconTrash, IconX } from '../Icons'
+import { usePollInterval } from '../shell/PageActivity'
 
 interface RouteMapping {
   id: string
@@ -264,7 +265,7 @@ export default function NetworkPage() {
   const { data: status } = useQuery<NetworkStatus>({
     queryKey: ['network-status'],
     queryFn: () => api.get('/network/status').then(r => r.data),
-    refetchInterval: 15_000,
+    refetchInterval: usePollInterval(15_000),
   })
 
   const { data: routes = [] } = useQuery<RouteMapping[]>({
@@ -280,19 +281,19 @@ export default function NetworkPage() {
   const createMut = useMutation({
     mutationFn: (r: Omit<RouteMapping, 'id'>) => api.post('/network/routes', r),
     onSuccess: () => { setModal(null); invalidate() },
-    onError: (e: any) => toast.error(e.response?.data?.message ?? 'Failed to create route'),
+    onError: (e: unknown) => toast.error(apiError(e, 'Failed to create route')),
   })
 
   const updateMut = useMutation({
     mutationFn: ({ id, ...r }: RouteMapping) => api.put(`/network/routes/${id}`, r),
     onSuccess: () => { setModal(null); invalidate() },
-    onError: (e: any) => toast.error(e.response?.data?.message ?? 'Failed to update route'),
+    onError: (e: unknown) => toast.error(apiError(e, 'Failed to update route')),
   })
 
   const deleteMut = useMutation({
     mutationFn: (id: string) => api.delete(`/network/routes/${id}`),
     onSuccess: () => { setDeletingId(null); invalidate() },
-    onError: (e: any) => toast.error(e.response?.data?.message ?? 'Failed to delete route'),
+    onError: (e: unknown) => toast.error(apiError(e, 'Failed to delete route')),
   })
 
   const toggleMut = useMutation({
@@ -315,19 +316,19 @@ export default function NetworkPage() {
   const createFwdMut = useMutation({
     mutationFn: (f: Omit<PortForward, 'id'>) => api.post('/network/forwards', f),
     onSuccess: () => { setFwdModal(null); invalidateFwd() },
-    onError: (e: any) => toast.error(e.response?.data?.message ?? 'Failed to create forward'),
+    onError: (e: unknown) => toast.error(apiError(e, 'Failed to create forward')),
   })
 
   const updateFwdMut = useMutation({
     mutationFn: ({ id, ...f }: PortForward) => api.put(`/network/forwards/${id}`, f),
     onSuccess: () => { setFwdModal(null); invalidateFwd() },
-    onError: (e: any) => toast.error(e.response?.data?.message ?? 'Failed to update forward'),
+    onError: (e: unknown) => toast.error(apiError(e, 'Failed to update forward')),
   })
 
   const deleteFwdMut = useMutation({
     mutationFn: (id: string) => api.delete(`/network/forwards/${id}`),
     onSuccess: () => { setDeletingFwdId(null); invalidateFwd() },
-    onError: (e: any) => toast.error(e.response?.data?.message ?? 'Failed to delete forward'),
+    onError: (e: unknown) => toast.error(apiError(e, 'Failed to delete forward')),
   })
 
   const toggleFwdMut = useMutation({

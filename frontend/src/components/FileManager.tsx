@@ -1,8 +1,6 @@
-import { useState, useCallback, useRef, useEffect } from 'react'
+import { useState, useRef, useEffect, lazy, Suspense } from 'react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
-import Editor, { useMonaco } from '@monaco-editor/react'
-import { api, TOKEN_KEY } from '../api/client'
-import { useSettings } from '../SettingsContext'
+import { api, apiError, apiStatus, downloadViaToken } from '../api/client'
 import { useContextMenu, type ContextMenuItem } from '../ContextMenu'
 import { useToast } from '../ToastContext'
 import { writeClipboard } from '../clipboard'
@@ -12,6 +10,8 @@ import {
   IconFolderPlus, IconPencil, IconTrash, IconSave, IconX, IconGlobe,
   IconChevronRight, IconChevronLeft, IconSearch, IconList, IconCheck, IconArchive,
 } from '../Icons'
+
+const CodeEditor = lazy(() => import('./files/CodeEditor'))
 
 interface FileEntry {
   name: string; path: string; isDirectory: boolean; size: number; lastModified: number
@@ -49,7 +49,9 @@ function loadFavs(): SidebarFav[] {
       saveFavs(next)
       return next
     }
-  } catch {}
+  } catch {
+    return DEFAULT_FAVS
+  }
   return DEFAULT_FAVS
 }
 
@@ -185,19 +187,6 @@ function SidebarLogIcon() {
   )
 }
 
-const EXT_LANG: Record<string, string> = {
-  js: 'javascript', ts: 'typescript', tsx: 'typescript', jsx: 'javascript',
-  json: 'json', yml: 'yaml', yaml: 'yaml', xml: 'xml', html: 'html',
-  css: 'css', scss: 'scss', sh: 'shell', bash: 'shell',
-  py: 'python', kt: 'kotlin', java: 'java', rs: 'rust', go: 'go',
-  toml: 'toml', md: 'markdown', txt: 'plaintext', properties: 'ini',
-  conf: 'ini', cfg: 'ini', log: 'plaintext',
-}
-
-function langFor(name: string) {
-  return EXT_LANG[name.split('.').pop()?.toLowerCase() ?? ''] ?? 'plaintext'
-}
-
 function fmtSize(b: number) {
   if (b < 1024) return `${b} B`
   if (b < 1024 ** 2) return `${(b / 1024).toFixed(1)} KB`
@@ -253,7 +242,7 @@ export default function FileManager() {
   const [selectedPaths, setSelectedPaths] = useState<string[]>([])
   const [selectionAnchor, setSelectionAnchor] = useState<string | null>(null)
   const [fileClipboard, setFileClipboard] = useState<FileClipboard>(null)
-  const [editing, setEditing] = useState<{ path: string } | null>(null)
+  const [editing, setEditing] = useState<{ path: string; lastModified: number | null } | null>(null)
   const [editorContent, setEditorContent] = useState('')
   const [saving, setSaving] = useState(false)
   const [justSaved, setJustSaved] = useState(false)
@@ -280,53 +269,10 @@ export default function FileManager() {
   const uploadFrameRef = useRef<number | null>(null)
   const conflictResolveRef = useRef<((file: File | null) => void) | null>(null)
   const qc = useQueryClient()
-  const { settings } = useSettings()
   const { openContextMenu } = useContextMenu()
   const toast = useToast()
-  const monacoInst = useMonaco()
 
   const effectiveView = editing ? 'list' : viewMode
-
-  useEffect(() => {
-    if (!monacoInst) return
-    // Theme values come from the live CSS custom properties so the editor
-    // follows whatever mode/palette AppearanceApplier stamped on <html>.
-    const cs = getComputedStyle(document.documentElement)
-    const v = (name: string, fallback: string) => cs.getPropertyValue(name).trim() || fallback
-    const isLight = (document.documentElement.dataset.mode
-      ?? (window.matchMedia('(prefers-color-scheme: light)').matches ? 'light' : 'dark')) === 'light'
-    const accent = v('--accent', isLight ? '#2563EB' : '#4C82F7')
-    monacoInst.editor.defineTheme('teletype-ui', {
-      base: isLight ? 'vs' : 'vs-dark',
-      inherit: true,
-      rules: [],
-      colors: {
-        'editor.background': v('--surface', isLight ? '#FFFFFF' : '#131316'),
-        'editor.foreground': v('--text-primary', isLight ? '#1B1F26' : '#EDEDEF'),
-        'editorLineNumber.foreground': v('--text-muted', '#5C5C64'),
-        'editorLineNumber.activeForeground': v('--text-secondary', '#9A9AA2'),
-        'editor.selectionBackground': accent + '33',
-        'editorCursor.foreground': accent,
-        'editor.lineHighlightBackground': v('--elevated', '#1B1B1F'),
-        'editorIndentGuide.background': v('--border', '#26262B'),
-        'editorIndentGuide.activeBackground': v('--border-hi', '#3A3A40'),
-        'editorWidget.background': v('--elevated', '#1B1B1F'),
-        'editorWidget.border': v('--border', '#26262B'),
-        'editorSuggestWidget.background': v('--elevated', '#1B1B1F'),
-        'editorSuggestWidget.border': v('--border', '#26262B'),
-      },
-    })
-    monacoInst.editor.setTheme('teletype-ui')
-  }, [monacoInst, settings.appearance])
-
-  useEffect(() => {
-    if (!monacoInst) return
-    const on = settings.editor.validate
-    const langs = monacoInst.languages as any
-    langs.json?.jsonDefaults?.setDiagnosticsOptions({ validate: on, allowComments: true })
-    langs.typescript?.typescriptDefaults?.setDiagnosticsOptions({ noSemanticValidation: !on, noSyntaxValidation: !on })
-    langs.typescript?.javascriptDefaults?.setDiagnosticsOptions({ noSemanticValidation: !on, noSyntaxValidation: !on })
-  }, [monacoInst, settings.editor.validate])
 
   useEffect(() => {
     return () => {
@@ -338,8 +284,10 @@ export default function FileManager() {
   const saveFileRef = useRef<() => void>(() => {})
   useEffect(() => { saveFileRef.current = saveFile })
 
+  const isEditing = editing !== null
+
   useEffect(() => {
-    if (!editing) return
+    if (!isEditing) return
     function handleKeyDown(e: KeyboardEvent) {
       if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 's') {
         e.preventDefault()
@@ -350,7 +298,7 @@ export default function FileManager() {
     }
     window.addEventListener('keydown', handleKeyDown)
     return () => window.removeEventListener('keydown', handleKeyDown)
-  }, [!!editing])
+  }, [isEditing])
 
   const qKey = ['files', cwd]
   const { data: entries = [], isLoading, error } = useQuery<FileEntry[]>({
@@ -482,46 +430,53 @@ export default function FileManager() {
 
   async function openFile(entry: FileEntry) {
     try {
-      const res = await api.get('/files/read', { params: { path: entry.path }, responseType: 'text' })
-      setEditing({ path: entry.path })
+      const res = await api.get<string>('/files/read', { params: { path: entry.path }, responseType: 'text' })
+      const lastModified = Number(res.headers['x-last-modified'])
+      setEditing({ path: entry.path, lastModified: Number.isFinite(lastModified) ? lastModified : null })
       setEditorContent(res.data)
       setJustSaved(false)
-    } catch (e: any) {
-      if (e.response?.status === 415) downloadFile(entry)
-      else showPrompt('Cannot open file', e.response?.data?.error ?? 'The selected file could not be opened.', 'error')
+    } catch (e) {
+      if (apiStatus(e) === 415) downloadFile(entry)
+      else showPrompt('Cannot open file', apiError(e, 'The selected file could not be opened.'), 'error')
     }
   }
 
-  function downloadFile(entry: FileEntry) {
-    const token = localStorage.getItem(TOKEN_KEY) ?? ''
-    fetch(`/api/files/download?path=${encodeURIComponent(entry.path)}`, {
-      headers: { Authorization: `Bearer ${token}` },
-    })
-      .then((r) => r.blob())
-      .then((blob) => {
-        const a = document.createElement('a')
-        a.href = URL.createObjectURL(blob)
-        a.download = entry.name
-        a.click()
-        URL.revokeObjectURL(a.href)
-      })
+  async function downloadFile(entry: FileEntry) {
+    try {
+      await downloadViaToken('/files/download-token', { path: entry.path })
+    } catch (e) {
+      showPrompt('Download failed', apiError(e, 'The file could not be downloaded.'), 'error')
+    }
   }
 
-  async function saveFile() {
-    // Ref check is synchronous (unlike `saving` state, which lags a render behind),
-    // so it actually blocks a second call fired in the same tick — e.g. a double-click
-    // or fast repeated Cmd/Ctrl+S before React has re-rendered the disabled button.
+  async function saveFile(overwriteExternalChanges = false) {
     if (!editing || isSavingRef.current) return
     isSavingRef.current = true
     setSaving(true)
     try {
-      await api.put('/files/write', editorContent, {
-        params: { path: editing.path },
+      const expectedLastModified = overwriteExternalChanges ? undefined : editing.lastModified ?? undefined
+      const res = await api.put('/files/write', editorContent, {
+        params: { path: editing.path, expectedLastModified },
         headers: { 'Content-Type': 'text/plain' },
       })
+      const saved = Number(res.headers['x-last-modified'])
+      setEditing(current => current && { ...current, lastModified: Number.isFinite(saved) ? saved : null })
       setJustSaved(true)
       setTimeout(() => setJustSaved(false), 1600)
-    } catch (e: any) { showPrompt('Save failed', e.response?.data?.error ?? 'The file could not be saved.', 'error') }
+    } catch (e) {
+      if (apiStatus(e) === 409) {
+        setPrompt({
+          title: 'File changed on disk',
+          message: `${editing.path} was modified by something else after you opened it. Overwrite those changes with your version?`,
+          variant: 'danger',
+          confirmLabel: 'Overwrite',
+          cancelLabel: 'Keep editing',
+          onConfirm: () => saveFile(true),
+        })
+      } else {
+        showPrompt('Save failed', apiError(e, 'The file could not be saved.'), 'error')
+      }
+    }
     finally { isSavingRef.current = false; setSaving(false) }
   }
 
@@ -542,8 +497,8 @@ export default function FileManager() {
           }
           clearSelection()
           invalidateFiles()
-        } catch (e: any) {
-          showPrompt('Delete failed', e.response?.data?.error ?? 'The selected item could not be deleted.', 'error')
+        } catch (e) {
+          showPrompt('Delete failed', apiError(e, 'The selected item could not be deleted.'), 'error')
           throw e
         }
       },
@@ -571,8 +526,8 @@ export default function FileManager() {
       if (fileClipboard.action === 'cut') setFileClipboard(null)
       clearSelection()
       invalidateFiles()
-    } catch (e: any) {
-      showPrompt('Paste failed', e.response?.data?.error ?? 'The selected item could not be pasted here.', 'error')
+    } catch (e) {
+      showPrompt('Paste failed', apiError(e, 'The selected item could not be pasted here.'), 'error')
     }
   }
 
@@ -588,7 +543,7 @@ export default function FileManager() {
     try {
       await api.patch('/files/rename', { from: modal.entry.path, to })
       setModal(null); invalidate()
-    } catch (e: any) { showPrompt('Rename failed', e.response?.data?.error ?? 'The item could not be renamed.', 'error') }
+    } catch (e) { showPrompt('Rename failed', apiError(e, 'The item could not be renamed.'), 'error') }
   }
 
   async function doMkdir() {
@@ -597,7 +552,7 @@ export default function FileManager() {
     try {
       await api.post('/files/mkdir', null, { params: { path } })
       setModal(null); invalidate()
-    } catch (e: any) { showPrompt('Folder not created', e.response?.data?.error ?? 'The folder could not be created.', 'error') }
+    } catch (e) { showPrompt('Folder not created', apiError(e, 'The folder could not be created.'), 'error') }
   }
 
   async function doFetch() {
@@ -610,7 +565,7 @@ export default function FileManager() {
         fileName: fetchName.trim() || undefined,
       })
       setModal(null); setFetchUrl(''); setFetchName(''); invalidate()
-    } catch (e: any) { showPrompt('Download failed', e.response?.data?.error ?? 'The file could not be fetched.', 'error') }
+    } catch (e) { showPrompt('Download failed', apiError(e, 'The file could not be fetched.'), 'error') }
     finally { setFetchLoading(false) }
   }
 
@@ -631,8 +586,8 @@ export default function FileManager() {
     try {
       await api.post('/files/decompress', { path: modal.entry.path, destPath })
       setModal(null); invalidateFiles()
-    } catch (e: any) {
-      showPrompt('Decompress failed', e.response?.data?.error ?? 'The archive could not be decompressed.', 'error')
+    } catch (e) {
+      showPrompt('Decompress failed', apiError(e, 'The archive could not be decompressed.'), 'error')
     } finally { setDecompressLoading(false) }
   }
 
@@ -694,7 +649,7 @@ export default function FileManager() {
       const fd = new FormData()
       fd.append('file', file)
       await api.post('/files/upload', fd, {
-        params: { path: uploadPath },
+        params: { path: uploadPath, overwrite: 'true' },
         onUploadProgress: (event) => {
           patchUploadItem(item.id, { loaded: event.loaded }, true)
         },
@@ -712,7 +667,7 @@ export default function FileManager() {
       }
 
       let nextChunk = 0
-      let failure: any = null
+      let failure: unknown = null
       const workerCount = Math.min(CHUNK_UPLOAD_CONCURRENCY, totalChunks)
       await Promise.all(Array.from({ length: workerCount }, async () => {
         while (failure == null && nextChunk < totalChunks) {
@@ -724,6 +679,7 @@ export default function FileManager() {
             await api.post('/files/upload-chunk', chunk, {
               params: {
                 path: uploadPath,
+                overwrite: 'true',
                 uploadId,
                 filename: file.name,
                 chunkIndex,
@@ -753,11 +709,11 @@ export default function FileManager() {
         if (file.size >= CHUNKED_UPLOAD_THRESHOLD) await uploadChunkedFile(file, item)
         else await uploadSmallFile(file, item)
         patchUploadItem(item.id, { status: 'done', loaded: file.size })
-      } catch (e: any) {
+      } catch (e) {
         patchUploadItem(item.id, {
           status: 'error',
           loaded: 0,
-          error: e.response?.data?.error ?? 'Upload failed',
+          error: apiError(e, 'Upload failed'),
         })
       }
     }
@@ -775,9 +731,10 @@ export default function FileManager() {
     invalidate()
   }
 
-  const onDrop = useCallback((e: React.DragEvent) => {
-    e.preventDefault(); upload(e.dataTransfer.files)
-  }, [cwd])
+  function onDrop(e: React.DragEvent) {
+    e.preventDefault()
+    upload(e.dataTransfer.files)
+  }
 
   function openModal(m: Modal, initial = '') {
     setModal(m); setModalInput(initial)
@@ -887,24 +844,6 @@ export default function FileManager() {
   function handleIconActivate(entry: FileEntry) {
     if (entry.isDirectory) navigate(entry.path)
     else openFile(entry)
-  }
-
-  const editorOptions = {
-    fontSize: settings.editor.fontSize,
-    fontFamily: "'JetBrains Mono', monospace",
-    minimap: { enabled: false },
-    wordWrap: (settings.editor.wordWrap ? 'on' : 'off') as 'on' | 'off',
-    lineHeight: 1.7,
-    scrollBeyondLastLine: false,
-    padding: { top: 12, bottom: 12 },
-    cursorSmoothCaretAnimation: (settings.editor.smoothCaret ? 'on' : 'off') as 'on' | 'off',
-    quickSuggestions: settings.editor.suggestions,
-    suggestOnTriggerCharacters: settings.editor.suggestions,
-    parameterHints: { enabled: settings.editor.suggestions },
-    lineNumbers: (settings.editor.lineNumbers ? 'on' : 'off') as 'on' | 'off',
-    renderWhitespace: (settings.editor.renderWhitespace ? 'boundary' : 'none') as 'boundary' | 'none',
-    bracketPairColorization: { enabled: true },
-    automaticLayout: true,
   }
 
   const uploadTotal = uploadItems.reduce((sum, item) => sum + item.size, 0)
@@ -1248,7 +1187,7 @@ export default function FileManager() {
           <div className="fm-editor-panel">
             <div className="fm-editor-bar">
               <span className="fm-editor-path">{editing.path}</span>
-              <button className={`pill-btn primary${justSaved ? ' success' : ''}`} onClick={saveFile} disabled={saving || justSaved}>
+              <button className={`pill-btn primary${justSaved ? ' success' : ''}`} onClick={() => saveFile()} disabled={saving || justSaved}>
                 {justSaved ? <IconCheck size={13} /> : <IconSave size={13} />}
                 {justSaved ? 'Saved' : saving ? 'Saving…' : 'Save'}
               </button>
@@ -1256,15 +1195,9 @@ export default function FileManager() {
                 <IconX size={13} />Close
               </button>
             </div>
-            <Editor
-              key={editing.path}
-              height="100%"
-              language={langFor(editing.path.split('/').pop() ?? '')}
-              defaultValue={editorContent}
-              onChange={(v) => setEditorContent(v ?? '')}
-              theme="teletype-ui"
-              options={editorOptions}
-            />
+            <Suspense fallback={<div className="fm-editor-loading">Loading editor…</div>}>
+              <CodeEditor path={editing.path} defaultValue={editorContent} onChange={setEditorContent} />
+            </Suspense>
           </div>
         )}
       </div>

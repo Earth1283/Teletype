@@ -24,13 +24,12 @@ class ConsoleInterceptor(
     Property.EMPTY_ARRAY
 ) {
     override fun append(event: LogEvent) {
-        val time = LocalTime.ofInstant(
-            Instant.ofEpochMilli(event.timeMillis), ZoneId.systemDefault()
-        ).format(TIME_FMT)
-        val level = event.level.name()
-        val thread = event.threadName ?: "Server thread"
-        val msg = event.message.formattedMessage
-        broadcaster.emit("[$time] [$thread/$level]: $msg")
+        val time = LocalTime.ofInstant(Instant.ofEpochMilli(event.timeMillis), ZoneId.systemDefault()).format(TIME_FMT)
+        val prefix = "[$time] [${event.threadName ?: "Server thread"}/${event.level.name()}]: "
+        broadcaster.emit(prefix + event.message.formattedMessage)
+        event.thrown?.stackTraceToString()?.lineSequence()
+            ?.filter { it.isNotBlank() }
+            ?.forEach { broadcaster.emit(prefix + it) }
     }
 
     companion object {

@@ -201,9 +201,18 @@ function json(res, data, status = 200) {
   res.end(body)
 }
 
-function text(res, body) {
-  res.writeHead(200, { 'Content-Type': 'text/plain', 'Access-Control-Allow-Origin': '*' })
+function text(res, body, headers = {}) {
+  res.writeHead(200, { 'Content-Type': 'text/plain', 'Access-Control-Allow-Origin': '*', ...headers })
   res.end(body)
+}
+
+const MOCK_FILE_MTIME = Date.now()
+const downloadTokens = new Map()
+
+function issueDownloadToken(name, body) {
+  const token = Math.random().toString(36).slice(2)
+  downloadTokens.set(token, { name, body })
+  return { token, url: `/api/download/${token}` }
 }
 
 function readBody(req) {
@@ -267,8 +276,9 @@ const server = http.createServer(async (req, res) => {
   }
   if (m === 'GET' && path === '/api/glance/history') {
     const win  = parseInt(url.searchParams.get('window') ?? '5')
-    const since = Date.now() - win * 60_000
-    return json(res, history.filter(s => s.timestamp >= since))
+    const cutoff = Date.now() - win * 60_000
+    const after = Number(url.searchParams.get('since') ?? 0)
+    return json(res, history.filter(s => s.timestamp >= cutoff && s.timestamp > after))
   }
   if (m === 'GET' && path === '/api/glance/gc-events') {
     const win  = parseInt(url.searchParams.get('window') ?? '5')
@@ -293,8 +303,23 @@ const server = http.createServer(async (req, res) => {
 
   // ── Files ──────────────────────────────────────────────────────────────────
   if (m === 'GET'    && path === '/api/files/list')     return json(res, FILES)
-  if (m === 'GET'    && path === '/api/files/read')     return text(res, SERVER_PROPERTIES)
+  if (m === 'GET'    && path === '/api/files/read')     return text(res, SERVER_PROPERTIES, { 'X-Last-Modified': String(MOCK_FILE_MTIME) })
   if (m === 'PUT'    && path === '/api/files/write')    return json(res, { status: 'saved' })
+  if (m === 'POST'   && path === '/api/files/download-token') {
+    const name = (url.searchParams.get('path') ?? 'file').split('/').pop()
+    return json(res, issueDownloadToken(name, SERVER_PROPERTIES))
+  }
+  if (m === 'POST'   && /^\/api\/profiling\/recording\/[^/]+\/download-token$/.test(path)) {
+    return json(res, issueDownloadToken('mock-recording.jfr', 'mock jfr bytes'))
+  }
+  if (m === 'GET'    && path.startsWith('/api/download/')) {
+    const ticket = downloadTokens.get(path.slice('/api/download/'.length))
+    if (!ticket) return json(res, { error: 'Download link expired or invalid' }, 404)
+    downloadTokens.delete(path.slice('/api/download/'.length))
+    res.writeHead(200, { 'Content-Type': 'application/octet-stream', 'Content-Disposition': `attachment; filename="${ticket.name}"` })
+    res.end(ticket.body)
+    return
+  }
   if (m === 'POST'   && path === '/api/files/mkdir')    return json(res, { status: 'created' })
   if (m === 'PATCH'  && path === '/api/files/rename')   return json(res, { status: 'moved' })
   if (m === 'POST'   && path === '/api/files/copy')     return json(res, { status: 'copied' })
@@ -329,12 +354,15 @@ server.on('upgrade', (req, socket, head) => {
 })
 
 wss.on('connection', ws => {
-  const send = line => {
-    if (ws.readyState === 1) ws.send(JSON.stringify({ type: 'log', payload: line }))
+  let seq = 0
+  const sendBatch = lines => {
+    if (ws.readyState !== 1) return
+    seq += lines.length
+    ws.send(JSON.stringify({ type: 'log_batch', payload: JSON.stringify(lines), seq, epoch: 'mock' }))
   }
+  const send = line => sendBatch([line])
 
-  // Replay burst on connect
-  for (let i = 0; i < 40; i++) send(randomLog())
+  sendBatch(Array.from({ length: 40 }, randomLog))
 
   // Trickle with variable cadence
   let timer

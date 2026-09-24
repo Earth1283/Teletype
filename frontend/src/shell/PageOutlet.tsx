@@ -1,18 +1,21 @@
+import { lazy, Suspense } from 'react'
 import { ErrorBoundary } from '../ErrorBoundary'
-import Console from '../components/Console'
-import PlayerList from '../components/PlayerList'
-import ServerStats from '../components/ServerStats'
-import FileManager from '../components/FileManager'
-import GlancePage from '../components/GlancePage'
-import ActionsPage from '../components/actions/ActionsPage'
-import SettingsPage from '../components/SettingsPage'
-import AuditPage from '../components/AuditPage'
-import NetworkPage from '../components/NetworkPage'
-import ProfilingPage from '../components/ProfilingPage'
+import { Skeleton } from '../Skeleton'
+import { PageActiveProvider } from './PageActivity'
 import { TABS, type Tab } from './tabs'
 
-/** Renders a single page's content for a tab id — shared by every shell. */
-export function renderPage(id: Tab, onNavigate: (tab: Tab) => void) {
+const Console = lazy(() => import('../components/Console'))
+const PlayerList = lazy(() => import('../components/PlayerList'))
+const ServerStats = lazy(() => import('../components/ServerStats'))
+const FileManager = lazy(() => import('../components/FileManager'))
+const GlancePage = lazy(() => import('../components/GlancePage'))
+const ActionsPage = lazy(() => import('../components/actions/ActionsPage'))
+const SettingsPage = lazy(() => import('../components/SettingsPage'))
+const AuditPage = lazy(() => import('../components/AuditPage'))
+const NetworkPage = lazy(() => import('../components/NetworkPage'))
+const ProfilingPage = lazy(() => import('../components/ProfilingPage'))
+
+function pageContent(id: Tab, onNavigate: (tab: Tab) => void) {
   switch (id) {
     case 'glance':    return <GlancePage />
     case 'console':   return <Console />
@@ -25,6 +28,27 @@ export function renderPage(id: Tab, onNavigate: (tab: Tab) => void) {
     case 'profiling': return <ProfilingPage />
     case 'settings':  return <SettingsPage />
   }
+}
+
+function PageFallback() {
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 12, padding: 24 }}>
+      <Skeleton height={28} width="40%" />
+      <Skeleton height={160} />
+      <Skeleton height={160} />
+    </div>
+  )
+}
+
+/** Renders a single page's content for a tab id — shared by every shell. */
+export function renderPage(id: Tab, onNavigate: (tab: Tab) => void, active = true) {
+  return (
+    <PageActiveProvider value={active}>
+      <Suspense fallback={<PageFallback />}>
+        {pageContent(id, onNavigate)}
+      </Suspense>
+    </PageActiveProvider>
+  )
 }
 
 export interface PageOutletProps {
@@ -43,7 +67,7 @@ export function PageOutlet({ activeTab, visitedTabs, onNavigate }: PageOutletPro
         return (
           <div key={id} style={{ display: active ? 'contents' : 'none' }}>
             <ErrorBoundary label={`${label} failed to render`}>
-              {renderPage(id, onNavigate)}
+              {renderPage(id, onNavigate, active)}
             </ErrorBoundary>
           </div>
         )

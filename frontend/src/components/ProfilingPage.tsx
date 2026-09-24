@@ -3,11 +3,13 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import {
   BarChart, Bar, LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid, LabelList,
 } from 'recharts'
-import { api, TOKEN_KEY } from '../api/client'
+import { api, apiError, downloadViaToken } from '../api/client'
 import { useToast } from '../ToastContext'
 import {
   IconFlightRecorder, IconDownload, IconTrash, IconX, IconRefresh, IconPlay,
 } from '../Icons'
+import { usePollInterval } from '../shell/PageActivity'
+import type { ChartTooltipProps } from './charts/chartTypes'
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -122,7 +124,7 @@ function EventSummaryModal({ recording, onClose }: { recording: JfrRecording; on
 
         {error && (
           <div style={{ color: 'var(--red)', fontSize: '13px', padding: '24px 0', textAlign: 'center' }}>
-            {(error as any).response?.data?.error ?? 'Failed to parse recording'}
+            {apiError(error, 'Failed to parse recording')}
           </div>
         )}
 
@@ -169,13 +171,13 @@ function EventSummaryModal({ recording, onClose }: { recording: JfrRecording; on
                       width={36}
                     />
                     <Tooltip
-                      content={({ active, payload }: any) => {
+                      content={({ active, payload }: ChartTooltipProps<unknown>) => {
                         if (!active || !payload?.length) return null
                         return (
                           <div style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 6, padding: '6px 10px', fontSize: 12 }}>
-                            {payload.map((p: any) => (
-                              <div key={p.dataKey} style={{ color: p.color }}>
-                                {p.dataKey === 'machineTotal' ? 'System' : 'JVM'}: {((p.value || 0) * 100).toFixed(1)}%
+                            {payload.map(p => (
+                              <div key={String(p.dataKey)} style={{ color: p.color }}>
+                                {p.dataKey === 'machineTotal' ? 'System' : 'JVM'}: {(Number(p.value || 0) * 100).toFixed(1)}%
                               </div>
                             ))}
                           </div>
@@ -209,7 +211,7 @@ function EventSummaryModal({ recording, onClose }: { recording: JfrRecording; on
                       width={40}
                     />
                     <Tooltip
-                      content={({ active, payload }: any) => {
+                      content={({ active, payload }: ChartTooltipProps<unknown>) => {
                         if (!active || !payload?.length) return null
                         return (
                           <div style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 6, padding: '6px 10px', fontSize: 12, color: 'var(--ash)' }}>
@@ -246,9 +248,9 @@ function EventSummaryModal({ recording, onClose }: { recording: JfrRecording; on
                         axisLine={false}
                       />
                       <Tooltip
-                        content={({ active, payload }: any) => {
-                          if (!active || !payload?.length) return null
-                          const d = payload[0].payload
+                        content={({ active, payload }: ChartTooltipProps<(typeof topLocks)[number]>) => {
+                          const d = payload?.[0]?.payload
+                          if (!active || !d) return null
                           return (
                             <div className="rounded-sm border border-border bg-surface px-2.5 py-1.5 font-mono text-[11px] text-text-primary">
                               <div className="mb-0.5" title={d.className}>{d.shortName}</div>
@@ -495,13 +497,13 @@ export default function ProfilingPage() {
   const { data: status, isLoading: statusLoading } = useQuery<ProfilingStatus>({
     queryKey: ['profiling-status'],
     queryFn: () => api.get('/profiling/status').then(r => r.data),
-    refetchInterval: 5_000,
+    refetchInterval: usePollInterval(5_000),
   })
 
   const { data: recordings = [], isLoading: recsLoading } = useQuery<JfrRecording[]>({
     queryKey: ['profiling-recordings'],
     queryFn: () => api.get('/profiling/recordings').then(r => r.data),
-    refetchInterval: 8_000,
+    refetchInterval: usePollInterval(8_000),
   })
 
   const invalidate = () => {
@@ -512,61 +514,44 @@ export default function ProfilingPage() {
   const startContinuousMut = useMutation({
     mutationFn: (req: object) => api.post('/profiling/continuous/start', req),
     onSuccess: () => { invalidate(); toast.success('Continuous recording started') },
-    onError: (e: any) => toast.error(e.response?.data?.error ?? 'Failed to start recording'),
+    onError: (e: unknown) => toast.error(apiError(e, 'Failed to start recording')),
   })
 
   const stopContinuousMut = useMutation({
     mutationFn: () => api.post('/profiling/continuous/stop'),
     onSuccess: () => { invalidate(); toast.success('Continuous recording stopped') },
-    onError: (e: any) => toast.error(e.response?.data?.error ?? 'Failed to stop recording'),
+    onError: (e: unknown) => toast.error(apiError(e, 'Failed to stop recording')),
   })
 
   const dumpMut = useMutation({
     mutationFn: (name: string) => api.post('/profiling/continuous/dump', { name }),
     onSuccess: () => { invalidate(); toast.success('Buffer dumped to disk'); setDumpName('') },
-    onError: (e: any) => toast.error(e.response?.data?.error ?? 'Failed to dump buffer'),
+    onError: (e: unknown) => toast.error(apiError(e, 'Failed to dump buffer')),
   })
 
   const startNamedMut = useMutation({
     mutationFn: (req: object) => api.post('/profiling/recording/start', req),
     onSuccess: () => { invalidate(); toast.success('Recording started') },
-    onError: (e: any) => toast.error(e.response?.data?.error ?? 'Failed to start recording'),
+    onError: (e: unknown) => toast.error(apiError(e, 'Failed to start recording')),
   })
 
   const stopNamedMut = useMutation({
     mutationFn: (id: string) => api.post(`/profiling/recording/${id}/stop`),
     onSuccess: () => { invalidate(); toast.success('Recording stopped') },
-    onError: (e: any) => toast.error(e.response?.data?.error ?? 'Failed to stop recording'),
+    onError: (e: unknown) => toast.error(apiError(e, 'Failed to stop recording')),
   })
 
   const deleteMut = useMutation({
     mutationFn: (id: string) => api.delete(`/profiling/recording/${id}`),
     onSuccess: () => { setDeletingId(null); invalidate(); toast.success('Recording deleted') },
-    onError: (e: any) => toast.error(e.response?.data?.error ?? 'Failed to delete recording'),
+    onError: (e: unknown) => toast.error(apiError(e, 'Failed to delete recording')),
   })
 
   const handleDownload = (rec: JfrRecording) => {
-    const a = document.createElement('a')
-    a.href = `/api/profiling/recording/${rec.id}/download`
-    a.download = `${rec.name}.jfr`
-    const token = localStorage.getItem(TOKEN_KEY)
-    if (token) {
-      // Fetch with auth header and create blob URL
-      fetch(`/api/profiling/recording/${rec.id}/download`, {
-        headers: { Authorization: `Bearer ${token}` },
-      })
-        .then(r => r.blob())
-        .then(blob => {
-          const url = URL.createObjectURL(blob)
-          const link = document.createElement('a')
-          link.href = url
-          link.download = `${rec.name}.jfr`
-          link.click()
-          URL.revokeObjectURL(url)
-        })
-        .catch(() => toast.error('Failed to download recording'))
-    }
+    downloadViaToken(`/profiling/recording/${rec.id}/download-token`)
+      .catch(() => toast.error('Failed to download recording'))
   }
+
 
   const isLoading = statusLoading && recsLoading
 

@@ -1,76 +1,103 @@
-import { TOKEN_KEY } from './client'
+import { TOKEN_KEY, expireSession } from './client'
 
-export type WsMessage = { type: string; payload: string }
-export type LogHandler = (line: string) => void
+export type WsMessage = { type: string; payload: string; seq?: number; epoch?: string }
+export type LogsHandler = (lines: string[]) => void
 export type TabCompleteHandler = (completions: string[]) => void
 
 type ConnHandler = () => void
 
+const POLICY_VIOLATION = 1008
+const MAX_RECONNECT_DELAY_MS = 30_000
+
+function parseJson<T>(text: string): T | null {
+  try { return JSON.parse(text) as T } catch { return null }
+}
+
 export class ConsoleSocket {
   private ws: WebSocket | null = null
-  private logHandlers: LogHandler[] = []
+  private logHandlers: LogsHandler[] = []
   private connHandlers: ConnHandler[] = []
   private discHandlers: ConnHandler[] = []
   private tabCompleteHandler: TabCompleteHandler | null = null
   private reconnectDelay = 1000
   private stopped = false
+  private lastSeq: number | undefined
+  private epoch: string | undefined
 
   connect() {
     this.stopped = false
-    this._connect()
+    this.open()
   }
 
-  private _connect() {
+  private open() {
     if (this.stopped) return
-    const token = localStorage.getItem(TOKEN_KEY) ?? ''
     const proto = location.protocol === 'https:' ? 'wss' : 'ws'
-    this.ws = new WebSocket(`${proto}://${location.host}/ws/console`)
+    const ws = new WebSocket(`${proto}://${location.host}/ws/console`)
+    this.ws = ws
 
-    this.ws.onopen = () => {
-      this.ws!.send(JSON.stringify({ type: 'auth', payload: token }))
+    ws.onopen = () => {
+      const token = localStorage.getItem(TOKEN_KEY) ?? ''
+      ws.send(JSON.stringify({ type: 'auth', payload: token, seq: this.lastSeq, epoch: this.epoch }))
       this.reconnectDelay = 1000
       this.connHandlers.forEach(h => h())
     }
 
-    this.ws.onmessage = (e) => {
-      const msg: WsMessage = JSON.parse(e.data)
-      if (msg.type === 'log') {
-        this.logHandlers.forEach(h => h(msg.payload))
-      } else if (msg.type === 'tab_complete') {
-        try {
-          const completions = JSON.parse(msg.payload) as string[]
-          this.tabCompleteHandler?.(completions)
-        } catch {}
-        this.tabCompleteHandler = null
-      }
+    ws.onmessage = (e) => {
+      const msg = parseJson<WsMessage>(e.data)
+      if (msg) this.handleMessage(msg)
     }
 
-    this.ws.onclose = () => {
+    ws.onclose = (e) => {
       this.discHandlers.forEach(h => h())
+      if (e.code === POLICY_VIOLATION) {
+        this.stopped = true
+        if (e.reason === 'Unauthorized') expireSession()
+        return
+      }
       if (!this.stopped) {
-        setTimeout(() => this._connect(), this.reconnectDelay)
-        this.reconnectDelay = Math.min(this.reconnectDelay * 2, 30_000)
+        setTimeout(() => this.open(), this.reconnectDelay)
+        this.reconnectDelay = Math.min(this.reconnectDelay * 2, MAX_RECONNECT_DELAY_MS)
       }
     }
+  }
+
+  private handleMessage(msg: WsMessage) {
+    switch (msg.type) {
+      case 'log_batch': {
+        const lines = parseJson<string[]>(msg.payload)
+        if (!lines) return
+        this.lastSeq = msg.seq
+        this.epoch = msg.epoch
+        this.logHandlers.forEach(h => h(lines))
+        break
+      }
+      case 'log':
+        this.logHandlers.forEach(h => h([msg.payload]))
+        break
+      case 'tab_complete':
+        this.tabCompleteHandler?.(parseJson<string[]>(msg.payload) ?? [])
+        this.tabCompleteHandler = null
+        break
+    }
+  }
+
+  private sendMessage(type: string, payload: string) {
+    if (this.ws?.readyState === WebSocket.OPEN) this.ws.send(JSON.stringify({ type, payload }))
   }
 
   send(command: string) {
-    if (this.ws?.readyState === WebSocket.OPEN) {
-      this.ws.send(JSON.stringify({ type: 'command', payload: command }))
-    }
+    this.sendMessage('command', command)
   }
 
   sendTabComplete(partial: string) {
-    if (this.ws?.readyState === WebSocket.OPEN) {
-      this.ws.send(JSON.stringify({ type: 'tab_complete', payload: partial }))
-    }
+    this.sendMessage('tab_complete', partial)
   }
 
   onTabComplete(handler: TabCompleteHandler) {
     this.tabCompleteHandler = handler
   }
 
-  onLog(handler: LogHandler) {
+  onLogs(handler: LogsHandler) {
     this.logHandlers.push(handler)
     return () => { this.logHandlers = this.logHandlers.filter(h => h !== handler) }
   }

@@ -7,11 +7,11 @@ export default defineConfig({
   build: {
     outDir: '../src/main/resources/webroot',
     emptyOutDir: true,
+    chunkSizeWarningLimit: 4096,
     rollupOptions: {
       output: {
         manualChunks: (id: string) => {
           if (id.includes('node_modules/recharts') || id.includes('node_modules/d3')) return 'recharts'
-          if (id.includes('node_modules/@monaco-editor') || id.includes('node_modules/monaco-editor')) return 'monaco'
           if (id.includes('node_modules/@tanstack')) return 'query'
           if (id.includes('node_modules/react') || id.includes('node_modules/react-dom')) return 'react'
         },

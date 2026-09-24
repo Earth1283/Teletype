@@ -4,12 +4,16 @@ import {
   XAxis, YAxis, CartesianGrid, Tooltip,
   ResponsiveContainer, ReferenceArea, ReferenceLine,
 } from 'recharts'
-import { useQuery } from '@tanstack/react-query'
+import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { Virtuoso, type VirtuosoHandle } from 'react-virtuoso'
 import { api } from '../api/client'
-import { useLogs, type TimestampedLog } from '../LogContext'
+import { fetchHistory, historyQueryKey } from '../api/history'
+import { useLogApi, useLogLines, type TimestampedLog } from '../LogContext'
+import { pointAtActiveIndex, type ChartDotProps, type ChartTooltipProps } from './charts/chartTypes'
 import { useSettings, type TeletypeSettings } from '../SettingsContext'
 import { IconChevronRight, IconChevronLeft } from '../Icons'
+import { usePollInterval } from '../shell/PageActivity'
+import { stripAnsi, stripLogPrefix } from '../logText'
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
@@ -133,18 +137,12 @@ function logLevel(line: string): string {
   if (u.includes('[ERROR]') || u.includes('[SEVERE]') || u.includes('[FATAL]')) return 'error'
   return ''
 }
-function stripAnsi(line: string): string {
-  return line.replace(/\x1b\[[0-9;]*m/g, '')
-}
-function stripLogPrefix(line: string): string {
-  return line.replace(/^(?:\[[^\]]*\]\s*)+:?\s*/, '')
-}
 
 // ── Tooltips ─────────────────────────────────────────────────────────────────
 
-function SimpleTooltip({ active, payload }: any) {
-  if (!active || !payload?.length) return null
-  const snap = payload[0].payload as ProcessedSnap
+function SimpleTooltip({ active, payload }: ChartTooltipProps<ProcessedSnap>) {
+  const snap = payload?.[0]?.payload
+  if (!active || !snap) return null
   return (
     <div className="glance-tooltip">
       <div className="glance-tooltip-time">{fmtTimeFull(snap.timestamp)}</div>
@@ -164,9 +162,7 @@ function SimpleTooltip({ active, payload }: any) {
   )
 }
 
-interface IncidentTooltipProps {
-  active?: boolean
-  payload?: any[]
+interface IncidentTooltipProps extends ChartTooltipProps<ProcessedSnap> {
   allStats: DataStats
   thresholds: AnomalyThresholds
   getLogsAround: (ts: number, windowMs: number) => TimestampedLog[]
@@ -328,9 +324,9 @@ const GlanceChart = memo(function GlanceChart({
     ? (() => { const z = (currentStatsVal - stats.mean) / stats.std; return `${z > 0 ? '+' : ''}${z.toFixed(1)}σ` })()
     : null
 
-  const renderDot = greyBeardMode ? false : (props: any) => {
+  const renderDot = greyBeardMode ? false : (props: ChartDotProps<ProcessedSnap>) => {
     const { cx, cy, payload, index } = props
-    if (cx == null || cy == null) return <g key={`d-empty-${index}`} />
+    if (cx == null || cy == null || !payload) return <g key={`d-empty-${index}`} />
     const v = payload[sKey] as number
     if (stats.std < 0.01) return <g key={`d-${cx}`} />
     const z = (v - stats.mean) / stats.std
@@ -351,8 +347,8 @@ const GlanceChart = memo(function GlanceChart({
   }
 
   const tooltipContent = greyBeardMode
-    ? (props: any) => <SimpleTooltip {...props} />
-    : (props: any) => (
+    ? (props: ChartTooltipProps<ProcessedSnap>) => <SimpleTooltip {...props} />
+    : (props: ChartTooltipProps<ProcessedSnap>) => (
         <IncidentTooltip
           {...props}
           allStats={allStats}
@@ -380,8 +376,8 @@ const GlanceChart = memo(function GlanceChart({
         <ComposedChart
           data={data}
           margin={{ top: 4, right: 8, bottom: 0, left: 0 }}
-          onClick={(e: any) => {
-            const pt = e?.activePayload?.[0]?.payload as ProcessedSnap | undefined
+          onClick={(state) => {
+            const pt = pointAtActiveIndex(data, state)
             if (pt) onPointClick(pt.timestamp)
           }}
         >
@@ -452,7 +448,7 @@ const GlanceChart = memo(function GlanceChart({
             stroke={strokeProp}
             strokeWidth={greyBeardMode ? 1 : 1.5}
             fill={fillProp}
-            dot={renderDot as any}
+            dot={renderDot}
             activeDot={{ r: 3, fill: color, stroke: 'var(--elevated)', strokeWidth: 1 }}
             isAnimationActive={false}
           />
@@ -611,15 +607,17 @@ function UptimeDisplay({ uptimeStr }: { uptimeStr: string }) {
 
 // ── Log Viewer ────────────────────────────────────────────────────────────────
 
-function GlanceLogViewer({ tsLogs, clickedTs, onClear, isOpen, onToggle }: {
-  tsLogs: TimestampedLog[]
+const HIGHLIGHT_WINDOW_MS = 5000
+
+function GlanceLogViewer({ clickedTs, onClear, isOpen, onToggle }: {
   clickedTs: number | null
   onClear: () => void
   isOpen: boolean
   onToggle: () => void
 }) {
+  const { tsLogs } = useLogLines()
   const virtuosoRef = useRef<VirtuosoHandle>(null)
-  const [highlightRange, setHighlightRange] = useState<{ from: number; to: number } | null>(null)
+  const highlightRange = clickedTs === null ? null : { from: clickedTs - HIGHLIGHT_WINDOW_MS, to: clickedTs + HIGHLIGHT_WINDOW_MS }
   const [showAll, setShowAll] = useState(false)
 
   // Correlation view: all logs around clicked point. Default: WARN/ERROR only.
@@ -630,10 +628,8 @@ function GlanceLogViewer({ tsLogs, clickedTs, onClear, isOpen, onToggle }: {
   }, [tsLogs, clickedTs, showAll])
 
   useEffect(() => {
-    if (clickedTs === null) { setHighlightRange(null); return }
-    const W = 5000
-    setHighlightRange({ from: clickedTs - W, to: clickedTs + W })
-    const idx = displayLogs.findIndex(l => l.ts >= clickedTs - W)
+    if (clickedTs === null) return
+    const idx = displayLogs.findIndex(l => l.ts >= clickedTs - HIGHLIGHT_WINDOW_MS)
     if (idx >= 0) {
       requestAnimationFrame(() => {
         virtuosoRef.current?.scrollToIndex({ index: Math.max(0, idx), behavior: 'smooth', align: 'center' })
@@ -711,27 +707,30 @@ export default function GlancePage() {
   const [windowMin, setWindowMin] = useState<WindowMin>(5)
   const [clickedTs, setClickedTs] = useState<number | null>(null)
   const [logPanelOpen, setLogPanelOpen] = useState(true)
-  const logCtx = useLogs()
+  const { getLogsAround } = useLogApi()
   const { settings } = useSettings()
   const { greyBeardMode: gbm, glance: gs } = settings
 
+  const qc = useQueryClient()
+  const historyPoll = usePollInterval(windowMin <= 5 ? Math.max(gs.refreshIntervalMs, 2000) : 30_000)
+
   const { data: histData = [], isError: histError, refetch: refetchHist } = useQuery<Snap[]>({
-    queryKey: ['glance-history', windowMin],
-    queryFn: () => api.get(`/glance/history?window=${windowMin}`).then(r => r.data),
-    refetchInterval: windowMin <= 5 ? Math.max(gs.refreshIntervalMs, 2000) : 30_000,
+    queryKey: historyQueryKey(windowMin),
+    queryFn: () => fetchHistory<Snap>(qc, windowMin),
+    refetchInterval: historyPoll,
     staleTime: 1_000,
   })
 
   const { data: current, isError: currentError, refetch: refetchCurrent } = useQuery<Snap>({
     queryKey: ['glance-current'],
     queryFn: () => api.get('/glance/current').then(r => r.data),
-    refetchInterval: gs.refreshIntervalMs,
+    refetchInterval: usePollInterval(gs.refreshIntervalMs),
   })
 
   const { data: rawGcEvents = [], isError: gcError, refetch: refetchGc } = useQuery<GcEvent[]>({
     queryKey: ['glance-gc-events', windowMin],
     queryFn: () => api.get(`/glance/gc-events?window=${windowMin}`).then(r => r.data),
-    refetchInterval: windowMin <= 5 ? Math.max(gs.refreshIntervalMs, 2000) : 30_000,
+    refetchInterval: historyPoll,
     staleTime: 1_000,
   })
 
@@ -776,7 +775,7 @@ export default function GlancePage() {
   }), [gbm, gs.anomalyThresholdTps, gs.anomalyThresholdTick, gs.anomalyThresholdMem, gs.anomalyThresholdCpu])
 
   const bifurTs = useMemo(() => {
-    if (data.length === 0) return Date.now()
+    if (data.length === 0) return 0
     return data[data.length - 1].timestamp - (FOCUS_SEC[windowMin] ?? 60) * 1000
   }, [data, windowMin])
 
@@ -820,7 +819,7 @@ export default function GlancePage() {
     bifurTs,
     allStats,
     thresholds,
-    getLogsAround: logCtx.getLogsAround,
+    getLogsAround,
     logWindowMs: gs.logCorrelationWindowMs,
     onPointClick: setClickedTs,
     greyBeardMode: gbm,
@@ -966,7 +965,6 @@ export default function GlancePage() {
       {showLogPanel && (
         <div className={`glance-right${logPanelOpen ? '' : ' collapsed'}`}>
           <GlanceLogViewer
-            tsLogs={logCtx.tsLogs}
             clickedTs={clickedTs}
             onClear={() => setClickedTs(null)}
             isOpen={logPanelOpen}

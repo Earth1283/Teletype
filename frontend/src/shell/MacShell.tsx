@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect, useCallback } from 'react'
-import { api } from '../api/client'
+import { api, apiError } from '../api/client'
 import { useSettings } from '../SettingsContext'
 import { useContextMenu, type ContextMenuItem, type ContextMenuTarget } from '../ContextMenu'
 import CommandPalette from '../CommandPalette'
@@ -103,6 +103,19 @@ const APP_ICONS: Record<MacTab, React.ReactNode> = {
     <circle cx="72" cy="72" r="14" fill="none" stroke="currentColor" strokeOpacity={0.4} strokeWidth="5"/>
     <line x1="80" y1="80" x2="90" y2="90" stroke="currentColor" strokeOpacity={0.6} strokeWidth="5" strokeLinecap="round"/>
   </>,
+}
+
+function threadDumpFileName() {
+  return `thread-dump-${Date.now()}.txt`
+}
+
+function saveTextFile(text: string, filename: string) {
+  const url = URL.createObjectURL(new Blob([text], { type: 'text/plain' }))
+  const link = document.createElement('a')
+  link.href = url
+  link.download = filename
+  link.click()
+  setTimeout(() => URL.revokeObjectURL(url), 1_000)
 }
 
 function AppIcon({ id }: { id: MacTab }) {
@@ -403,19 +416,13 @@ export default function MacShell({ onLogout }: { onLogout: () => void }) {
     try {
       const res = await api.get('/system/thread-dump', { responseType: 'text' })
       const text = res.data as string
-      const blob = new Blob([text], { type: 'text/plain' })
-      const url = URL.createObjectURL(blob)
-      const a = document.createElement('a')
-      a.href = url
-      a.download = `thread-dump-${Date.now()}.txt`
-      a.click()
-      URL.revokeObjectURL(url)
+      saveTextFile(text, threadDumpFileName())
       setThreadDumpText(text)
       openApp('thread-dump')
-    } catch (e: any) {
+    } catch (e) {
       setPrompt({
         title: 'Thread dump failed',
-        message: e.response?.data?.error ?? 'The thread dump could not be generated.',
+        message: apiError(e, 'The thread dump could not be generated.'),
         variant: 'error',
       })
     }
@@ -425,10 +432,10 @@ export default function MacShell({ onLogout }: { onLogout: () => void }) {
     setShowRestartConfirm(false)
     try {
       await api.post('/system/restart')
-    } catch (e: any) {
+    } catch (e) {
       setPrompt({
         title: 'Restart request failed',
-        message: e.response?.data?.error ?? 'The restart command could not be dispatched.',
+        message: apiError(e, 'The restart command could not be dispatched.'),
         variant: 'error',
       })
     }
@@ -719,7 +726,7 @@ function MacWindow({ win, isActive, onFocus, onStartDrag, onStartResize, onClose
       <div className="mac-window-content">
         {win.id === 'thread-dump'
           ? <div className="thread-dump-view">{threadDumpText || 'No thread dump loaded.'}</div>
-          : renderPage(win.id as Tab, onNavigate as (t: Tab) => void)}
+          : renderPage(win.id as Tab, onNavigate as (t: Tab) => void, !win.min)}
       </div>
       {!win.max && (
         <div className="mac-resize-handle" onMouseDown={e => onStartResize(e, win.id)} />

@@ -9,6 +9,27 @@ import java.time.ZoneId
 import java.time.ZonedDateTime
 import java.time.temporal.ChronoUnit
 
+private const val HOUR_MS = 3_600_000L
+private const val DAY_MS = 86_400_000L
+private const val EVENT_RETENTION_DAYS = 30L
+private const val STARTUP_DELAY_MS = 5 * 60_000L
+
+data class RetentionCutoffs(
+    val downsampleRawBefore: Long,
+    val downsampleMinutesBefore: Long,
+    val delete15mBefore: Long?,
+    val deleteEventsBefore: Long,
+) {
+    companion object {
+        fun at(now: Long, rawAfterHours: Int, minuteAfterDays: Int, delete15mAfterDays: Int) = RetentionCutoffs(
+            downsampleRawBefore = now - rawAfterHours.coerceAtLeast(1) * HOUR_MS,
+            downsampleMinutesBefore = now - minuteAfterDays.coerceAtLeast(1) * DAY_MS,
+            delete15mBefore = if (delete15mAfterDays > 0) now - delete15mAfterDays * DAY_MS else null,
+            deleteEventsBefore = now - EVENT_RETENTION_DAYS * DAY_MS,
+        )
+    }
+}
+
 class RetentionJob(
     private val plugin: Teletype,
     private val db: MetricsDatabase,
@@ -16,6 +37,8 @@ class RetentionJob(
 ) {
     fun start() {
         scope.launch {
+            delay(STARTUP_DELAY_MS)
+            runRetention()
             while (isActive) {
                 delay(millisUntilMidnight())
                 runRetention()
@@ -27,30 +50,20 @@ class RetentionJob(
         val cfg = plugin.teletypeConfig
         if (!cfg.retentionEnabled) return
 
-        val now = System.currentTimeMillis()
-        val downsample1sAfterMs = cfg.retentionDownsample1sAfterHours.coerceAtLeast(1) * 3_600_000L
-        val downsample1mAfterMs = cfg.retentionDownsample1mAfterDays.coerceAtLeast(1) * 86_400_000L
-        val delete15mAfterDays = cfg.retentionDelete15mAfterDays
-        val d30 = now - 30L * 86_400_000L
-
-        // The job runs once a day, so each window covers exactly the slice of rows that
-        // crossed the retention threshold since the previous run (e.g. default 48h means
-        // rows 48-72h old get downsampled today, having been 24-48h old yesterday).
-        val downsample1sFrom = now - downsample1sAfterMs - 86_400_000L
-        val downsample1sTo   = now - downsample1sAfterMs
-        val downsample1mFrom = now - downsample1mAfterMs - 86_400_000L
-        val downsample1mTo   = now - downsample1mAfterMs
+        val cutoffs = RetentionCutoffs.at(
+            now = System.currentTimeMillis(),
+            rawAfterHours = cfg.retentionDownsample1sAfterHours,
+            minuteAfterDays = cfg.retentionDownsample1mAfterDays,
+            delete15mAfterDays = cfg.retentionDelete15mAfterDays,
+        )
 
         try {
             plugin.messages.console("metrics.retention-start")
-            db.downsampleToMinute(from = downsample1sFrom, to = downsample1sTo)
-            db.downsampleTo15Min(from = downsample1mFrom, to = downsample1mTo)
-            // 0 = keep 15-minute rows forever (see config.yml)
-            if (delete15mAfterDays > 0) {
-                db.pruneMetrics15m(before = now - delete15mAfterDays * 86_400_000L)
-            }
-            db.prunePlayerEvents(before = d30)
-            db.pruneGcEvents(before = d30)
+            db.downsampleToMinute(before = cutoffs.downsampleRawBefore)
+            db.downsampleTo15Min(before = cutoffs.downsampleMinutesBefore)
+            cutoffs.delete15mBefore?.let { db.pruneMetrics15m(before = it) }
+            db.prunePlayerEvents(before = cutoffs.deleteEventsBefore)
+            db.pruneGcEvents(before = cutoffs.deleteEventsBefore)
             plugin.messages.console("metrics.retention-done")
         } catch (e: Exception) {
             plugin.messages.console("metrics.retention-failed", "error" to (e.message ?: "unknown"))

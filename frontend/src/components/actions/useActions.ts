@@ -5,6 +5,7 @@ import type {
   CreateSnippetRequest, UpdateSnippetRequest,
   CreateCategoryRequest, CreateScheduleRequest,
 } from './actionTypes'
+import { usePollInterval } from '../../shell/PageActivity'
 
 const BASE = '/actions'
 
@@ -13,6 +14,13 @@ export function useCategories() {
     queryKey: ['categories'],
     queryFn: () => api.get(`${BASE}/categories`).then(r => r.data),
   })
+}
+
+const FALLBACK_QUICK_ACTIONS_ID = 'quick-actions'
+
+export function useQuickActionsCategoryId() {
+  const { data: categories = [] } = useCategories()
+  return categories.find(c => c.special)?.id ?? FALLBACK_QUICK_ACTIONS_ID
 }
 
 export function useSnippets() {
@@ -26,7 +34,7 @@ export function useSchedule() {
   return useQuery<ScheduledAction[]>({
     queryKey: ['schedule'],
     queryFn: () => api.get(`${BASE}/schedule`).then(r => r.data),
-    refetchInterval: 15_000,
+    refetchInterval: usePollInterval(15_000),
   })
 }
 

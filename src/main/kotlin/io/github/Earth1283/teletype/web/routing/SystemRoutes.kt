@@ -30,13 +30,11 @@ fun Route.systemRoutes(plugin: Teletype) {
         sb.appendLine("Total active threads: ${Thread.activeCount()}")
         sb.appendLine("=".repeat(80))
         sb.appendLine()
-        @Suppress("DEPRECATION")
         Thread.getAllStackTraces()
             .entries
             .sortedBy { it.key.name }
             .forEach { (thread, frames) ->
-                @Suppress("DEPRECATION")
-                sb.appendLine("\"${thread.name}\" #${thread.id} state=${thread.state}${if (thread.isDaemon) " daemon" else ""} prio=${thread.priority}")
+                sb.appendLine("\"${thread.name}\" #${thread.threadId()} state=${thread.state}${if (thread.isDaemon) " daemon" else ""} prio=${thread.priority}")
                 if (frames.isEmpty()) {
                     sb.appendLine("\t(no stack trace available)")
                 } else {

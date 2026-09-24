@@ -1,4 +1,4 @@
-import { createContext, useCallback, useContext, useEffect, useRef, useState } from 'react'
+import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react'
 import { ConsoleSocket } from './api/websocket'
 
 export interface TimestampedLog {
@@ -11,18 +11,24 @@ export interface LogLine {
   text: string
 }
 
-interface LogContextValue {
+interface LogLinesValue {
   lines: LogLine[]
   tsLogs: TimestampedLog[]
+}
+
+interface LogApiValue {
   connected: boolean
   send: (cmd: string) => void
   tabComplete: (partial: string, callback: (completions: string[]) => void) => void
   getLogsAround: (ts: number, windowMs: number) => TimestampedLog[]
 }
 
-const LogContext = createContext<LogContextValue>({
-  lines: [],
-  tsLogs: [],
+const MAX_LINES = 5000
+const MAX_TIMESTAMPED = 2000
+const FLUSH_INTERVAL_MS = 50
+
+const LogLinesContext = createContext<LogLinesValue>({ lines: [], tsLogs: [] })
+const LogApiContext = createContext<LogApiValue>({
   connected: false,
   send: () => {},
   tabComplete: () => {},
@@ -34,15 +40,17 @@ function stripMinecraft(s: string) {
 }
 
 function parseLogTs(raw: string): number | null {
-  // Paper: "[12:34:56] [Server thread/INFO]: ..."
-  // Spigot: "[12:34:56 INFO]: ..."
   const m = raw.match(/^\[(\d{2}):(\d{2}):(\d{2})/)
   if (!m) return null
   const d = new Date()
   d.setHours(+m[1], +m[2], +m[3], 0)
-  // If parsed time is in the future (just past midnight), assume it's from yesterday
   if (d.getTime() > Date.now() + 60_000) d.setDate(d.getDate() - 1)
   return d.getTime()
+}
+
+function appendCapped<T>(prev: T[], added: T[], cap: number): T[] {
+  const next = prev.concat(added)
+  return next.length > cap ? next.slice(next.length - cap) : next
 }
 
 export function LogProvider({ children }: { children: React.ReactNode }) {
@@ -50,24 +58,29 @@ export function LogProvider({ children }: { children: React.ReactNode }) {
   const [tsLogs, setTsLogs] = useState<TimestampedLog[]>([])
   const [connected, setConnected] = useState(false)
   const socketRef = useRef<ConsoleSocket | null>(null)
+  const tsLogsRef = useRef<TimestampedLog[]>([])
   const nextLineIdRef = useRef(0)
 
   useEffect(() => {
     const socket = new ConsoleSocket()
     socketRef.current = socket
+    let pending: string[] = []
+    let flushTimer: ReturnType<typeof setTimeout> | null = null
 
-    const unsubLog = socket.onLog((raw) => {
-      const line = stripMinecraft(raw)
-      const ts = parseLogTs(raw) ?? Date.now()
-      const id = nextLineIdRef.current++
-      setLines(prev => {
-        const next = [...prev, { id, text: line }]
-        return next.length > 5000 ? next.slice(-5000) : next
-      })
-      setTsLogs(prev => {
-        const next = [...prev, { ts, line }]
-        return next.length > 2000 ? next.slice(-2000) : next
-      })
+    const flush = () => {
+      flushTimer = null
+      const batch = pending
+      pending = []
+      const added = batch.map(raw => ({ id: nextLineIdRef.current++, text: stripMinecraft(raw) }))
+      const addedTs = batch.map((raw, i) => ({ ts: parseLogTs(raw) ?? Date.now(), line: added[i].text }))
+      setLines(prev => appendCapped(prev, added, MAX_LINES))
+      tsLogsRef.current = appendCapped(tsLogsRef.current, addedTs, MAX_TIMESTAMPED)
+      setTsLogs(tsLogsRef.current)
+    }
+
+    const unsubLogs = socket.onLogs((raw) => {
+      pending = appendCapped(pending, raw, MAX_LINES)
+      flushTimer ??= setTimeout(flush, FLUSH_INTERVAL_MS)
     })
     const unsubConn = socket.onConnected(() => setConnected(true))
     const unsubDisc = socket.onDisconnected(() => setConnected(false))
@@ -75,7 +88,8 @@ export function LogProvider({ children }: { children: React.ReactNode }) {
     socket.connect()
 
     return () => {
-      unsubLog()
+      if (flushTimer) clearTimeout(flushTimer)
+      unsubLogs()
       unsubConn()
       unsubDisc()
       socket.disconnect()
@@ -96,16 +110,28 @@ export function LogProvider({ children }: { children: React.ReactNode }) {
   const getLogsAround = useCallback((ts: number, windowMs: number): TimestampedLog[] => {
     const from = ts - windowMs
     const to = ts + windowMs
-    return tsLogs.filter(l => l.ts >= from && l.ts <= to)
-  }, [tsLogs])
+    return tsLogsRef.current.filter(l => l.ts >= from && l.ts <= to)
+  }, [])
+
+  const linesValue = useMemo(() => ({ lines, tsLogs }), [lines, tsLogs])
+  const apiValue = useMemo(
+    () => ({ connected, send, tabComplete, getLogsAround }),
+    [connected, send, tabComplete, getLogsAround],
+  )
 
   return (
-    <LogContext.Provider value={{ lines, tsLogs, connected, send, tabComplete, getLogsAround }}>
-      {children}
-    </LogContext.Provider>
+    <LogApiContext.Provider value={apiValue}>
+      <LogLinesContext.Provider value={linesValue}>
+        {children}
+      </LogLinesContext.Provider>
+    </LogApiContext.Provider>
   )
 }
 
-export function useLogs() {
-  return useContext(LogContext)
+export function useLogLines() {
+  return useContext(LogLinesContext)
+}
+
+export function useLogApi() {
+  return useContext(LogApiContext)
 }

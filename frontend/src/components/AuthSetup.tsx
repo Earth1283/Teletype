@@ -157,6 +157,10 @@ export default function AuthSetup({ onAuth }: Props) {
               <div className="auth-spinner" />
               Waiting for console verification…
             </div>
+
+            <div className="auth-hint">
+              Other server-side controls (status, restart the panel, log everyone out) are listed by <code>/tty help</code>.
+            </div>
           </>
         )}
       </div>

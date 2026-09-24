@@ -1,12 +1,15 @@
 package io.github.Earth1283.teletype.actions
 
 import io.github.Earth1283.teletype.Teletype
+import io.github.Earth1283.teletype.util.quarantineCorrupt
+import io.github.Earth1283.teletype.util.writeTextAtomic
 import io.github.Earth1283.teletype.web.model.Snippet
 import io.github.Earth1283.teletype.web.model.SnippetCategory
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.Serializable
-import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
 import java.io.File
 
@@ -26,6 +29,7 @@ class SnippetStore(private val plugin: Teletype) {
     @Synchronized fun getCategories(): List<SnippetCategory> = categories.toList()
     @Synchronized fun getSnippets(): List<Snippet> = snippets.toList()
     @Synchronized fun findSnippet(id: String): Snippet? = snippets.find { it.id == id }
+    @Synchronized fun hasCategory(id: String): Boolean = categories.any { it.id == id }
 
     @Synchronized fun load() {
         if (!file.exists()) { seedDefaults(); saveNow(); return }
@@ -35,17 +39,19 @@ class SnippetStore(private val plugin: Teletype) {
             snippets.clear(); snippets.addAll(data.snippets)
         } catch (e: Exception) {
             plugin.messages.console("data.snippets-load-failed", "error" to (e.message ?: "unknown"))
+            file.quarantineCorrupt()
             seedDefaults(); saveNow()
         }
     }
 
+    private val saveMutex = Mutex()
+
     private fun saveNow() {
-        plugin.dataFolder.mkdirs()
-        file.writeText(json.encodeToString(StoreData(categories.toList(), snippets.toList())))
+        val snapshot = synchronized(this) { StoreData(categories.toList(), snippets.toList()) }
+        file.writeTextAtomic(json.encodeToString(StoreData.serializer(), snapshot))
     }
 
-    // Off the Ktor request thread — saveNow() does a full-file rewrite on every mutation.
-    private suspend fun save() = withContext(Dispatchers.IO) { saveNow() }
+    private suspend fun save() = saveMutex.withLock { withContext(Dispatchers.IO) { saveNow() } }
 
     private fun seedDefaults() {
         val quickId = plugin.teletypeConfig.actionsQuickActionsCategoryId

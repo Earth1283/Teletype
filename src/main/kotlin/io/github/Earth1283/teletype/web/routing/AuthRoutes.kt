@@ -16,6 +16,7 @@ import java.util.UUID
 fun Route.authRoutes(plugin: Teletype) {
     post("/challenge") {
         val challenge = plugin.challengeStore.createChallenge(call.request.origin.remoteAddress)
+            ?: throw ApiException(HttpStatusCode.TooManyRequests, "Too many pending login challenges — try again in a few minutes")
         call.respond(
             ChallengeResponse(
                 uuid = challenge.uuid.toString(),
@@ -39,8 +40,8 @@ fun Route.authRoutes(plugin: Teletype) {
         }
 
         if (jwt != null) {
-            call.respond(PollResponse(status = "verified", token = jwt))
             plugin.challengeStore.remove(uuid)
+            call.respond(PollResponse(status = "verified", token = jwt))
         } else {
             call.respond(HttpStatusCode.Accepted, PollResponse(status = "pending"))
         }
