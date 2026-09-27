@@ -26,7 +26,7 @@ export function Button({ variant = 'primary', size = 'sm', icon, className, chil
     <button
       className={cx(
         'inline-flex items-center justify-center rounded-sm border font-sans font-medium',
-        'transition-colors duration-150 active:scale-[0.96] disabled:opacity-40 disabled:pointer-events-none',
+        'transition-[color,background-color,border-color,transform] duration-150 ease-[var(--ease-out)] active:scale-[0.97] active:duration-75 disabled:opacity-40 disabled:pointer-events-none',
         VARIANT[variant],
         SIZE[size],
         className,

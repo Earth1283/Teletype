@@ -3,10 +3,6 @@
   0%, 100% { opacity: 1; }
   50% { opacity: 0; }
 }
-@keyframes pulse-dot {
-  0%, 100% { box-shadow: 0 0 0 2px var(--void), 0 0 0 3px rgba(74,222,128,.4); }
-  50% { box-shadow: 0 0 0 2px var(--void), 0 0 0 4px rgba(74,222,128,.15); }
-}
 @keyframes pulse-dot-live {
   0%, 100% { box-shadow: 0 0 0 2px var(--void), 0 0 0 3px color-mix(in srgb, var(--live) 40%, transparent); }
   50% { box-shadow: 0 0 0 2px var(--void), 0 0 0 4px color-mix(in srgb, var(--live) 15%, transparent); }
@@ -18,12 +14,24 @@
   from { opacity: 0; transform: scale(0.96) translateY(6px); }
   to   { opacity: 1; transform: scale(1)    translateY(0);   }
 }
+@keyframes sheet-up {
+  from { opacity: 0.4; transform: translateY(32px); }
+  to   { opacity: 1;   transform: translateY(0); }
+}
+@keyframes palette-in {
+  from { opacity: 0; transform: translateY(-8px) scale(0.985); }
+  to   { opacity: 1; transform: translateY(0)    scale(1); }
+}
 @keyframes fade-in {
   from { opacity: 0; }
   to   { opacity: 1; }
 }
 @keyframes page-in {
-  from { opacity: 0; transform: translateY(4px); }
+  from { opacity: 0; transform: translateY(6px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+@keyframes rise-in {
+  from { opacity: 0; transform: translateY(10px); }
   to   { opacity: 1; transform: translateY(0); }
 }
 @keyframes rail-pulse {
@@ -31,26 +39,64 @@
   50%       { opacity: 0.4; }
 }
 @keyframes shimmer {
-  from { background-position: -200% 0; }
-  to   { background-position: 200% 0; }
+  from { background-position: 150% 0; }
+  to   { background-position: -50% 0; }
 }
-.page-content {
-  animation: page-in 120ms ease-out;
+@keyframes live-ping {
+  0%        { transform: scale(1);   opacity: 0.55; }
+  70%, 100% { transform: scale(3.2); opacity: 0; }
+}
+
+/* Replays on every display:none → shown. Skips pages with an open modal: the
+   transform would briefly become the fixed overlay's containing block. */
+.page-slot > :not(.page-fallback, :has(.modal-overlay)) {
+  animation: page-in var(--dur-base) var(--ease-out);
+}
+
+/* Delayed so fast chunk loads never flash a skeleton */
+.page-fallback {
+  animation: fade-in var(--dur-base) var(--ease-out) 140ms both;
+}
+
+.overlay-in {
+  animation: fade-in 180ms var(--ease-out);
+}
+
+.palette-panel {
+  transform-origin: 50% 0;
+  animation: palette-in 200ms var(--ease-out);
+}
+
+.live-dot {
+  position: relative;
+  flex-shrink: 0;
+}
+.live-dot::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  background: inherit;
+  animation: live-ping 2.4s var(--ease-out) infinite;
 }
 
 @media (prefers-reduced-motion: reduce) {
   .console-cursor, .tty-cursor { animation: none; opacity: 1; }
   .status-dot { animation: none; }
   .auth-spinner { animation: none; border-color: var(--amber); }
-  .modal-card { animation: none; }
+  .modal-overlay, .modal-card, .overlay-in, .palette-panel { animation: none; }
   .glance-stat-card.incident::after { animation: none; }
   .nav-btn, .nav-btn svg, .player-row,
   .btn-primary, .btn-ghost { transform: none !important; }
-  .page-content { animation: none; }
+  .page-slot > :not(.page-fallback, :has(.modal-overlay)), .page-fallback, .editor-loading { animation: none; }
   .skeleton { animation: none; }
+  .live-dot::after { animation: none; display: none; }
+  .speedo-fill-mask { transition: none; animation: none; }
   .toast, .toast.exiting {
     transition: opacity 160ms ease;
     transform: none !important;
   }
   .mac-ctx-item { animation: none; opacity: 1; transform: none; }
+  .auth-card, .auth-card > *, .auth-card.verified { animation: none !important; }
+  ::view-transition-group(root) { animation: none; }
 }

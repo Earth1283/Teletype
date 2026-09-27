@@ -254,9 +254,9 @@ export default function CommandPalette({ open, onClose, onNavigate }: Props) {
   let flatIdx = 0
 
   return (
-    <div className="fixed inset-0 z-palette flex items-start justify-center bg-scrim pt-[10vh] backdrop-blur-[2px]" onClick={onClose}>
+    <div className="overlay-in fixed inset-0 z-palette flex items-start justify-center bg-scrim pt-[10vh] backdrop-blur-[2px]" onClick={onClose}>
       <div
-        className="w-[90vw] max-w-[520px] overflow-hidden rounded-lg border border-border-hi bg-surface shadow-2xl"
+        className="palette-panel w-[90vw] max-w-[520px] overflow-hidden rounded-lg border border-border-hi bg-surface shadow-2xl"
         onClick={e => e.stopPropagation()}
       >
         <div className="flex items-center gap-2 border-b border-border px-3 py-2">

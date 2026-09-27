@@ -4,3 +4,56 @@
 .shell.force-mobile .mobile-header { display: flex !important; }
 .shell.force-mobile .mobile-bottom-nav { display: flex !important; }
 .shell.force-mobile .main { margin-top: 3rem !important; }
+
+/* Labels leave before the rail clips them and return once it's mostly open */
+.tabs-label,
+.rail-fade {
+  opacity: 1;
+  transition: opacity 180ms var(--ease-out) 110ms;
+}
+.tabs-label.is-collapsed,
+.rail-fade.is-collapsed {
+  opacity: 0;
+  pointer-events: none;
+  transition-duration: 90ms;
+  transition-delay: 0ms;
+}
+
+.rail-chevron {
+  transition: transform var(--dur-slow) var(--ease-in-out);
+}
+.rail-chevron.is-collapsed {
+  transform: rotate(180deg);
+}
+
+.mobile-sheet {
+  transition: transform var(--dur-slow) var(--ease-drawer);
+}
+.mobile-sheet:not(.is-open) {
+  transform: translateY(100%);
+  transition: transform var(--dur-base) var(--ease-in);
+}
+.mobile-scrim {
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity var(--dur-base) var(--ease-out);
+}
+.mobile-scrim.is-open {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+.topbar-title {
+  animation: fade-in var(--dur-quick) var(--ease-out);
+}
+
+::view-transition-old(root),
+::view-transition-new(root) {
+  animation-duration: 280ms;
+  animation-timing-function: var(--ease-in-out);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .tabs-label, .rail-fade, .rail-chevron, .mobile-sheet, .mobile-scrim { transition: none; }
+  .topbar-title { animation: none; }
+}

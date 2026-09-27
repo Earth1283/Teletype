@@ -973,7 +973,7 @@ export default function ServerStats({ onNavigate }: Props) {
   const diskPct = snap?.diskUsedGb && snap?.diskTotalGb ? snap.diskUsedGb / snap.diskTotalGb : null
 
   return (
-    <div className="section-root page-content">
+    <div className="section-root">
       <div className="section-header">
         <span className="section-title">Server Stats</span>
         <div className="mac-seg-ctrl">

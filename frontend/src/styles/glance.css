@@ -123,6 +123,18 @@
   width: 100%;
   height: auto;
 }
+.speedo-fill-mask {
+  stroke-dasharray: 2 2;
+  stroke-dashoffset: calc(2 - var(--t));
+  transition: stroke-dashoffset var(--dur-sweep) var(--ease-needle);
+  animation: speedo-power-on 1s var(--ease-needle);
+}
+@keyframes speedo-power-on {
+  from { stroke-dashoffset: 2; }
+}
+.speedo-value {
+  transition: fill 400ms var(--ease-out);
+}
 .speedo-uptime {
   display: flex;
   flex-direction: column;

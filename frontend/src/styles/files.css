@@ -212,6 +212,34 @@
 .row-action-btn:hover { background: var(--elevated); color: var(--ash); border-color: var(--border); }
 .row-action-btn.del:hover { color: var(--red); background: rgba(248,113,113,.08); border-color: rgba(248,113,113,0.25); }
 
+.editor-loading {
+  flex: 1;
+  align-self: stretch;
+  width: 100%;
+  height: 100%;
+  min-height: 0;
+  padding: 12px 0;
+  background: var(--surface);
+  overflow: hidden;
+  animation: fade-in var(--dur-base) var(--ease-out) 140ms both;
+}
+.editor-loading-line {
+  display: flex;
+  align-items: center;
+  gap: 18px;
+  height: 22px;
+  padding-right: 24px;
+}
+.editor-loading-gutter {
+  width: 40px;
+  flex-shrink: 0;
+  text-align: right;
+  font-family: var(--mono);
+  font-size: 11px;
+  color: var(--text-muted);
+  opacity: 0.6;
+}
+
 .fm-editor-wrap {
   display: flex;
   flex-direction: column;

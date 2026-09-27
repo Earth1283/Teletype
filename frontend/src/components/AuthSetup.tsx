@@ -11,9 +11,11 @@ export default function AuthSetup({ onAuth }: Props) {
   const [displayedUuid, setDisplayedUuid] = useState('')
   const [copied, setCopied] = useState(false)
   const [copyFailed, setCopyFailed] = useState(false)
+  const [verified, setVerified] = useState(false)
   const polling = useRef(false)
   const animFrame = useRef<ReturnType<typeof setTimeout> | null>(null)
   const copiedTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const handoffTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   useEffect(() => {
     async function poll(id: string) {
@@ -23,7 +25,8 @@ export default function AuthSetup({ onAuth }: Props) {
           if (res.data.status === 'verified' && res.data.token) {
             localStorage.setItem(TOKEN_KEY, res.data.token)
             polling.current = false
-            onAuth()
+            setVerified(true)
+            handoffTimer.current = setTimeout(onAuth, handoffDelayMs())
             return
           }
         } catch (err) {
@@ -65,6 +68,7 @@ export default function AuthSetup({ onAuth }: Props) {
       polling.current = false
       if (animFrame.current) clearTimeout(animFrame.current)
       if (copiedTimer.current) clearTimeout(copiedTimer.current)
+      if (handoffTimer.current) clearTimeout(handoffTimer.current)
     }
   }, [onAuth])
 
@@ -106,7 +110,7 @@ export default function AuthSetup({ onAuth }: Props) {
 
   return (
     <div className="auth-root">
-      <div className="auth-card">
+      <div className={`auth-card${verified ? ' verified' : ''}`}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 6 }}>
           <TeletypeLogo size={26} />
           <div className="auth-wordmark">Teletype</div>
@@ -153,10 +157,17 @@ export default function AuthSetup({ onAuth }: Props) {
               </div>
             )}
 
-            <div className="auth-waiting">
-              <div className="auth-spinner" />
-              Waiting for console verification…
-            </div>
+            {verified ? (
+              <div className="auth-waiting auth-verified">
+                <IconCheck size={14} />
+                Verified — opening console
+              </div>
+            ) : (
+              <div className="auth-waiting">
+                <div className="auth-spinner" />
+                Waiting for console verification…
+              </div>
+            )}
 
             <div className="auth-hint">
               Other server-side controls (status, restart the panel, log everyone out) are listed by <code>/tty help</code>.
@@ -166,6 +177,10 @@ export default function AuthSetup({ onAuth }: Props) {
       </div>
     </div>
   )
+}
+
+function handoffDelayMs() {
+  return window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 0 : 750
 }
 
 function authRequestError(err: unknown) {

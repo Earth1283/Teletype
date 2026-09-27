@@ -2,6 +2,7 @@ import { useEffect } from 'react'
 import Editor from '@monaco-editor/react'
 import { jsonDefaults, monaco } from './monacoSetup'
 import { useSettings } from '../../SettingsContext'
+import { EditorLoading } from './EditorLoading'
 
 const EXT_LANG: Record<string, string> = {
   js: 'javascript', ts: 'typescript', tsx: 'typescript', jsx: 'javascript',
@@ -73,6 +74,7 @@ export default function CodeEditor({ path, defaultValue, onChange }: CodeEditorP
       defaultValue={defaultValue}
       onChange={(v) => onChange(v ?? '')}
       theme={THEME}
+      loading={<EditorLoading />}
       options={{
         fontSize: editor.fontSize,
         fontFamily: "'JetBrains Mono', monospace",

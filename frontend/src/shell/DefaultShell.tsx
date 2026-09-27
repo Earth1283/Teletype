@@ -11,7 +11,7 @@ import { Tabs, cx } from '../design'
 import CommandPalette from '../CommandPalette'
 import KeyboardHelp from '../components/KeyboardHelp'
 import {
-  TeletypeLogo, IconLogOut, IconChevronLeft, IconChevronRight, IconCommand, IconDots,
+  TeletypeLogo, IconLogOut, IconChevronLeft, IconCommand, IconDots,
   IconSearch, IconZap,
 } from '../Icons'
 import { useQuickActionsCategoryId } from '../components/actions/useActions'
@@ -91,10 +91,10 @@ export function DefaultShell({ onLogout }: { onLogout: () => void }) {
 
   const navItems = useMemo(() => TABS.map((t, i) => ({
     id: t.id,
-    label: sidebarOpen ? t.label : '',
+    label: t.label,
     icon: <t.Icon size={15} />,
     hint: `Alt+${i === 9 ? 0 : i + 1}`,
-  })), [sidebarOpen])
+  })), [])
 
   return (
     <div className={cx('shell flex h-full w-full bg-void', forceMobile && 'force-mobile')}>
@@ -115,7 +115,7 @@ export function DefaultShell({ onLogout }: { onLogout: () => void }) {
             connected ? 'border-live/30 text-live' : 'border-border text-text-muted',
           )}
         >
-          <span className={cx('h-1.5 w-1.5 rounded-full', connected ? 'bg-live animate-[blink_2s_steps(1)_infinite]' : 'bg-text-muted')} />
+          <span className={cx('h-1.5 w-1.5 rounded-full', connected ? 'live-dot bg-live' : 'bg-text-muted')} />
           {connected ? 'online' : 'offline'}
         </span>
         {forceMobile && (
@@ -153,38 +153,49 @@ export function DefaultShell({ onLogout }: { onLogout: () => void }) {
       {/* ── Desktop sidebar ───────────────────────────────────────────── */}
       <aside
         className={cx(
-          'sidebar hidden sm:flex sticky top-0 z-sidebar h-screen shrink-0 flex-col border-r border-border bg-surface transition-[width] duration-150',
+          'sidebar hidden sm:flex sticky top-0 z-sidebar h-screen shrink-0 flex-col overflow-hidden border-r border-border bg-surface',
+          'transition-[width] duration-[320ms] ease-[var(--ease-in-out)]',
           sidebarOpen ? 'w-[204px]' : 'w-[52px]',
         )}
       >
-        <div className={cx('flex items-center gap-2 px-4 py-4', !sidebarOpen && 'justify-center px-0')}>
-          <TeletypeLogo />
-          {sidebarOpen && <span className="font-sans text-[14px] font-semibold text-text-primary">Teletype</span>}
+        <div className="flex items-center gap-2 py-4 pl-[15px]">
+          <span className="flex shrink-0"><TeletypeLogo /></span>
+          <span className={cx('rail-fade whitespace-nowrap font-sans text-[14px] font-semibold text-text-primary', !sidebarOpen && 'is-collapsed')}>
+            Teletype
+          </span>
         </div>
 
         <Tabs
           items={navItems}
           active={tab}
           onChange={setTab}
-          className={cx('flex-1 overflow-y-auto px-2', !sidebarOpen && 'items-stretch px-1.5')}
+          collapsed={!sidebarOpen}
+          className="flex-1 overflow-y-auto overflow-x-hidden px-1.5"
         />
 
-        <div className={cx('flex items-center p-3', sidebarOpen ? 'justify-between' : 'justify-center px-1.5')}>
-          {sidebarOpen && settings.palette.enabled && (
+        <div className="relative h-12 shrink-0">
+          {settings.palette.enabled && (
             <button
-              className="rounded-sm border border-border px-1.5 py-0.5 font-mono text-[10px] text-text-muted hover:border-border-hi hover:text-text-secondary"
+              className={cx(
+                'rail-fade absolute left-[12px] top-1/2 -translate-y-1/2 rounded-sm border border-border px-1.5 py-0.5 font-mono text-[10px] text-text-muted hover:border-border-hi hover:text-text-secondary',
+                !sidebarOpen && 'is-collapsed',
+              )}
               onClick={() => setPaletteOpen(true)}
               title="Command palette (⌘K)"
+              tabIndex={sidebarOpen ? undefined : -1}
             >
               ⌘K
             </button>
           )}
           <button
-            className="flex h-6 w-6 items-center justify-center rounded-sm text-text-muted hover:bg-surface-raised hover:text-text-secondary"
+            className="absolute right-[14px] top-1/2 flex h-6 w-6 -translate-y-1/2 items-center justify-center rounded-sm text-text-muted hover:bg-surface-raised hover:text-text-secondary"
             title={sidebarOpen ? 'Collapse sidebar' : 'Expand sidebar'}
+            aria-expanded={sidebarOpen}
             onClick={() => setSidebarOpen(!sidebarOpen)}
           >
-            {sidebarOpen ? <IconChevronLeft size={13} /> : <IconChevronRight size={13} />}
+            <span className={cx('rail-chevron flex', !sidebarOpen && 'is-collapsed')}>
+              <IconChevronLeft size={13} />
+            </span>
           </button>
         </div>
       </aside>
@@ -192,7 +203,7 @@ export function DefaultShell({ onLogout }: { onLogout: () => void }) {
       {/* ── Desktop column: cockpit strip + page ──────────────────────── */}
       <div className="flex min-w-0 flex-1 flex-col">
         <header className="topbar hidden h-12 shrink-0 items-center gap-3 border-b border-border bg-surface px-4 sm:flex">
-          <h1 className="font-sans text-[13px] font-semibold text-text-primary">{tabDef(tab).label}</h1>
+          <h1 key={tab} className="topbar-title font-sans text-[13px] font-semibold text-text-primary">{tabDef(tab).label}</h1>
 
           <div className="flex-1" />
 
@@ -228,7 +239,7 @@ export function DefaultShell({ onLogout }: { onLogout: () => void }) {
               connected ? 'border-live/30 text-live' : 'border-border text-text-muted',
             )}
           >
-            <span className={cx('h-1.5 w-1.5 rounded-full', connected ? 'bg-live animate-[blink_2s_steps(1)_infinite]' : 'bg-text-muted')} />
+            <span className={cx('h-1.5 w-1.5 rounded-full', connected ? 'live-dot bg-live' : 'bg-text-muted')} />
             {connected ? 'online' : 'offline'}
           </span>
 
@@ -254,7 +265,7 @@ export function DefaultShell({ onLogout }: { onLogout: () => void }) {
               key={tabId}
               type="button"
               className={cx(
-                'flex flex-1 flex-col items-center gap-0.5 py-2 font-sans text-[10px]',
+                'flex flex-1 flex-col items-center gap-0.5 py-2 font-sans text-[10px] transition-colors duration-150 active:scale-95',
                 active ? 'text-accent' : 'text-text-muted',
               )}
               onClick={() => { setTab(tabId); setMobileMoreOpen(false) }}
@@ -277,20 +288,21 @@ export function DefaultShell({ onLogout }: { onLogout: () => void }) {
         </button>
       </nav>
 
-      {mobileMoreOpen && (
-        <button
-          type="button"
-          className="fixed inset-0 z-mobile-nav bg-scrim"
-          aria-label="Close menu"
-          onClick={() => setMobileMoreOpen(false)}
-        />
-      )}
+      <button
+        type="button"
+        className={cx('mobile-scrim fixed inset-0 z-mobile-nav bg-scrim', mobileMoreOpen && 'is-open')}
+        aria-label="Close menu"
+        aria-hidden={!mobileMoreOpen}
+        tabIndex={-1}
+        onClick={() => setMobileMoreOpen(false)}
+      />
       <div
         className={cx(
-          'fixed inset-x-0 bottom-0 z-mobile-nav rounded-t-lg border-t border-border bg-surface transition-transform duration-200 sm:hidden',
-          mobileMoreOpen ? 'translate-y-0' : 'translate-y-full',
+          'mobile-sheet fixed inset-x-0 bottom-0 z-mobile-nav rounded-t-lg border-t border-border bg-surface sm:hidden',
+          mobileMoreOpen && 'is-open',
         )}
         aria-hidden={!mobileMoreOpen}
+        inert={!mobileMoreOpen}
       >
         <div className="mx-auto mt-2 h-1 w-8 rounded-full bg-border" aria-hidden="true" />
         <div className="grid grid-cols-3 gap-1 p-3">

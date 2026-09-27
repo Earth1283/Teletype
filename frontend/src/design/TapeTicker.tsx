@@ -27,7 +27,7 @@ export function TapeTicker({ items, className }: TapeTickerProps) {
         <span key={it.label} className="flex items-center gap-3">
           {i > 0 && <span className="text-border">·</span>}
           <span className="flex items-center gap-1.5">
-            {it.live && <span className="h-1.5 w-1.5 rounded-full bg-live animate-[blink_2s_steps(1)_infinite]" />}
+            {it.live && <span className="live-dot h-1.5 w-1.5 rounded-full bg-live" />}
             <span className="uppercase tracking-[0.08em] text-text-muted">{it.label}</span>
             <span className="text-accent">{it.value}</span>
           </span>

@@ -9,7 +9,6 @@
 @import './styles/themes.css' layer(base);
 @import './styles/tokens.css' layer(base);
 @import './styles/chart-tokens.css' layer(base);
-@import './styles/animations.css' layer(base);
 @import './styles/layout.css' layer(components);
 @import './styles/console.css' layer(components);
 @import './styles/players.css' layer(components);
@@ -26,3 +25,5 @@
 @import './styles/appleify.css' layer(components);
 @import './styles/profiling.css' layer(components);
 @import './shell/shell.css' layer(components);
+/* Last in `components` so its reduced-motion overrides beat page styles */
+@import './styles/animations.css' layer(components);

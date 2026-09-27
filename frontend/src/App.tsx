@@ -12,6 +12,12 @@ import { DefaultShell } from './shell/DefaultShell'
 import MacShell from './shell/MacShell'
 import AppleShell from './shell/AppleShell'
 
+function withThemeTransition(apply: () => void) {
+  const reduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches
+  if (!document.startViewTransition || reduced) apply()
+  else document.startViewTransition(apply)
+}
+
 /* Stamps data-theme / data-mode / data-density on <html>. Mode "system"
    resolves via matchMedia and tracks OS changes live. Renders nothing. */
 function AppearanceApplier() {
@@ -20,14 +26,16 @@ function AppearanceApplier() {
 
   useEffect(() => {
     const root = document.documentElement
-    root.dataset.theme = theme
-    root.dataset.density = density
-
     const mq = window.matchMedia('(prefers-color-scheme: light)')
+    const resolvedMode = () => (mode === 'system' ? (mq.matches ? 'light' : 'dark') : mode)
     const apply = () => {
-      root.dataset.mode = mode === 'system' ? (mq.matches ? 'light' : 'dark') : mode
+      root.dataset.theme = theme
+      root.dataset.density = density
+      root.dataset.mode = resolvedMode()
     }
-    apply()
+    const recolors = root.dataset.theme !== theme || root.dataset.mode !== resolvedMode()
+    if (recolors) withThemeTransition(apply)
+    else apply()
     if (mode === 'system') {
       mq.addEventListener('change', apply)
       return () => mq.removeEventListener('change', apply)

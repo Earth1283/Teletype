@@ -5,6 +5,7 @@ import { useContextMenu, type ContextMenuItem } from '../ContextMenu'
 import { useToast } from '../ToastContext'
 import { writeClipboard } from '../clipboard'
 import PromptModal, { type PromptVariant } from './PromptModal'
+import { EditorLoading } from './files/EditorLoading'
 import {
   IconFolder, IconFile, IconUpload, IconDownload,
   IconFolderPlus, IconPencil, IconTrash, IconSave, IconX, IconGlobe,
@@ -1195,7 +1196,7 @@ export default function FileManager() {
                 <IconX size={13} />Close
               </button>
             </div>
-            <Suspense fallback={<div className="fm-editor-loading">Loading editor…</div>}>
+            <Suspense fallback={<EditorLoading />}>
               <CodeEditor path={editing.path} defaultValue={editorContent} onChange={setEditorContent} />
             </Suspense>
           </div>

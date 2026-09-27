@@ -14,13 +14,13 @@ export function Modal({ open, onClose, title, children, footer, className }: Mod
   if (!open) return null
   return (
     <div
-      className="fixed inset-0 z-modal flex items-center justify-center bg-void/70 backdrop-blur-[2px]"
+      className="overlay-in fixed inset-0 z-modal flex items-center justify-center bg-void/70 backdrop-blur-[2px]"
       onClick={onClose}
     >
       <div
         className={cx(
           'w-[90vw] max-w-[520px] min-w-[360px] rounded-lg border border-border-hi bg-surface p-6',
-          'animate-[modal-in_220ms_cubic-bezier(0.16,1,0.3,1)]',
+          'motion-safe:animate-[modal-in_220ms_var(--ease-out)]',
           className,
         )}
         onClick={e => e.stopPropagation()}

@@ -32,7 +32,7 @@ function pageContent(id: Tab, onNavigate: (tab: Tab) => void) {
 
 function PageFallback() {
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 12, padding: 24 }}>
+    <div className="page-fallback" style={{ display: 'flex', flexDirection: 'column', gap: 12, padding: 24 }}>
       <Skeleton height={28} width="40%" />
       <Skeleton height={160} />
       <Skeleton height={160} />
@@ -65,7 +65,7 @@ export function PageOutlet({ activeTab, visitedTabs, onNavigate }: PageOutletPro
         if (!visitedTabs.has(id)) return null
         const active = id === activeTab
         return (
-          <div key={id} style={{ display: active ? 'contents' : 'none' }}>
+          <div key={id} className="page-slot" style={{ display: active ? 'contents' : 'none' }}>
             <ErrorBoundary label={`${label} failed to render`}>
               {renderPage(id, onNavigate, active)}
             </ErrorBoundary>

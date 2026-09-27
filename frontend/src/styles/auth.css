@@ -16,6 +16,29 @@
   background: var(--surface);
   border: 1px solid var(--border);
   border-radius: var(--r-lg);
+  animation: rise-in 480ms var(--ease-out) both;
+}
+.auth-card > * {
+  animation: rise-in 420ms var(--ease-out) both;
+}
+.auth-card > :nth-child(1) { animation-delay: 60ms; }
+.auth-card > :nth-child(2) { animation-delay: 100ms; }
+.auth-card > :nth-child(3) { animation-delay: 160ms; }
+.auth-card > :nth-child(4) { animation-delay: 220ms; }
+.auth-card > :nth-child(n+5) { animation-delay: 280ms; }
+.auth-card.verified {
+  animation: auth-out 280ms var(--ease-in) 420ms forwards;
+}
+.auth-card.verified .tty-display {
+  border-color: color-mix(in srgb, var(--green) 45%, transparent);
+  transition: border-color var(--dur-base) var(--ease-out);
+}
+.auth-card .auth-verified {
+  color: var(--green);
+  animation: fade-in var(--dur-quick) var(--ease-out);
+}
+@keyframes auth-out {
+  to { opacity: 0; transform: translateY(-8px) scale(0.985); }
 }
 
 .insecure-http-banner + .auth-root .auth-card {

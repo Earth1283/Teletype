@@ -1,4 +1,4 @@
-import { memo, useEffect, useMemo, useRef, useState } from 'react'
+import { memo, useEffect, useId, useMemo, useRef, useState } from 'react'
 import {
   ComposedChart, Area,
   XAxis, YAxis, CartesianGrid, Tooltip,
@@ -525,6 +525,11 @@ function SpeedoGauge({ label, value, displayValue, subLine, min, max, zones, sig
   const activeColor = t == null ? 'var(--ghost)'
     : (zones.find(z => t >= z.from && t <= z.to + 0.001) ?? zones[zones.length - 1]).color
   const hasSubLine = Boolean(subLine)
+  const maskId = useId()
+  const zoneArcs = (opacity?: number) => zones.map((z, i) => (
+    <path key={i} d={g_arc(SP.start + z.from * SP.sweep, (z.to - z.from) * SP.sweep)} fill="none"
+      stroke={z.color} strokeWidth="9" strokeOpacity={opacity} strokeLinecap="butt" />
+  ))
 
   return (
     <div className="speedo-wrap">
@@ -533,36 +538,22 @@ function SpeedoGauge({ label, value, displayValue, subLine, min, max, zones, sig
         <path d={g_arc(SP.start, SP.sweep)} fill="none"
           stroke="var(--border-hi)" strokeWidth="9" strokeLinecap="round" />
 
-        {/* Zone arcs — VU-meter fill up to needle */}
-        {zones.flatMap((z, i) => {
-          const zs = SP.start + z.from * SP.sweep
-          const zsw = (z.to - z.from) * SP.sweep
-          if (t == null) {
-            return [<path key={i} d={g_arc(zs, zsw)} fill="none"
-              stroke={z.color} strokeWidth="9" strokeOpacity={0.13} strokeLinecap="butt" />]
-          }
-          if (t >= z.to) {
-            return [<path key={i} d={g_arc(zs, zsw)} fill="none"
-              stroke={z.color} strokeWidth="9" strokeLinecap="butt" />]
-          }
-          if (t <= z.from) {
-            return [<path key={i} d={g_arc(zs, zsw)} fill="none"
-              stroke={z.color} strokeWidth="9" strokeOpacity={0.13} strokeLinecap="butt" />]
-          }
-          const split = (t - z.from) / (z.to - z.from)
-          const activeSw = split * zsw
-          const inactiveSw = zsw - activeSw
-          return [
-            <path key={`${i}a`} d={g_arc(zs, activeSw)} fill="none"
-              stroke={z.color} strokeWidth="9" strokeLinecap="butt" />,
-            <path key={`${i}b`} d={g_arc(zs + activeSw, inactiveSw)} fill="none"
-              stroke={z.color} strokeWidth="9" strokeOpacity={0.13} strokeLinecap="butt" />,
-          ]
-        })}
+        {zoneArcs(0.13)}
 
+        {t != null && (
+          <>
+            <mask id={maskId} maskUnits="userSpaceOnUse" x="0" y="0" width="100" height="88">
+              <path d={g_arc(SP.start, SP.sweep)} pathLength={1} fill="none"
+                stroke="white" strokeWidth="12" strokeLinecap="butt"
+                className="speedo-fill-mask" style={{ '--t': t } as React.CSSProperties} />
+            </mask>
+            <g mask={`url(#${maskId})`}>{zoneArcs()}</g>
+          </>
+        )}
 
         {/* Value */}
         <text x={SP.cx} y={SP.cy - 2} textAnchor="middle" dominantBaseline="middle"
+          className="speedo-value"
           fill={activeColor} fontSize="15" fontWeight="700"
           style={{ fontFamily: 'var(--mono)', fontVariantNumeric: 'tabular-nums lining-nums' }}>
           {displayValue}
