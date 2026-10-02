@@ -58,6 +58,8 @@ export default function App() {
   const [qc] = useState(() => new QueryClient())
   const [authed, setAuthed] = useState(() => !!localStorage.getItem(TOKEN_KEY))
 
+  const handleAuth = useCallback(() => setAuthed(true), [])
+
   const handleLogout = useCallback(() => {
     localStorage.removeItem(TOKEN_KEY)
     qc.clear()
@@ -67,21 +69,21 @@ export default function App() {
   return (
     <QueryClientProvider client={qc}>
       <SettingsProvider>
-        <LogProvider>
-          <ContextMenuProvider>
-            <ToastProvider>
-              <AppearanceApplier />
-              <InsecureHttpBanner />
-              {authed ? (
+        <ContextMenuProvider>
+          <ToastProvider>
+            <AppearanceApplier />
+            <InsecureHttpBanner />
+            {authed ? (
+              <LogProvider>
                 <ShellKernel>
                   <MainApp onLogout={handleLogout} />
                 </ShellKernel>
-              ) : (
-                <AuthSetup onAuth={() => setAuthed(true)} />
-              )}
-            </ToastProvider>
-          </ContextMenuProvider>
-        </LogProvider>
+              </LogProvider>
+            ) : (
+              <AuthSetup onAuth={handleAuth} />
+            )}
+          </ToastProvider>
+        </ContextMenuProvider>
       </SettingsProvider>
     </QueryClientProvider>
   )
