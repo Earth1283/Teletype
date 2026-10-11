@@ -4,6 +4,8 @@ import io.github.Earth1283.teletype.Teletype
 import io.ktor.network.tls.certificates.buildKeyStore
 import io.ktor.network.tls.certificates.saveToFile
 import java.io.File
+import java.nio.file.Files
+import java.nio.file.attribute.PosixFilePermissions
 import java.security.KeyStore
 import java.security.cert.X509Certificate
 import java.time.Duration
@@ -32,7 +34,10 @@ class TlsManager(private val plugin: Teletype) {
         val existing = ksFile.takeIf { it.exists() }?.let { file ->
             KeyStore.getInstance("JKS").apply { file.inputStream().use { load(it, DEFAULT_PASSWORD.toCharArray()) } }
         }
-        if (existing != null && !expiresSoon(existing)) return existing
+        if (existing != null && !expiresSoon(existing)) {
+            restrictToOwner(ksFile)
+            return existing
+        }
 
         plugin.messages.console("tls.generating", "path" to ksFile.absolutePath)
         val ks = buildKeyStore {
@@ -43,9 +48,14 @@ class TlsManager(private val plugin: Teletype) {
             }
         }
         ks.saveToFile(ksFile, DEFAULT_PASSWORD)
+        restrictToOwner(ksFile)
         plugin.messages.console("tls.cert-created")
         plugin.messages.console("tls.production-hint")
         return ks
+    }
+
+    private fun restrictToOwner(file: File) {
+        runCatching { Files.setPosixFilePermissions(file.toPath(), PosixFilePermissions.fromString("rw-------")) }
     }
 
     private fun expiresSoon(ks: KeyStore): Boolean {

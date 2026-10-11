@@ -32,6 +32,7 @@ private const val LOG_BATCH_WINDOW_MS = 40L
 private const val MAX_LOG_BATCH = 500
 private const val PENDING_LINE_BUFFER = 4096
 private const val TAB_COMPLETE_TIMEOUT_MS = 500L
+private const val AUTH_TIMEOUT_MS = 10_000L
 
 private val UNAUTHORIZED = CloseReason(CloseReason.Codes.VIOLATED_POLICY, "Unauthorized")
 
@@ -53,7 +54,7 @@ suspend fun DefaultWebSocketServerSession.consoleWebSocket(plugin: Teletype) {
         return
     }
 
-    val authMsg = receiveMessage()?.takeIf { it.type == "auth" && it.payload.isNotBlank() } ?: return close(UNAUTHORIZED)
+    val authMsg = withTimeoutOrNull(AUTH_TIMEOUT_MS) { receiveMessage() }?.takeIf { it.type == "auth" && it.payload.isNotBlank() } ?: return close(UNAUTHORIZED)
     val token = plugin.jwtService.verify(authMsg.payload) ?: return close(UNAUTHORIZED)
 
     if (activeConsoleSockets.incrementAndGet() > plugin.teletypeConfig.maxWebSocketConnections) {

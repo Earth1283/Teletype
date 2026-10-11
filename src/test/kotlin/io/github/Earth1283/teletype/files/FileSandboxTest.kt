@@ -68,4 +68,22 @@ class FileSandboxTest {
         assertFalse("secret.txt" in names)
         assertTrue(sandbox.walkWithoutFollowingLinks(sandbox.root, 3).count() <= 3)
     }
+
+    @Test
+    fun `tree delete and copy never follow symlinks out of the tree`() {
+        val outside = tempDir.resolve("outside").toFile().apply { mkdirs() }
+        val secret = File(outside, "secret.txt").apply { writeText("keep") }
+        val tree = File(root, "tree").apply { mkdirs() }
+        File(tree, "a.txt").writeText("a")
+        Files.createSymbolicLink(File(tree, "link").toPath(), outside.toPath())
+
+        val copy = File(root, "copy")
+        assertTrue(FileSandbox.copyTree(tree, copy))
+        assertTrue(File(copy, "a.txt").exists())
+        assertFalse(File(copy, "link").exists())
+
+        assertTrue(FileSandbox.deleteTree(tree))
+        assertFalse(tree.exists())
+        assertTrue(secret.exists())
+    }
 }

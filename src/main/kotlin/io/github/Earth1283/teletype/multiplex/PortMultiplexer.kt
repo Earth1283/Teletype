@@ -8,6 +8,8 @@ import java.net.Inet4Address
 import java.net.Inet6Address
 import java.net.ServerSocket
 import java.net.Socket
+import java.security.SecureRandom
+import java.util.HexFormat
 import java.util.Properties
 import java.util.concurrent.ExecutorService
 import java.util.concurrent.Executors
@@ -122,12 +124,12 @@ class PortMultiplexer(private val plugin: Teletype) {
                 return
             }
 
-            val forwarded = request.rewriteForProxy(clientIp)
-            relay(client, route?.targetPort ?: targets.ktorPort, forwarded)
+            val forwarded = request.rewriteForProxy(clientIp, trustSecret = PortMultiplexer.TRUST_SECRET.takeIf { route == null })
+            relay(client, route?.targetPort ?: targets.ktorPort, forwarded, requireUpgradeResponse = route == null && request.isUpgrade)
         }
     }
 
-    private fun relay(client: Socket, targetPort: Int, preface: ByteArray) {
+    private fun relay(client: Socket, targetPort: Int, preface: ByteArray, requireUpgradeResponse: Boolean = false) {
         try {
             Socket("127.0.0.1", targetPort).use { backend ->
                 backend.tcpNoDelay = true
@@ -135,8 +137,20 @@ class PortMultiplexer(private val plugin: Teletype) {
                 backendOut.write(preface)
                 backendOut.flush()
                 val pool = executor ?: return
+                val backendIn = backend.getInputStream()
+                val clientOut = client.getOutputStream()
+                if (requireUpgradeResponse) {
+                    val responseHead = readRequestHead(backendIn, ByteArray(0)) ?: return
+                    clientOut.write(responseHead)
+                    clientOut.flush()
+                    if (!String(responseHead, Charsets.ISO_8859_1).startsWith(SWITCHING_PROTOCOLS)) {
+                        backend.soTimeout = REJECTED_UPGRADE_DRAIN_MS
+                        pipe(backendIn, clientOut) { closeBoth(client, backend) }
+                        return
+                    }
+                }
                 val upstream = pool.submit { pipe(client.getInputStream(), backendOut) { closeBoth(client, backend) } }
-                pipe(backend.getInputStream(), client.getOutputStream()) { closeBoth(client, backend) }
+                pipe(backendIn, clientOut) { closeBoth(client, backend) }
                 upstream.get()
             }
         } catch (_: Exception) {}
@@ -216,7 +230,11 @@ class PortMultiplexer(private val plugin: Teletype) {
 
     companion object {
         const val CLIENT_ADDRESS_HEADER = "X-Teletype-Mux-Client"
+        const val TRUST_SECRET_HEADER = "X-Teletype-Mux-Secret"
+        val TRUST_SECRET: String = HexFormat.of().formatHex(ByteArray(32).also(SecureRandom()::nextBytes))
         private const val SNIFF_TIMEOUT_MS = 10_000
+        private const val REJECTED_UPGRADE_DRAIN_MS = 5_000
+        private const val SWITCHING_PROTOCOLS = "HTTP/1.1 101"
         private const val MAX_REQUEST_HEAD_BYTES = 16 * 1024
         private const val HEAD_TERMINATOR = "\r\n\r\n"
         private val HTTP_METHOD_PREFIXES = setOf("GET ", "POST", "PUT ", "DELE", "HEAD", "OPTI", "PATC", "CONN")
@@ -244,15 +262,19 @@ class PortMultiplexer(private val plugin: Teletype) {
 internal class HttpRequestHead(val requestLine: String, val headers: List<Pair<String, String>>) {
     val path: String = requestLine.split(' ').getOrNull(1)?.substringBefore('?')?.ifEmpty { "/" } ?: "/"
 
-    private val isUpgrade: Boolean =
-        headers.any { (name, value) -> name.equals("Connection", true) && value.contains("upgrade", ignoreCase = true) }
+    val isUpgrade: Boolean =
+        headers.any { (name, value) -> name.equals("Connection", true) && value.contains("upgrade", ignoreCase = true) } &&
+            headers.any { (name, value) -> name.equals("Upgrade", true) && value.trim().equals("websocket", ignoreCase = true) }
 
-    fun rewriteForProxy(clientIp: String): ByteArray {
+    fun rewriteForProxy(clientIp: String, trustSecret: String? = null): ByteArray {
         val kept = headers.filterNot { (name, _) ->
-            name.equals(PortMultiplexer.CLIENT_ADDRESS_HEADER, true) || (!isUpgrade && name.equals("Connection", true))
+            name.equals(PortMultiplexer.CLIENT_ADDRESS_HEADER, true) ||
+                name.equals(PortMultiplexer.TRUST_SECRET_HEADER, true) ||
+                (!isUpgrade && name.equals("Connection", true))
         }
         val added = buildList {
             add(PortMultiplexer.CLIENT_ADDRESS_HEADER to clientIp)
+            if (trustSecret != null) add(PortMultiplexer.TRUST_SECRET_HEADER to trustSecret)
             if (!isUpgrade) add("Connection" to "close")
         }
         return buildString {
@@ -265,6 +287,7 @@ internal class HttpRequestHead(val requestLine: String, val headers: List<Pair<S
     companion object {
         fun parse(head: ByteArray): HttpRequestHead? {
             val lines = String(head, Charsets.ISO_8859_1).split("\r\n").filter { it.isNotEmpty() }
+            if (lines.any { line -> line.any { it == '\r' || it == '\n' || it == '\u0000' } }) return null
             val requestLine = lines.firstOrNull()?.takeIf { it.split(' ').size >= 3 } ?: return null
             val headers = lines.drop(1).mapNotNull { line ->
                 val colon = line.indexOf(':')

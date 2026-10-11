@@ -250,7 +250,7 @@ fun Route.fileRoutes(plugin: Teletype) {
         if (!file.exists()) notFound()
 
         val deleted = withContext(Dispatchers.IO) {
-            if (file.isDirectory) file.deleteRecursively() else file.delete()
+            if (file.isDirectory) FileSandbox.deleteTree(file) else file.delete()
         }
         if (!deleted) throw ApiException(HttpStatusCode.InternalServerError, "Delete failed")
         call.respond(StatusResponse("deleted"))
@@ -294,7 +294,7 @@ fun Route.fileRoutes(plugin: Teletype) {
         val copied = withContext(Dispatchers.IO) {
             runCatching {
                 to.parentFile?.mkdirs()
-                if (from.isDirectory) from.copyRecursively(to, overwrite = false)
+                if (from.isDirectory) FileSandbox.copyTree(from, to)
                 else from.copyTo(to, overwrite = false).exists()
             }.getOrDefault(false)
         }

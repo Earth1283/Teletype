@@ -48,6 +48,37 @@ class HttpRequestHeadTest {
     }
 }
 
+class HttpRequestHeadSmugglingTest {
+    private fun raw(text: String) = text.toByteArray(Charsets.ISO_8859_1)
+
+    @Test
+    fun `bare line feeds cannot smuggle a spoofed client address header`() {
+        val head = raw("GET / HTTP/1.1\r\nHost: x\n${PortMultiplexer.CLIENT_ADDRESS_HEADER}: 6.6.6.6\r\n\r\n")
+        assertNull(HttpRequestHead.parse(head))
+    }
+
+    @Test
+    fun `incoming trust secret is stripped and only the supplied one is added`() {
+        val head = raw("GET / HTTP/1.1\r\nHost: x\r\n${PortMultiplexer.TRUST_SECRET_HEADER}: forged\r\n\r\n")
+        val req = assertNotNull(HttpRequestHead.parse(head))
+
+        val routed = String(req.rewriteForProxy("1.2.3.4"), Charsets.ISO_8859_1)
+        assertFalse(PortMultiplexer.TRUST_SECRET_HEADER in routed)
+
+        val trusted = String(req.rewriteForProxy("1.2.3.4", trustSecret = "real"), Charsets.ISO_8859_1)
+        assertFalse("forged" in trusted)
+        assertTrue("${PortMultiplexer.TRUST_SECRET_HEADER}: real\r\n" in trusted)
+    }
+
+    @Test
+    fun `connection upgrade without a websocket upgrade is not kept alive`() {
+        val head = raw("GET / HTTP/1.1\r\nHost: x\r\nConnection: keep-alive, upgrade\r\nUpgrade: h2c\r\n\r\n")
+        val req = assertNotNull(HttpRequestHead.parse(head))
+        assertFalse(req.isUpgrade)
+        assertTrue("Connection: close\r\n" in String(req.rewriteForProxy("1.2.3.4"), Charsets.ISO_8859_1))
+    }
+}
+
 class ProtocolClassificationTest {
     private fun bytes(vararg b: Int) = ByteArray(b.size) { b[it].toByte() }
 

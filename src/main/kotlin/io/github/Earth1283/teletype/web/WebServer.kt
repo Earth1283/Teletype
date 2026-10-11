@@ -66,6 +66,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.json.Json
 import java.net.InetAddress
+import java.security.MessageDigest
 import java.util.concurrent.ConcurrentHashMap
 import java.util.logging.Level
 import kotlin.time.Duration.Companion.minutes
@@ -162,6 +163,8 @@ class WebServer(private val plugin: Teletype) {
 
         install(Compression) { gzip() }
 
+        install(SecurityHeaders)
+
         install(CORS) {
             if (cfg.corsOrigins.isEmpty()) anyHost() else cfg.corsOrigins.forEach { allowOrigin(it) }
             allowHeader(HttpHeaders.Authorization)
@@ -226,7 +229,9 @@ class WebServer(private val plugin: Teletype) {
         get("/favicon.svg") { respondStatic("webroot/favicon.svg", ContentType.Image.SVG, "public, max-age=3600") }
         get("/icons.svg") { respondStatic("webroot/icons.svg", ContentType.Image.SVG, "public, max-age=3600") }
         get("/assets/{file...}") {
-            val file = call.parameters.getAll("file")?.joinToString("/") ?: return@get
+            val segments = call.parameters.getAll("file") ?: return@get
+            if (segments.any { it == ".." || it == "." || '\\' in it || '/' in it }) notFound()
+            val file = segments.joinToString("/")
             respondStatic("webroot/assets/$file", assetContentType(file), "public, max-age=31536000, immutable")
         }
         get("{...}") {
@@ -284,11 +289,22 @@ class WebServer(private val plugin: Teletype) {
     }
 }
 
+private val SecurityHeaders = createApplicationPlugin("SecurityHeaders") {
+    onCall { call ->
+        call.response.header("X-Content-Type-Options", "nosniff")
+        call.response.header("X-Frame-Options", "DENY")
+        call.response.header("Content-Security-Policy", "frame-ancestors 'none'")
+        call.response.header("Referrer-Policy", "no-referrer")
+    }
+}
+
 private val MultiplexerClientAddress = createApplicationPlugin("MultiplexerClientAddress") {
     onCall { call ->
         val clientAddress = call.request.headers[PortMultiplexer.CLIENT_ADDRESS_HEADER] ?: return@onCall
+        val secret = call.request.headers[PortMultiplexer.TRUST_SECRET_HEADER] ?: return@onCall
         val peer = call.request.local.remoteAddress
-        if (runCatching { InetAddress.getByName(peer).isLoopbackAddress }.getOrDefault(false)) {
+        val trusted = MessageDigest.isEqual(secret.toByteArray(), PortMultiplexer.TRUST_SECRET.toByteArray())
+        if (trusted && runCatching { InetAddress.getByName(peer).isLoopbackAddress }.getOrDefault(false)) {
             call.mutableOriginConnectionPoint.remoteAddress = clientAddress
             call.mutableOriginConnectionPoint.remoteHost = clientAddress
         }
