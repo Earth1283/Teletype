@@ -1,11 +1,14 @@
 import { useEffect, useRef, useState } from 'react'
 import axios from 'axios'
+import { Trans, useTranslation } from 'react-i18next'
+import type { TFunction } from 'i18next'
 import { TOKEN_KEY } from '../api/client'
 import { IconCheck, IconCopy, TeletypeLogo } from '../Icons'
 
 interface Props { onAuth: () => void }
 
 export default function AuthSetup({ onAuth }: Props) {
+  const { t } = useTranslation(['auth', 'common'])
   const [uuid, setUuid] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [displayedUuid, setDisplayedUuid] = useState('')
@@ -33,13 +36,13 @@ export default function AuthSetup({ onAuth }: Props) {
           if (axios.isAxiosError(err)) {
             if (err.response?.status === 404) {
               polling.current = false
-              setError('Verification challenge expired or was already used. Refresh to create a new challenge.')
+              setError(t('auth:setup.errorChallengeExpired'))
               return
             }
             if (err.response?.status === 429) {
-              setError('Too many auth requests. Waiting before trying again.')
+              setError(t('auth:setup.errorTooManyRequestsPolling'))
             } else if (!err.response) {
-              setError(authRequestError(err))
+              setError(authRequestError(err, t))
             }
           }
         }
@@ -62,7 +65,7 @@ export default function AuthSetup({ onAuth }: Props) {
         }
         animFrame.current = setTimeout(reveal, 200)
       })
-      .catch((err) => setError(authRequestError(err)))
+      .catch((err) => setError(authRequestError(err, t)))
 
     return () => {
       polling.current = false
@@ -70,6 +73,8 @@ export default function AuthSetup({ onAuth }: Props) {
       if (copiedTimer.current) clearTimeout(copiedTimer.current)
       if (handoffTimer.current) clearTimeout(handoffTimer.current)
     }
+    // `t` deliberately omitted: a language switch must not restart the auth handshake.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [onAuth])
 
   const cmd = `tty verify ${uuid ?? '...'}`
@@ -115,14 +120,14 @@ export default function AuthSetup({ onAuth }: Props) {
           <TeletypeLogo size={26} />
           <div className="auth-wordmark">Teletype</div>
         </div>
-        <div className="auth-sub">Remote server console</div>
+        <div className="auth-sub">{t('auth:setup.subtitle')}</div>
 
         {error ? (
           <div className="auth-error">{error}</div>
         ) : (
           <>
             <div className="auth-instruction">
-              Run this command in your Minecraft server console to authenticate:
+              {t('auth:setup.instruction')}
             </div>
 
             <button
@@ -130,26 +135,26 @@ export default function AuthSetup({ onAuth }: Props) {
               type="button"
               onClick={copyCommand}
               disabled={!uuid}
-              title={uuid ? 'Copy auth command' : 'Waiting for challenge'}
+              title={uuid ? t('auth:setup.copyAuthCommandTitle') : t('auth:setup.waitingForChallengeTitle')}
             >
               <div className="tty-command-line">
                 <span className="tty-prompt">server&gt;</span>
                 <span className="tty-cmd">{cmd}</span>
                 <span className="tty-copy-state">
                   {copied ? <IconCheck size={14} /> : <IconCopy size={14} />}
-                  {copied ? 'Copied' : copyFailed ? 'Copy failed' : 'Copy'}
+                  {copied ? t('common:copied') : copyFailed ? t('auth:setup.copyFailed') : t('common:copy')}
                 </span>
               </div>
               {uuid && displayedUuid.length === uuid.length && (
                 <div className="tty-expiry">
-                  Challenge expires in 5 minutes
+                  {t('auth:setup.challengeExpiry')}
                 </div>
               )}
             </button>
 
             {uuid && (
               <div className="auth-challenge">
-                <div className="auth-challenge-label">Challenge UUID</div>
+                <div className="auth-challenge-label">{t('auth:setup.challengeUuidLabel')}</div>
                 <div className="auth-challenge-value">
                   {displayedUuid}
                   {displayedUuid.length < (uuid?.length ?? 0) && <span className="tty-cursor" />}
@@ -160,17 +165,17 @@ export default function AuthSetup({ onAuth }: Props) {
             {verified ? (
               <div className="auth-waiting auth-verified">
                 <IconCheck size={14} />
-                Verified — opening console
+                {t('auth:setup.verified')}
               </div>
             ) : (
               <div className="auth-waiting">
                 <div className="auth-spinner" />
-                Waiting for console verification…
+                {t('auth:setup.waitingForVerification')}
               </div>
             )}
 
             <div className="auth-hint">
-              Other server-side controls (status, restart the panel, log everyone out) are listed by <code>/tty help</code>.
+              <Trans i18nKey="auth:setup.hint" components={{ code: <code /> }} />
             </div>
           </>
         )}
@@ -183,10 +188,10 @@ function handoffDelayMs() {
   return window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 0 : 750
 }
 
-function authRequestError(err: unknown) {
+function authRequestError(err: unknown, t: TFunction) {
   if (axios.isAxiosError(err)) {
-    if (err.response?.status === 429) return 'Too many auth requests. Wait a moment and refresh.'
-    if (err.response) return `Authentication request failed (${err.response.status}). Refresh and try again.`
+    if (err.response?.status === 429) return t('auth:setup.errorTooManyRequestsInitial')
+    if (err.response) return t('auth:setup.errorRequestFailed', { status: err.response.status })
   }
-  return 'Cannot reach Teletype server. Is the plugin running?'
+  return t('auth:setup.errorUnreachable')
 }

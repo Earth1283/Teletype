@@ -1,0 +1,51 @@
+{
+  "metricLabel.tps": "TPS",
+  "metricLabel.tick": "Tick",
+  "metricLabel.mem": "Mem",
+  "metricLabel.cpu": "CPU",
+
+  "heuristic.tpsNearFreeze": "Servidor casi congelado",
+  "heuristic.tpsSignificantLag": "Evento de lag significativo",
+  "heuristic.tpsBelowTarget": "TPS por debajo del objetivo",
+  "heuristic.mainThreadStalled": "Hilo principal bloqueado",
+  "heuristic.serverLagSpike": "Pico de lag del servidor",
+  "heuristic.memPressureCritical": "Presión de memoria crítica",
+  "heuristic.memSurgeDetected": "Aumento de memoria detectado",
+  "heuristic.hostCpuSaturated": "CPU del host saturada",
+  "heuristic.hostCpuSpike": "Pico de CPU del host",
+
+  "nearestLog": "registro más cercano",
+  "jumpToLog": "ir al registro →",
+  "gcHint": "Los marcadores de GC son eventos JMX de la JVM. Las ventanas cortas indican la duración.",
+  "focusLabel": "enfoque",
+  "gcDurationLabel": "GC {{duration}}",
+
+  "speedo.tps1m": "TPS 1m",
+  "speedo.tickTime": "Tiempo de Tick",
+  "speedo.memory": "Memoria",
+  "speedo.cpu": "CPU",
+  "speedo.sysRam": "RAM del Sistema",
+  "speedo.disk": "Disco",
+  "speedo.uptime": "Tiempo Activo",
+  "speedo.tickGood": "< {{value}}ms bien",
+
+  "logPanel.collapse": "Contraer panel de registros",
+  "logPanel.expand": "Expandir panel de registros",
+  "logPanel.errorsTitle": "Errores",
+  "logPanel.logsTitle": "Registros",
+  "logPanel.clearHighlight": "Quitar resaltado",
+  "logPanel.filterToWarnings": "Filtrar a advertencias/errores",
+  "logPanel.showAllLogs": "Mostrar todos los registros",
+  "logPanel.errorsToggle": "errores",
+  "logPanel.allToggle": "todos",
+  "logPanel.waitingForLogs": "esperando registros…",
+  "logPanel.noWarningsOrErrors": "sin advertencias ni errores",
+
+  "errorBanner.failedToFetch": "⚠ Error al obtener métricas",
+  "statusBar.up": "activo {{uptime}}",
+  "statusBar.showLogPanel": "Mostrar panel de registros",
+  "statusBar.logsButton": "registros",
+
+  "emptyState.waitingForMetrics": "Esperando métricas…",
+  "chartTitle.hostCpu": "CPU del Host"
+}

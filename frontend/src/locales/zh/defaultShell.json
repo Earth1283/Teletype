@@ -1,0 +1,19 @@
+{
+  "signOut": "登出",
+  "online": "在线",
+  "offline": "离线",
+  "exitMobileView": "退出移动视图",
+  "switchToMobileView": "切换到移动视图",
+  "commandPalette": "命令面板",
+  "openCommandPalette": "打开命令面板",
+  "collapseSidebar": "收起侧边栏",
+  "expandSidebar": "展开侧边栏",
+  "commandPaletteHint": "命令面板（⌘K）",
+  "searchOrRunCommand": "搜索或运行命令",
+  "tpsTooltip": "TPS，最近 100 秒",
+  "tps": "tps",
+  "primaryNavigation": "主导航",
+  "closeMenu": "关闭菜单",
+  "more": "更多",
+  "executeFailed": "{{name}} 失败"
+}

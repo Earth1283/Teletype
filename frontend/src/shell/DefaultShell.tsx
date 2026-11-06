@@ -1,4 +1,5 @@
 import { useMemo, useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import { useQuery } from '@tanstack/react-query'
 import { api } from '../api/client'
 import { useToast } from '../ToastContext'
@@ -17,10 +18,11 @@ import {
 import { useQuickActionsCategoryId } from '../components/actions/useActions'
 
 function LogoutButton({ onLogout }: { onLogout: () => void }) {
+  const { t } = useTranslation('defaultShell')
   return (
     <button
       className="flex h-7 w-7 items-center justify-center rounded-sm text-text-muted transition-colors hover:text-status-critical hover:bg-status-critical/10"
-      title="Sign out"
+      title={t('defaultShell:signOut')}
       onClick={onLogout}
     >
       <IconLogOut size={14} />
@@ -30,6 +32,7 @@ function LogoutButton({ onLogout }: { onLogout: () => void }) {
 
 /* Up to three parameterless quick-action snippets, one click from anywhere */
 function TopbarQuickActions() {
+  const { t } = useTranslation('defaultShell')
   const toast = useToast()
   const quickActionsId = useQuickActionsCategoryId()
   const { data: snippets = [] } = useQuery<Snippet[]>({
@@ -50,7 +53,7 @@ function TopbarQuickActions() {
           onClick={() => {
             api.post(`/actions/execute/${s.id}`, { vars: {} })
               .then(() => toast.success(s.name))
-              .catch(() => toast.error(`${s.name} failed`))
+              .catch(() => toast.error(t('defaultShell:executeFailed', { name: s.name })))
           }}
         >
           <IconZap size={11} />
@@ -79,6 +82,7 @@ function TpsSparkline({ history }: { history: number[] }) {
 }
 
 export function DefaultShell({ onLogout }: { onLogout: () => void }) {
+  const { t } = useTranslation('defaultShell')
   const { settings } = useSettings()
   const {
     tab, setTab, visitedTabs, paletteOpen, setPaletteOpen, openPalette,
@@ -116,13 +120,13 @@ export function DefaultShell({ onLogout }: { onLogout: () => void }) {
           )}
         >
           <span className={cx('h-1.5 w-1.5 rounded-full', connected ? 'live-dot bg-live' : 'bg-text-muted')} />
-          {connected ? 'online' : 'offline'}
+          {connected ? t('defaultShell:online') : t('defaultShell:offline')}
         </span>
         {forceMobile && (
           <button
             className="flex h-7 w-7 items-center justify-center rounded-sm text-text-secondary"
-            title="Exit mobile view"
-            aria-label="Exit mobile view"
+            title={t('defaultShell:exitMobileView')}
+            aria-label={t('defaultShell:exitMobileView')}
             onClick={() => setForceMobile(false)}
           >
             🖥️
@@ -131,8 +135,8 @@ export function DefaultShell({ onLogout }: { onLogout: () => void }) {
         {!isPhoneViewport && !forceMobile && (
           <button
             className="force-mobile-btn flex h-7 w-7 items-center justify-center rounded-sm text-text-secondary"
-            title="Switch to mobile view"
-            aria-label="Switch to mobile view"
+            title={t('defaultShell:switchToMobileView')}
+            aria-label={t('defaultShell:switchToMobileView')}
             onClick={() => setForceMobile(true)}
           >
             📱
@@ -141,8 +145,8 @@ export function DefaultShell({ onLogout }: { onLogout: () => void }) {
         {settings.palette.enabled && (
           <button
             className="flex h-7 w-7 items-center justify-center rounded-sm text-text-secondary"
-            title="Command palette"
-            aria-label="Open command palette"
+            title={t('defaultShell:commandPalette')}
+            aria-label={t('defaultShell:openCommandPalette')}
             onClick={openPalette}
           >
             <IconCommand size={17} />
@@ -181,7 +185,7 @@ export function DefaultShell({ onLogout }: { onLogout: () => void }) {
                 !sidebarOpen && 'is-collapsed',
               )}
               onClick={() => setPaletteOpen(true)}
-              title="Command palette (⌘K)"
+              title={t('defaultShell:commandPaletteHint')}
               tabIndex={sidebarOpen ? undefined : -1}
             >
               ⌘K
@@ -189,7 +193,7 @@ export function DefaultShell({ onLogout }: { onLogout: () => void }) {
           )}
           <button
             className="absolute right-[14px] top-1/2 flex h-6 w-6 -translate-y-1/2 items-center justify-center rounded-sm text-text-muted hover:bg-surface-raised hover:text-text-secondary"
-            title={sidebarOpen ? 'Collapse sidebar' : 'Expand sidebar'}
+            title={sidebarOpen ? t('defaultShell:collapseSidebar') : t('defaultShell:expandSidebar')}
             aria-expanded={sidebarOpen}
             onClick={() => setSidebarOpen(!sidebarOpen)}
           >
@@ -214,19 +218,19 @@ export function DefaultShell({ onLogout }: { onLogout: () => void }) {
               type="button"
               className="flex h-8 w-[280px] items-center gap-2 rounded-md border border-border bg-void px-3 text-left font-sans text-[12px] text-text-muted transition-colors hover:border-border-hi hover:text-text-secondary"
               onClick={() => setPaletteOpen(true)}
-              aria-label="Open command palette"
+              aria-label={t('defaultShell:openCommandPalette')}
             >
               <IconSearch size={13} />
-              <span className="flex-1 truncate">Search or run a command</span>
+              <span className="flex-1 truncate">{t('defaultShell:searchOrRunCommand')}</span>
               <kbd className="rounded-sm border border-border px-1 font-mono text-[10px]">⌘K</kbd>
             </button>
           )}
 
           <span
             className="flex h-8 items-center gap-2 rounded-md border border-border px-2.5"
-            title="TPS, last 100 seconds"
+            title={t('defaultShell:tpsTooltip')}
           >
-            <span className="font-mono text-[10px] uppercase tracking-[0.08em] text-text-muted">tps</span>
+            <span className="font-mono text-[10px] uppercase tracking-[0.08em] text-text-muted">{t('defaultShell:tps')}</span>
             <TpsSparkline history={tpsHistory} />
             <span className="font-mono text-[12px] tabular-nums text-text-primary">
               {lastTps != null ? lastTps.toFixed(1) : '—'}
@@ -240,7 +244,7 @@ export function DefaultShell({ onLogout }: { onLogout: () => void }) {
             )}
           >
             <span className={cx('h-1.5 w-1.5 rounded-full', connected ? 'live-dot bg-live' : 'bg-text-muted')} />
-            {connected ? 'online' : 'offline'}
+            {connected ? t('defaultShell:online') : t('defaultShell:offline')}
           </span>
 
           <LogoutButton onLogout={onLogout} />
@@ -255,7 +259,7 @@ export function DefaultShell({ onLogout }: { onLogout: () => void }) {
       {/* ── Mobile bottom nav ─────────────────────────────────────────── */}
       <nav
         className="mobile-bottom-nav fixed inset-x-0 bottom-0 z-mobile-nav flex items-stretch border-t border-border bg-surface sm:hidden"
-        aria-label="Primary navigation"
+        aria-label={t('defaultShell:primaryNavigation')}
       >
         {PRIMARY_MOBILE_TABS.map(tabId => {
           const t = tabDef(tabId)
@@ -284,14 +288,14 @@ export function DefaultShell({ onLogout }: { onLogout: () => void }) {
           onClick={() => setMobileMoreOpen(!mobileMoreOpen)}
         >
           <IconDots size={22} />
-          <span>More</span>
+          <span>{t('defaultShell:more')}</span>
         </button>
       </nav>
 
       <button
         type="button"
         className={cx('mobile-scrim fixed inset-0 z-mobile-nav bg-scrim', mobileMoreOpen && 'is-open')}
-        aria-label="Close menu"
+        aria-label={t('defaultShell:closeMenu')}
         aria-hidden={!mobileMoreOpen}
         tabIndex={-1}
         onClick={() => setMobileMoreOpen(false)}
@@ -332,7 +336,7 @@ export function DefaultShell({ onLogout }: { onLogout: () => void }) {
             onClick={onLogout}
           >
             <IconLogOut size={18} />
-            <span>Sign out</span>
+            <span>{t('defaultShell:signOut')}</span>
           </button>
         </div>
       </div>

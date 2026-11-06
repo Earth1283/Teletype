@@ -1,0 +1,18 @@
+{
+  "title": "Consola en Vivo",
+  "searchPlaceholder": "Buscar registros…",
+  "precise": "Preciso",
+  "fuzzy": "Difuso",
+  "searchLogs": "Buscar registros",
+  "clearConsole": "Limpiar consola",
+  "scrollToBottom": "Ir al final",
+  "bottom": "Final",
+  "connected": "conectado",
+  "connecting": "conectando",
+  "commandPlaceholder": "Ingresa un comando del servidor… (Tab para completar)",
+  "send": "Enviar",
+  "copyMessageOnly": "Copiar Solo el Mensaje",
+  "copyLine": "Copiar Línea",
+  "copyFailed": "Error al copiar",
+  "quickActions": "Acciones Rápidas"
+}

@@ -1,0 +1,51 @@
+{
+  "metricLabel.tps": "TPS",
+  "metricLabel.tick": "Tick",
+  "metricLabel.mem": "Mem",
+  "metricLabel.cpu": "CPU",
+
+  "heuristic.tpsNearFreeze": "Server near-freeze",
+  "heuristic.tpsSignificantLag": "Significant lag event",
+  "heuristic.tpsBelowTarget": "TPS below target",
+  "heuristic.mainThreadStalled": "Main thread stalled",
+  "heuristic.serverLagSpike": "Server lag spike",
+  "heuristic.memPressureCritical": "Memory pressure critical",
+  "heuristic.memSurgeDetected": "Memory surge detected",
+  "heuristic.hostCpuSaturated": "Host CPU saturated",
+  "heuristic.hostCpuSpike": "Host CPU spike",
+
+  "nearestLog": "nearest log",
+  "jumpToLog": "jump to log →",
+  "gcHint": "GC markers are JVM JMX events. Short windows label duration.",
+  "focusLabel": "focus",
+  "gcDurationLabel": "GC {{duration}}",
+
+  "speedo.tps1m": "TPS 1m",
+  "speedo.tickTime": "Tick Time",
+  "speedo.memory": "Memory",
+  "speedo.cpu": "CPU",
+  "speedo.sysRam": "Sys RAM",
+  "speedo.disk": "Disk",
+  "speedo.uptime": "Uptime",
+  "speedo.tickGood": "< {{value}}ms good",
+
+  "logPanel.collapse": "Collapse log panel",
+  "logPanel.expand": "Expand log panel",
+  "logPanel.errorsTitle": "Errors",
+  "logPanel.logsTitle": "Logs",
+  "logPanel.clearHighlight": "Clear highlight",
+  "logPanel.filterToWarnings": "Filter to warnings/errors",
+  "logPanel.showAllLogs": "Show all logs",
+  "logPanel.errorsToggle": "errors",
+  "logPanel.allToggle": "all",
+  "logPanel.waitingForLogs": "waiting for logs…",
+  "logPanel.noWarningsOrErrors": "no warnings or errors",
+
+  "errorBanner.failedToFetch": "⚠ Failed to fetch metrics",
+  "statusBar.up": "up {{uptime}}",
+  "statusBar.showLogPanel": "Show log panel",
+  "statusBar.logsButton": "logs",
+
+  "emptyState.waitingForMetrics": "Waiting for metrics…",
+  "chartTitle.hostCpu": "Host CPU"
+}

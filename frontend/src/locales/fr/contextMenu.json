@@ -1,0 +1,14 @@
+{
+  "closeContextWheel": "Fermer la roue contextuelle",
+  "actionPalette": "Palette de commandes",
+  "actionGlance": "Aperçu",
+  "actionConsole": "Console",
+  "actionPlayers": "Joueurs",
+  "actionStats": "Statistiques",
+  "actionFiles": "Fichiers",
+  "actionActions": "Actions",
+  "actionAudit": "Audit",
+  "actionNetwork": "Réseau",
+  "actionSettings": "Paramètres",
+  "actionQuickActions": "Actions rapides"
+}

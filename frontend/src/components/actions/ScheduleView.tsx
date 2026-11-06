@@ -1,3 +1,5 @@
+import { useTranslation } from 'react-i18next'
+import type { TFunction } from 'i18next'
 import type { ScheduledAction, Snippet } from './actionTypes'
 import { useDeleteSchedule, usePauseSchedule, useResumeSchedule } from './useActions'
 import { IconTrash } from '../../Icons'
@@ -12,13 +14,14 @@ function formatDate(ms: number | undefined) {
   return new Date(ms).toLocaleString(undefined, { dateStyle: 'short', timeStyle: 'short' })
 }
 
-function modeLabel(a: ScheduledAction) {
-  if (a.mode === 'once')    return 'Once'
-  if (a.mode === 'ntimes')  return `${a.runsRemaining ?? 0}/${a.repeatCount ?? '?'} left`
-  return '∞ Forever'
+function modeLabel(a: ScheduledAction, t: TFunction) {
+  if (a.mode === 'once')    return t('actions:scheduleView.modeOnce')
+  if (a.mode === 'ntimes')  return t('actions:scheduleView.modeNTimes', { remaining: a.runsRemaining ?? 0, count: a.repeatCount ?? '?' })
+  return t('actions:scheduleView.modeForever')
 }
 
 export default function ScheduleView({ actions, snippets }: Props) {
+  const { t } = useTranslation('actions')
   const deleteSchedule = useDeleteSchedule()
   const pauseSchedule  = usePauseSchedule()
   const resumeSchedule = useResumeSchedule()
@@ -28,8 +31,8 @@ export default function ScheduleView({ actions, snippets }: Props) {
     return (
       <div className="schedule-view">
         <div className="actions-empty">
-          <span>No scheduled actions yet.</span>
-          <span className="ghost-hint">Open the Snippets tab and click 🕐 on any snippet to schedule it.</span>
+          <span>{t('scheduleView.empty.title')}</span>
+          <span className="ghost-hint">{t('scheduleView.empty.hint')}</span>
         </div>
       </div>
     )
@@ -40,12 +43,12 @@ export default function ScheduleView({ actions, snippets }: Props) {
       <table className="sched-table">
         <thead>
           <tr>
-            <th>Label</th>
-            <th>Snippet</th>
-            <th>Schedule</th>
-            <th>Mode</th>
-            <th>Status</th>
-            <th>Last run</th>
+            <th>{t('scheduleView.columns.label')}</th>
+            <th>{t('scheduleView.columns.snippet')}</th>
+            <th>{t('scheduleView.columns.schedule')}</th>
+            <th>{t('scheduleView.columns.mode')}</th>
+            <th>{t('scheduleView.columns.status')}</th>
+            <th>{t('scheduleView.columns.lastRun')}</th>
             <th></th>
           </tr>
         </thead>
@@ -55,9 +58,9 @@ export default function ScheduleView({ actions, snippets }: Props) {
             return (
               <tr key={a.id} className={a.status === 'paused' ? 'row-paused' : ''}>
                 <td className="sched-label">{a.label}</td>
-                <td className="sched-snippet">{sn?.name ?? <span className="ghost-hint">(deleted)</span>}</td>
+                <td className="sched-snippet">{sn?.name ?? <span className="ghost-hint">{t('scheduleView.deletedSnippet')}</span>}</td>
                 <td className="sched-trigger">{a.trigger}</td>
-                <td className="sched-mode">{modeLabel(a)}</td>
+                <td className="sched-mode">{modeLabel(a, t)}</td>
                 <td>
                   <span className={`status-badge status-${a.status}`}>{a.status}</span>
                 </td>
@@ -71,8 +74,8 @@ export default function ScheduleView({ actions, snippets }: Props) {
                 <td className="sched-row-acts">
                   {a.mode !== 'once' && (
                     a.status === 'active'
-                      ? <button className="btn-ghost btn-xs" onClick={() => pauseSchedule.mutate(a.id)}>Pause</button>
-                      : <button className="btn-ghost btn-xs" onClick={() => resumeSchedule.mutate(a.id)}>Resume</button>
+                      ? <button className="btn-ghost btn-xs" onClick={() => pauseSchedule.mutate(a.id)}>{t('scheduleView.pause')}</button>
+                      : <button className="btn-ghost btn-xs" onClick={() => resumeSchedule.mutate(a.id)}>{t('scheduleView.resume')}</button>
                   )}
                   <button className="icon-btn danger-icon" onClick={() => deleteSchedule.mutate(a.id)}>
                     <IconTrash size={13} />

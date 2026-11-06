@@ -1,0 +1,18 @@
+{
+  "title": "实时控制台",
+  "searchPlaceholder": "搜索日志…",
+  "precise": "精确",
+  "fuzzy": "模糊",
+  "searchLogs": "搜索日志",
+  "clearConsole": "清空控制台",
+  "scrollToBottom": "滚动到底部",
+  "bottom": "底部",
+  "connected": "已连接",
+  "connecting": "连接中",
+  "commandPlaceholder": "输入服务器命令…（Tab 键补全）",
+  "send": "发送",
+  "copyMessageOnly": "仅复制消息",
+  "copyLine": "复制行",
+  "copyFailed": "复制失败",
+  "quickActions": "快捷操作"
+}

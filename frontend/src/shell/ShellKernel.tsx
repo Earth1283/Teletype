@@ -2,6 +2,7 @@ import {
   createContext, useCallback, useContext, useEffect, useMemo, useRef, useState,
   type ReactNode,
 } from 'react'
+import { useTranslation } from 'react-i18next'
 import { useQuery } from '@tanstack/react-query'
 import { api } from '../api/client'
 import { useLogApi } from '../LogContext'
@@ -106,6 +107,7 @@ function ContextWheelBinding({ tab, onNavigate, onOpenPalette }: {
   onNavigate: (tab: Tab) => void
   onOpenPalette: () => void
 }) {
+  const { t } = useTranslation('shellKernel')
   const { setFallbackContextMenu } = useContextMenu()
   const quickActionsId = useQuickActionsCategoryId()
   const { settings } = useSettings()
@@ -123,7 +125,7 @@ function ContextWheelBinding({ tab, onNavigate, onOpenPalette }: {
 
     return selected.flatMap<ContextMenuItem>(id => {
       if (id === 'palette') {
-        return [{ label: 'Command Palette', shortcut: '⌘K', action: onOpenPalette }]
+        return [{ label: t('shellKernel:wheelCommandPalette'), shortcut: '⌘K', action: onOpenPalette }]
       }
       if (id === 'quick-actions') {
         return quickActions.map(snippet => ({
@@ -137,15 +139,15 @@ function ContextWheelBinding({ tab, onNavigate, onOpenPalette }: {
           },
         }))
       }
-      const tabDef = TABS.find(t => t.id === id)
+      const tabDef = TABS.find(td => td.id === id)
       if (!tabDef) return []
       return [{
-        label: `Open ${tabDef.label}`,
+        label: t('shellKernel:wheelOpenTab', { label: tabDef.label }),
         disabled: tab === tabDef.id,
         action: () => onNavigate(tabDef.id),
       }]
     })
-  }, [onNavigate, onOpenPalette, quickActionsId, settings.contextWheel.actions, snippets, tab])
+  }, [onNavigate, onOpenPalette, quickActionsId, settings.contextWheel.actions, snippets, tab, t])
 
   useEffect(() => {
     setFallbackContextMenu(items)
@@ -156,6 +158,7 @@ function ContextWheelBinding({ tab, onNavigate, onOpenPalette }: {
 }
 
 export function ShellKernel({ children }: { children: ReactNode }) {
+  const { t } = useTranslation('shellKernel')
   const [tab, setTab] = useState<Tab>('glance')
   const [visitedTabs, setVisitedTabs] = useState<Set<Tab>>(() => new Set<Tab>(['glance']))
   const [paletteOpen, setPaletteOpen] = useState(false)
@@ -235,11 +238,11 @@ export function ShellKernel({ children }: { children: ReactNode }) {
     if (tapCountRef.current >= 5) {
       tapCountRef.current = 0
       update({ appleify: true })
-      toast.success('Appleify activated')
+      toast.success(t('shellKernel:appleifyActivated'))
     } else {
       tapTimerRef.current = setTimeout(() => { tapCountRef.current = 0 }, 2000)
     }
-  }, [update, toast])
+  }, [update, toast, t])
 
   const openPalette = useCallback(() => {
     setMobileMoreOpen(false)

@@ -1,0 +1,34 @@
+{
+  "kpis.entriesLabel": "Entries (page)",
+  "kpis.topActor": "Top Actor",
+  "kpis.topAction": "Top Action",
+  "kpis.actionsCount": "{{count}} actions",
+  "kpis.timesCount": "{{count}} times",
+
+  "toolbar.title": "Audit Log",
+  "toolbar.refreshing": "Refreshing…",
+  "toolbar.entriesCount": "{{count}} entries",
+  "toolbar.filterByActorPlaceholder": "Filter by actor…",
+  "toolbar.allActions": "All actions",
+  "toolbar.reset": "Reset",
+  "toolbar.exportCsv": "Export CSV",
+
+  "contextMenu.copyDetail": "Copy Detail",
+  "contextMenu.copyRow": "Copy Row",
+  "contextMenu.filterByActor": "Filter by Actor",
+  "contextMenu.filterByAction": "Filter by Action",
+  "contextMenu.copyFailed": "Copy failed",
+
+  "emptyState.title": "No audit entries",
+  "emptyState.hintFiltered": "Try clearing the filters",
+  "emptyState.hintDefault": "Actions you take will appear here",
+
+  "columns.timestamp": "Timestamp",
+  "columns.actor": "Actor",
+  "columns.ip": "IP",
+  "columns.action": "Action",
+  "columns.detail": "Detail",
+
+  "pagination.previous": "← Previous",
+  "pagination.next": "Next →"
+}

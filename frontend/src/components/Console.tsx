@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState, useCallback, useMemo } from 'react'
+import { useTranslation } from 'react-i18next'
 import { Virtuoso, type VirtuosoHandle } from 'react-virtuoso'
 import AnsiConvert from 'ansi-to-html'
 import { useQuery } from '@tanstack/react-query'
@@ -38,6 +39,7 @@ function matchLine(line: string, q: string, fuzzyLevel: number): boolean {
 }
 
 export default function Console() {
+  const { t } = useTranslation('console')
   const { lines } = useLogLines()
   const { connected, send: socketSend, tabComplete } = useLogApi()
   const { settings } = useSettings()
@@ -193,16 +195,16 @@ export default function Console() {
     const clean = stripAnsi(line)
     const items: ContextMenuItem[] = [
       {
-        label: plain ? 'Copy Message Only' : 'Copy Line',
+        label: plain ? t('console:copyMessageOnly') : t('console:copyLine'),
         shortcut: '⌘C',
         action: async () => {
           const ok = await writeClipboard(plain ? stripLogPrefix(clean) : clean).catch(() => false)
-          if (!ok) toast.error('Copy failed')
+          if (!ok) toast.error(t('console:copyFailed'))
         },
       },
     ]
     if (quickActions.length > 0) {
-      items.push({ type: 'separator' }, { type: 'header', label: 'Quick Actions' })
+      items.push({ type: 'separator' }, { type: 'header', label: t('console:quickActions') })
       quickActions.forEach(s => {
         items.push({ label: s.name, action: () => handleQAClick(s) })
       })
@@ -221,7 +223,7 @@ export default function Console() {
   return (
     <div className="console-root">
       <div className="console-header">
-        <span className="console-header-title">Live Console</span>
+        <span className="console-header-title">{t('console:title')}</span>
         {searchOpen && (
           <div className="console-search-bar">
             <IconSearch size={12} />
@@ -229,18 +231,18 @@ export default function Console() {
               className="console-search-input"
               value={searchQuery}
               onChange={e => setSearchQuery(e.target.value)}
-              placeholder="Search logs…"
+              placeholder={t('console:searchPlaceholder')}
               autoFocus
               spellCheck={false}
             />
             <div className="fuzzy-slider-wrap">
-              <span className="fuzzy-label">Precise</span>
+              <span className="fuzzy-label">{t('console:precise')}</span>
               <input
                 type="range" min={0} max={100} value={fuzzyLevel}
                 onChange={e => setFuzzyLevel(+e.target.value)}
                 className="fuzzy-slider"
               />
-              <span className="fuzzy-label">Fuzzy</span>
+              <span className="fuzzy-label">{t('console:fuzzy')}</span>
             </div>
             {searchOpen && searchQuery && (
               <span className="console-search-count">
@@ -255,7 +257,7 @@ export default function Console() {
         <button
           className={`icon-btn${searchOpen ? ' active' : ''}`}
           onClick={() => { setSearchOpen(v => !v); if (searchOpen) setSearchQuery('') }}
-          title="Search logs"
+          title={t('console:searchLogs')}
           style={{ flexShrink: 0 }}
         >
           <IconSearch size={13} />
@@ -263,7 +265,7 @@ export default function Console() {
         <button
           className="icon-btn"
           onClick={() => setClearedAt(lines.length)}
-          title="Clear console"
+          title={t('console:clearConsole')}
           style={{ flexShrink: 0 }}
         >
           <IconX size={13} />
@@ -271,14 +273,14 @@ export default function Console() {
         <button
           className={`console-bottom-btn${followingTail ? '' : ' active'}`}
           onClick={() => scrollToBottom('smooth')}
-          title="Scroll to bottom"
+          title={t('console:scrollToBottom')}
           disabled={filteredLines.length === 0}
         >
-          Bottom
+          {t('console:bottom')}
         </button>
         <div className="conn-badge">
           <span className={`dot ${connected ? 'on' : 'off'}`} />
-          {connected ? 'connected' : 'connecting'}
+          {connected ? t('console:connected') : t('console:connecting')}
         </div>
       </div>
 
@@ -328,12 +330,12 @@ export default function Console() {
           value={input}
           onChange={(e) => { setInput(e.target.value); clearCompletions() }}
           onKeyDown={handleKeyDown}
-          placeholder="Enter server command… (Tab to complete)"
+          placeholder={t('console:commandPlaceholder')}
           spellCheck={false}
           autoComplete="off"
           autoFocus
         />
-        <button className="console-send-btn" onClick={send}>Send</button>
+        <button className="console-send-btn" onClick={send}>{t('console:send')}</button>
       </div>
 
       {runSnippet && <RunModal snippet={runSnippet} onClose={() => setRunSnippet(null)} />}

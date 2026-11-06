@@ -1,0 +1,117 @@
+# Teletype Plugin Messages — 中文（简体）(zh)
+# Format: MiniMessage — https://docs.advntr.dev/minimessage/format
+# Available placeholders depend on the message; see comments on each key.
+# {prefix} is always available and resolved from the prefix key below.
+# To disable a message entirely, set it to an empty string: ""
+#
+# Missing keys in this file silently fall back to languages/en.yml.
+
+prefix: "<bold><aqua>Teletype</aqua></bold> <dark_gray>»</dark_gray> "
+
+# ── Lifecycle (console-only) ─────────────────────────────────────────────────
+# {version} {url}
+startup: "{prefix}<green>v{version} 已就绪 <dark_gray>—</dark_gray> <white>{url}</white> <dark_gray>·</dark_gray> <gray>/tty help"
+# (no placeholders)
+shutdown: "{prefix}<yellow>已停止"
+
+# ── /tty command ─────────────────────────────────────────────────────────────
+command:
+  # {input} {label}
+  unknown-subcommand: "{prefix}<red>未知子命令 <white>{input}</white>。<gray>运行 <aqua>/{label} help</aqua> 查看所有命令。"
+  # {command} — clickable, fills the suggestion into chat
+  did-you-mean: "{prefix}<gray>你是想输入 <aqua><u>{command}</u></aqua> 吗？"
+
+  help:
+    # {version} {port} {state}
+    header: "{prefix}<white><bold>命令</bold></white> <dark_gray>·</dark_gray> <gray>v{version}，Web 面板{state}，端口 {port}"
+    # {command} {usage} — the description below is appended, and the whole line is clickable
+    entry: "  <aqua>{command}</aqua> <gray>{usage}</gray> <dark_gray>— "
+    # {command}
+    hover: "<gray>点击将 <aqua>{command}</aqua> 放入聊天框"
+    # {label}
+    footer: "<dark_gray>点击命令即可将其填入聊天框。<gray>/{label} help</gray> 后跟命令名可查看详细说明。"
+    admin-only: "<dark_gray>你需要是 Teletype 管理员才能运行此命令。"
+    descriptions:
+      help: "<white>显示此列表，或某个命令的详细信息"
+      status: "<white>显示 Web 面板是否正在运行"
+      verify: "<white>使用浏览器中显示的代码批准 Web 登录"
+      start: "<white>启动 Web 面板"
+      stop: "<white>停止 Web 面板"
+      reload: "<white>重新加载 config.yml 和 messages.yml，然后重启面板"
+      doctor: "<white>检查端口、文件、TLS 和安全设置"
+      revoke: "<white>注销所有 Web 会话"
+    # {label}
+    details:
+      help: "<gray>列出你可以运行的每个 <aqua>/{label}</aqua> 命令。添加命令名可查看详情，例如 <aqua>/{label} help verify</aqua>。"
+      status: "<gray>显示内置 Web 服务器是否正在运行，以及它监听的端口。"
+      verify: "<gray>在浏览器中打开面板，复制它显示的代码，然后在此处运行 <aqua>/{label} verify</aqua> 并加上该代码。浏览器将以你的身份登录，其所有操作都会在审计日志中记录在你的名下。<newline><yellow>只批准你刚刚自己打开的代码。</yellow>"
+      start: "<gray>如果 Web 服务器是通过 <aqua>/{label} stop</aqua> 停止的，则启动它。"
+      stop: "<gray>停止 Web 服务器。指标、计划任务和端口转发将继续运行。"
+      reload: "<gray>重新读取 config.yml 和 messages.yml，如果 Web 服务器正在运行则将其重启。部分设置（指标采样、多路复用器）仍需要完全重启服务器才能生效。"
+      doctor: "<gray>运行健康检查：Web 资源、端口、TLS 密钥库、JWT 密钥、数据文件和安全防护。每行结果为 PASS、WARN 或 FAIL。"
+      revoke: "<gray>生成新的签名密钥，这将使所有已签发的登录和下载链接失效，并断开已打开的控制台。所有人都必须重新执行 <aqua>/{label} verify</aqua>。"
+  no-permission: "{prefix}<red>没有权限。"
+
+  verify:
+    no-permission: "{prefix}<red>只有控制台或 Teletype 管理员（当 auth.require-op 为 true 时为服务器管理员）可以验证挑战。"
+    teletype-denied: "{prefix}<red>出于安全考虑，<white>/tty verify</white><red> 不能从 Teletype 中运行。请使用真实的服务器控制台或游戏内管理员。"
+    player-denied: "{prefix}<red>出于安全考虑，玩家不能运行 <white>/tty verify</white><red>。请使用真实的服务器控制台。"
+    # {player_ip} {http_ip}
+    player-ip-mismatch: "{prefix}<red>出于安全考虑，玩家验证需要匹配的 IP。<gray>玩家：<white>{player_ip}</white> <dark_gray>|</dark_gray> HTTP：<white>{http_ip}</white>"
+    usage: "{prefix}<red>用法：<gray>/tty verify [uuid]"
+    invalid-uuid: "{prefix}<red>UUID 格式无效。"
+    # (no placeholders)
+    success: "{prefix}<green>挑战已验证。JWT 已发放给等待的客户端。"
+    # (no placeholders)
+    not-found: "{prefix}<red>未找到挑战，或已过期。"
+
+  status:
+    # {port}
+    running: "{prefix}<green>Web 服务器正在端口 <white>{port}"
+    stopped: "{prefix}<red>Web 服务器已停止。"
+
+  start:
+    already-running: "{prefix}<yellow>Web 服务器已在运行。"
+    progress: "{prefix}<gray>正在启动 Web 服务器..."
+    success: "{prefix}<green>Web 服务器已启动。"
+    # {error}
+    failed: "{prefix}<red>启动 Web 服务器失败：<white>{error}"
+
+  revoke:
+    # (no placeholders)
+    success: "{prefix}<green>已注销所有 Web 会话。所有人都必须使用 <white>/tty verify</white><green> 重新登录。"
+
+  stop:
+    not-running: "{prefix}<yellow>Web 服务器未在运行。"
+    progress: "{prefix}<gray>正在停止 Web 服务器..."
+    success: "{prefix}<yellow>Web 服务器已停止。"
+    # {error}
+    failed: "{prefix}<red>停止 Web 服务器失败：<white>{error}"
+
+  reload:
+    progress: "{prefix}<gray>正在重新加载配置..."
+    # {state}
+    success: "{prefix}<green>配置已重新加载；<white>{state}<green>。<gray>仅限启动时生效的子系统更改需要完全重启服务器。"
+    # {error}
+    failed: "{prefix}<red>重新加载失败：<white>{error}"
+
+# ── TLS (console-only) ───────────────────────────────────────────────────────
+tls:
+  # {path}
+  generating: "{prefix}<gray>正在生成自签名证书 <dark_gray>→</dark_gray> <white>{path}"
+  cert-created: "{prefix}<gray>自签名证书已创建。<yellow>浏览器会显示警告 — 接受一次即可。"
+  production-hint: "{prefix}<gray>生产环境请在 config.yml 中使用 <white>server.tls.mode: keystore</white>"
+
+# ── Metrics retention (console-only) ─────────────────────────────────────────
+metrics:
+  retention-start: "{prefix}<gray>正在运行夜间指标保留任务…"
+  retention-done: "{prefix}<gray>指标保留任务完成。"
+  # {error}
+  retention-failed: "{prefix}<red>保留任务失败：<white>{error}"
+
+# ── Data file errors (console-only) ──────────────────────────────────────────
+data:
+  # {error}
+  snippets-load-failed: "{prefix}<red>加载 snippets.json 失败：<white>{error}<red>。正在使用默认值。"
+  # {error}
+  schedule-load-failed: "{prefix}<red>加载 schedule.json 失败：<white>{error}"

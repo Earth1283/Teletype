@@ -1,0 +1,34 @@
+{
+  "kpis.entriesLabel": "条目数（当前页）",
+  "kpis.topActor": "最活跃操作者",
+  "kpis.topAction": "最常见操作",
+  "kpis.actionsCount": "{{count}} 次操作",
+  "kpis.timesCount": "{{count}} 次",
+
+  "toolbar.title": "审计日志",
+  "toolbar.refreshing": "刷新中…",
+  "toolbar.entriesCount": "{{count}} 条条目",
+  "toolbar.filterByActorPlaceholder": "按操作者筛选…",
+  "toolbar.allActions": "全部操作",
+  "toolbar.reset": "重置",
+  "toolbar.exportCsv": "导出 CSV",
+
+  "contextMenu.copyDetail": "复制详情",
+  "contextMenu.copyRow": "复制行",
+  "contextMenu.filterByActor": "按操作者筛选",
+  "contextMenu.filterByAction": "按操作筛选",
+  "contextMenu.copyFailed": "复制失败",
+
+  "emptyState.title": "暂无审计条目",
+  "emptyState.hintFiltered": "请尝试清除筛选条件",
+  "emptyState.hintDefault": "您执行的操作将显示在此处",
+
+  "columns.timestamp": "时间戳",
+  "columns.actor": "操作者",
+  "columns.ip": "IP",
+  "columns.action": "操作",
+  "columns.detail": "详情",
+
+  "pagination.previous": "← 上一页",
+  "pagination.next": "下一页 →"
+}

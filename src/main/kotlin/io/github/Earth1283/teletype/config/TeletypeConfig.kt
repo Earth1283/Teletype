@@ -16,6 +16,9 @@ class TeletypeConfig(private val plugin: Teletype) {
     private fun bool(key: String, default: Boolean) = config.getBoolean(key, default)
     private fun double(key: String, default: Double) = config.getDouble(key, default)
 
+    // ── Language ──────────────────────────────────────────────────────────────
+    val language: String get() = (config.getString("language") ?: "en").trim().lowercase()
+
     // ── Server ────────────────────────────────────────────────────────────────
     val port: Int get() =
         if (config.contains("server.port")) config.getInt("server.port", 8080)

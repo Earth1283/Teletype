@@ -1,0 +1,117 @@
+# Teletype Plugin Messages — Français (fr)
+# Format: MiniMessage — https://docs.advntr.dev/minimessage/format
+# Available placeholders depend on the message; see comments on each key.
+# {prefix} is always available and resolved from the prefix key below.
+# To disable a message entirely, set it to an empty string: ""
+#
+# Missing keys in this file silently fall back to languages/en.yml.
+
+prefix: "<bold><aqua>Teletype</aqua></bold> <dark_gray>»</dark_gray> "
+
+# ── Lifecycle (console-only) ─────────────────────────────────────────────────
+# {version} {url}
+startup: "{prefix}<green>v{version} prêt <dark_gray>—</dark_gray> <white>{url}</white> <dark_gray>·</dark_gray> <gray>/tty help"
+# (no placeholders)
+shutdown: "{prefix}<yellow>arrêté"
+
+# ── /tty command ─────────────────────────────────────────────────────────────
+command:
+  # {input} {label}
+  unknown-subcommand: "{prefix}<red>Sous-commande inconnue <white>{input}</white>. <gray>Exécutez <aqua>/{label} help</aqua> pour voir toutes les commandes."
+  # {command} — clickable, fills the suggestion into chat
+  did-you-mean: "{prefix}<gray>Vouliez-vous dire <aqua><u>{command}</u></aqua> ?"
+
+  help:
+    # {version} {port} {state}
+    header: "{prefix}<white><bold>Commandes</bold></white> <dark_gray>·</dark_gray> <gray>v{version}, panneau web {state} sur le port {port}"
+    # {command} {usage} — the description below is appended, and the whole line is clickable
+    entry: "  <aqua>{command}</aqua> <gray>{usage}</gray> <dark_gray>— "
+    # {command}
+    hover: "<gray>Cliquez pour placer <aqua>{command}</aqua> dans le chat"
+    # {label}
+    footer: "<dark_gray>Cliquez sur une commande pour la remplir. <gray>/{label} help</gray> suivi du nom d'une commande l'explique en détail."
+    admin-only: "<dark_gray>Vous devez être administrateur Teletype pour exécuter cette commande."
+    descriptions:
+      help: "<white>Affiche cette liste, ou les détails d'une commande"
+      status: "<white>Indique si le panneau web est en cours d'exécution"
+      verify: "<white>Approuve une connexion web avec le code affiché par le navigateur"
+      start: "<white>Démarre le panneau web"
+      stop: "<white>Arrête le panneau web"
+      reload: "<white>Recharge config.yml et messages.yml, puis redémarre le panneau"
+      doctor: "<white>Vérifie les ports, les fichiers, TLS et les paramètres de sécurité"
+      revoke: "<white>Déconnecte toutes les sessions web"
+    # {label}
+    details:
+      help: "<gray>Liste chaque commande <aqua>/{label}</aqua> que vous pouvez exécuter. Ajoutez le nom d'une commande pour les détails, p. ex. <aqua>/{label} help verify</aqua>."
+      status: "<gray>Indique si le serveur web intégré est en cours d'exécution et sur quel port il écoute."
+      verify: "<gray>Ouvrez le panneau dans un navigateur, copiez le code affiché, puis exécutez <aqua>/{label} verify</aqua> suivi de ce code ici. Le navigateur se connecte en tant que vous, et chacune de ses actions est enregistrée à votre nom dans le journal d'audit.<newline><yellow>N'approuvez que les codes que vous venez d'ouvrir vous-même.</yellow>"
+      start: "<gray>Démarre le serveur web s'il a été arrêté avec <aqua>/{label} stop</aqua>."
+      stop: "<gray>Arrête le serveur web. Les métriques, les planifications et les redirections de ports continuent de fonctionner."
+      reload: "<gray>Relit config.yml et messages.yml et redémarre le serveur web s'il était en cours d'exécution. Certains réglages (échantillonnage des métriques, le multiplexeur) nécessitent encore un redémarrage complet du serveur."
+      doctor: "<gray>Lance un contrôle de santé : ressources web, ports, keystore TLS, secret JWT, fichiers de données et protections de sécurité. Chaque ligne affiche PASS, WARN ou FAIL."
+      revoke: "<gray>Génère un nouveau secret de signature, ce qui invalide toutes les connexions et tous les liens de téléchargement émis, et déconnecte les consoles ouvertes. Chacun doit à nouveau exécuter <aqua>/{label} verify</aqua>."
+  no-permission: "{prefix}<red>Permission refusée."
+
+  verify:
+    no-permission: "{prefix}<red>Seuls la console ou les administrateurs Teletype (opérateurs lorsque auth.require-op est true) peuvent vérifier les défis."
+    teletype-denied: "{prefix}<red>Pour des raisons de sécurité, <white>/tty verify</white><red> ne peut pas être exécuté depuis Teletype. Utilisez la vraie console du serveur ou un opérateur en jeu."
+    player-denied: "{prefix}<red>Pour des raisons de sécurité, les joueurs ne peuvent pas exécuter <white>/tty verify</white><red>. Utilisez la vraie console du serveur."
+    # {player_ip} {http_ip}
+    player-ip-mismatch: "{prefix}<red>Pour des raisons de sécurité, la vérification du joueur nécessite des IP correspondantes. <gray>Joueur : <white>{player_ip}</white> <dark_gray>|</dark_gray> HTTP : <white>{http_ip}</white>"
+    usage: "{prefix}<red>Usage : <gray>/tty verify [uuid]"
+    invalid-uuid: "{prefix}<red>Format UUID invalide."
+    # (no placeholders)
+    success: "{prefix}<green>Défi vérifié. JWT délivré au client en attente."
+    # (no placeholders)
+    not-found: "{prefix}<red>Défi introuvable ou déjà expiré."
+
+  status:
+    # {port}
+    running: "{prefix}<green>Serveur web actif sur le port <white>{port}"
+    stopped: "{prefix}<red>Le serveur web est arrêté."
+
+  start:
+    already-running: "{prefix}<yellow>Le serveur web est déjà en cours d'exécution."
+    progress: "{prefix}<gray>Démarrage du serveur web..."
+    success: "{prefix}<green>Serveur web démarré."
+    # {error}
+    failed: "{prefix}<red>Échec du démarrage du serveur web : <white>{error}"
+
+  revoke:
+    # (no placeholders)
+    success: "{prefix}<green>Toutes les sessions web ont été révoquées. Chacun doit se reconnecter avec <white>/tty verify</white><green>."
+
+  stop:
+    not-running: "{prefix}<yellow>Le serveur web n'est pas en cours d'exécution."
+    progress: "{prefix}<gray>Arrêt du serveur web..."
+    success: "{prefix}<yellow>Serveur web arrêté."
+    # {error}
+    failed: "{prefix}<red>Échec de l'arrêt du serveur web : <white>{error}"
+
+  reload:
+    progress: "{prefix}<gray>Rechargement de la configuration..."
+    # {state}
+    success: "{prefix}<green>Configuration rechargée ; <white>{state}<green>. <gray>Les changements de sous-systèmes au démarrage uniquement nécessitent un redémarrage complet du serveur."
+    # {error}
+    failed: "{prefix}<red>Échec du rechargement : <white>{error}"
+
+# ── TLS (console-only) ───────────────────────────────────────────────────────
+tls:
+  # {path}
+  generating: "{prefix}<gray>Génération du certificat auto-signé <dark_gray>→</dark_gray> <white>{path}"
+  cert-created: "{prefix}<gray>Certificat auto-signé créé. <yellow>Les navigateurs afficheront un avertissement — acceptez-le une fois."
+  production-hint: "{prefix}<gray>Pour la production, utilisez <white>server.tls.mode: keystore</white> dans config.yml"
+
+# ── Metrics retention (console-only) ─────────────────────────────────────────
+metrics:
+  retention-start: "{prefix}<gray>Exécution de la rétention nocturne des métriques…"
+  retention-done: "{prefix}<gray>Rétention des métriques terminée."
+  # {error}
+  retention-failed: "{prefix}<red>Échec de la tâche de rétention : <white>{error}"
+
+# ── Data file errors (console-only) ──────────────────────────────────────────
+data:
+  # {error}
+  snippets-load-failed: "{prefix}<red>Échec du chargement de snippets.json : <white>{error}<red>. Chargement des valeurs par défaut."
+  # {error}
+  schedule-load-failed: "{prefix}<red>Échec du chargement de schedule.json : <white>{error}"

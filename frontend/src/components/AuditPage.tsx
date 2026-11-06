@@ -1,5 +1,6 @@
 import { useMemo, useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
+import { useTranslation } from 'react-i18next'
 import { api } from '../api/client'
 import { useContextMenu } from '../ContextMenu'
 import { useToast } from '../ToastContext'
@@ -72,6 +73,7 @@ function fmtTs(ts: number): string {
 }
 
 export default function AuditPage() {
+  const { t } = useTranslation('audit')
   const [actorFilter, setActorFilter]   = useState('')
   const [actionFilter, setActionFilter] = useState('')
   const [sinceInput, setSinceInput]     = useState('')
@@ -115,17 +117,17 @@ export default function AuditPage() {
 
   const openCtx = (e: React.MouseEvent, entry: AuditEntry) => {
     openContextMenu(e, [
-      { label: 'Copy Detail', action: async () => { if (!await writeClipboard(entry.detail)) toast.error('Copy failed') } },
+      { label: t('contextMenu.copyDetail'), action: async () => { if (!await writeClipboard(entry.detail)) toast.error(t('contextMenu.copyFailed')) } },
       {
-        label: 'Copy Row',
+        label: t('contextMenu.copyRow'),
         action: async () => {
           const line = [fmtTs(entry.ts), entry.actor, entry.ip, entry.action, entry.detail].join('\t')
-          if (!await writeClipboard(line)) toast.error('Copy failed')
+          if (!await writeClipboard(line)) toast.error(t('contextMenu.copyFailed'))
         },
       },
       { type: 'separator' },
-      { label: 'Filter by Actor', action: () => { setActorFilter(entry.actor); setOffset(0) } },
-      { label: 'Filter by Action', action: () => { setActionFilter(entry.action); setOffset(0) } },
+      { label: t('contextMenu.filterByActor'), action: () => { setActorFilter(entry.actor); setOffset(0) } },
+      { label: t('contextMenu.filterByAction'), action: () => { setActionFilter(entry.action); setOffset(0) } },
     ], { kind: 'auditEntry', id: entry.id })
   }
 
@@ -150,33 +152,33 @@ export default function AuditPage() {
       {kpis && (
         <div className="grid grid-cols-3 gap-3 px-4 pt-3">
           <div className="rounded-md border border-border bg-surface p-3">
-            <Eyebrow>Entries (page)</Eyebrow>
+            <Eyebrow>{t('kpis.entriesLabel')}</Eyebrow>
             <div className="mt-1 font-mono text-xl text-text-primary">{kpis.total}</div>
           </div>
           <div className="rounded-md border border-border bg-surface p-3">
-            <Eyebrow>Top Actor</Eyebrow>
+            <Eyebrow>{t('kpis.topActor')}</Eyebrow>
             <div className="mt-1 truncate font-mono text-xl text-text-primary">{kpis.topActor[0]}</div>
-            <div className="font-mono text-[11px] text-text-muted">{kpis.topActor[1]} actions</div>
+            <div className="font-mono text-[11px] text-text-muted">{t('kpis.actionsCount', { count: kpis.topActor[1] })}</div>
           </div>
           <div className="rounded-md border border-border bg-surface p-3">
-            <Eyebrow>Top Action</Eyebrow>
+            <Eyebrow>{t('kpis.topAction')}</Eyebrow>
             <div className="mt-1 truncate font-mono text-xl" style={{ color: ACTION_COLORS[kpis.topAction[0]] ?? 'var(--ash)' }}>
               {kpis.topAction[0]}
             </div>
-            <div className="font-mono text-[11px] text-text-muted">{kpis.topAction[1]} times</div>
+            <div className="font-mono text-[11px] text-text-muted">{t('kpis.timesCount', { count: kpis.topAction[1] })}</div>
           </div>
         </div>
       )}
       <div className="audit-toolbar">
-        <span className="audit-title">Audit Log</span>
+        <span className="audit-title">{t('toolbar.title')}</span>
         <span className="audit-meta">
-          {isFetching ? 'Refreshing…' : `${entries.length} entries`}
+          {isFetching ? t('toolbar.refreshing') : t('toolbar.entriesCount', { count: entries.length })}
           {dataUpdatedAt ? ` · ${new Date(dataUpdatedAt).toLocaleTimeString()}` : ''}
         </span>
 
         <input
           className="audit-filter-input"
-          placeholder="Filter by actor…"
+          placeholder={t('toolbar.filterByActorPlaceholder')}
           value={actorFilter}
           onChange={e => { setActorFilter(e.target.value); setOffset(0) }}
         />
@@ -185,7 +187,7 @@ export default function AuditPage() {
           value={actionFilter}
           onChange={e => { setActionFilter(e.target.value); setOffset(0) }}
         >
-          <option value="">All actions</option>
+          <option value="">{t('toolbar.allActions')}</option>
           {KNOWN_ACTIONS.map(a => <option key={a} value={a}>{a}</option>)}
         </select>
         <input
@@ -195,17 +197,17 @@ export default function AuditPage() {
           onChange={e => { setSinceInput(e.target.value); setOffset(0) }}
         />
         {(actorFilter || actionFilter || sinceInput) && (
-          <button className="audit-reset-btn" onClick={reset}>Reset</button>
+          <button className="audit-reset-btn" onClick={reset}>{t('toolbar.reset')}</button>
         )}
         <span style={{ flex: 1 }} />
-        <button className="audit-export-btn" onClick={exportCsv}>Export CSV</button>
+        <button className="audit-export-btn" onClick={exportCsv}>{t('toolbar.exportCsv')}</button>
       </div>
 
       <div className="data-table-wrap" style={{ borderRadius: 0, border: 'none', flex: 1 }}>
         <table className="data-table">
           <thead>
             <tr>
-              {['Timestamp', 'Actor', 'IP', 'Action', 'Detail'].map(h => (
+              {[t('columns.timestamp'), t('columns.actor'), t('columns.ip'), t('columns.action'), t('columns.detail')].map(h => (
                 <th key={h}>{h}</th>
               ))}
             </tr>
@@ -232,9 +234,9 @@ export default function AuditPage() {
                       <line x1="16" y1="17" x2="8" y2="17" />
                       <polyline points="10 9 9 9 8 9" />
                     </svg>
-                    <div style={{ fontSize: 13, fontWeight: 500, color: 'var(--mist)' }}>No audit entries</div>
+                    <div style={{ fontSize: 13, fontWeight: 500, color: 'var(--mist)' }}>{t('emptyState.title')}</div>
                     <div style={{ fontSize: 11.5, color: 'var(--ghost)', marginTop: 4 }}>
-                      {actorFilter || actionFilter || sinceInput ? 'Try clearing the filters' : 'Actions you take will appear here'}
+                      {actorFilter || actionFilter || sinceInput ? t('emptyState.hintFiltered') : t('emptyState.hintDefault')}
                     </div>
                   </div>
                 </td>
@@ -262,13 +264,13 @@ export default function AuditPage() {
       {(hasPrev || hasMore) && (
         <div className="audit-pagination">
           <button className="btn-ghost btn-sm" disabled={!hasPrev} onClick={() => setOffset(o => Math.max(0, o - PAGE_SIZE))}>
-            ← Previous
+            {t('pagination.previous')}
           </button>
           <span className="audit-meta">
             {offset + 1}–{offset + entries.length}
           </span>
           <button className="btn-ghost btn-sm" disabled={!hasMore} onClick={() => setOffset(o => o + PAGE_SIZE)}>
-            Next →
+            {t('pagination.next')}
           </button>
         </div>
       )}

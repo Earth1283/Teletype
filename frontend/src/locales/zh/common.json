@@ -1,0 +1,19 @@
+{
+  "ok": "确定",
+  "cancel": "取消",
+  "save": "保存",
+  "close": "关闭",
+  "delete": "删除",
+  "edit": "编辑",
+  "confirm": "确认",
+  "loading": "加载中…",
+  "error": "错误",
+  "search": "搜索",
+  "yes": "是",
+  "no": "否",
+  "back": "返回",
+  "copy": "复制",
+  "copied": "已复制",
+  "refresh": "刷新",
+  "retry": "重试"
+}

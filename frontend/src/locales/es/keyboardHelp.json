@@ -1,0 +1,16 @@
+{
+  "title": "Atajos de Teclado",
+  "groupGlobal": "Global",
+  "groupConsole": "Consola",
+  "groupContext": "Contexto",
+  "showShortcuts": "Mostrar atajos de teclado",
+  "openPalette": "Abrir paleta de comandos",
+  "jumpToTab": "Ir a pestaña (orden de la barra lateral)",
+  "jumpToSettings": "Ir a Ajustes",
+  "closeDialog": "Cerrar diálogo / superposición",
+  "navigateHistory": "Navegar historial de comandos",
+  "tabComplete": "Autocompletar comando con Tab",
+  "focusSearch": "Enfocar barra de búsqueda",
+  "clearCompletions": "Limpiar completados / cerrar búsqueda",
+  "openContextWheel": "Abrir rueda de contexto (mantener clic derecho)"
+}

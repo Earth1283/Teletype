@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { api, apiError } from '../api/client'
 import { useToast } from '../ToastContext'
@@ -46,6 +47,7 @@ function ForwardModal({
   onSave: (f: Omit<PortForward, 'id'>) => void
   onClose: () => void
 }) {
+  const { t } = useTranslation(['network', 'common'])
   const [form, setForm] = useState<Omit<PortForward, 'id'>>(
     initial
       ? { label: initial.label, externalPort: initial.externalPort, targetPort: initial.targetPort, enabled: initial.enabled }
@@ -59,8 +61,8 @@ function ForwardModal({
   const submit = () => {
     const ext = Number(form.externalPort)
     const tgt = Number(form.targetPort)
-    if (!ext || ext < 1 || ext > 65535) { setErr('External port must be 1–65535'); return }
-    if (!tgt || tgt < 1 || tgt > 65535) { setErr('Target port must be 1–65535'); return }
+    if (!ext || ext < 1 || ext > 65535) { setErr(t('forwardModal.errExternalPort')); return }
+    if (!tgt || tgt < 1 || tgt > 65535) { setErr(t('forwardModal.errTargetPort')); return }
     onSave({ ...form, externalPort: ext, targetPort: tgt })
   }
 
@@ -68,15 +70,15 @@ function ForwardModal({
     <div className="modal-overlay" onClick={e => e.target === e.currentTarget && onClose()}>
       <div className="modal-card">
         <div className="modal-title">
-          {initial ? 'Edit Forward' : 'Add Port Forward'}
+          {initial ? t('forwardModal.editTitle') : t('forwardModal.addTitle')}
           <button className="btn-ghost btn-xs" onClick={onClose}><IconX size={12} /></button>
         </div>
 
         <div className="modal-field">
-          <div className="modal-label">Label (optional)</div>
+          <div className="modal-label">{t('forwardModal.labelField')}</div>
           <input
             className="modal-input"
-            placeholder="e.g. Dynmap"
+            placeholder={t('forwardModal.labelPlaceholder')}
             value={form.label}
             onChange={e => set('label', e.target.value)}
           />
@@ -84,7 +86,7 @@ function ForwardModal({
 
         <div style={{ display: 'flex', gap: '12px' }}>
           <div className="modal-field" style={{ flex: 1 }}>
-            <div className="modal-label">External Port</div>
+            <div className="modal-label">{t('forwardModal.externalPortLabel')}</div>
             <input
               className="modal-input mono-input"
               type="number"
@@ -97,7 +99,7 @@ function ForwardModal({
           </div>
 
           <div className="modal-field" style={{ flex: 1 }}>
-            <div className="modal-label">Target Port</div>
+            <div className="modal-label">{t('forwardModal.targetPortLabel')}</div>
             <input
               className="modal-input mono-input"
               type="number"
@@ -118,7 +120,7 @@ function ForwardModal({
               onChange={e => set('enabled', e.target.checked)}
             />
             <span style={{ fontSize: '12.5px', color: 'var(--ash)' }}>
-              {form.enabled ? 'Enabled' : 'Disabled'}
+              {form.enabled ? t('forwardModal.enabled') : t('forwardModal.disabled')}
             </span>
           </label>
         </div>
@@ -128,9 +130,9 @@ function ForwardModal({
         )}
 
         <div className="modal-footer">
-          <button className="btn-ghost" onClick={onClose}>Cancel</button>
+          <button className="btn-ghost" onClick={onClose}>{t('common:cancel')}</button>
           <button className="btn-primary" onClick={submit}>
-            {initial ? 'Save' : 'Add Forward'}
+            {initial ? t('forwardModal.saveButton') : t('forwardModal.addButton')}
           </button>
         </div>
       </div>
@@ -153,6 +155,7 @@ function RouteModal({
   onSave: (r: Omit<RouteMapping, 'id'>) => void
   onClose: () => void
 }) {
+  const { t } = useTranslation(['network', 'common'])
   const [form, setForm] = useState<Omit<RouteMapping, 'id'>>(
     initial ? { label: initial.label, prefix: initial.prefix, targetPort: initial.targetPort,
                 enabled: initial.enabled, rateLimitPerMinute: initial.rateLimitPerMinute }
@@ -164,9 +167,9 @@ function RouteModal({
     setForm(f => ({ ...f, [k]: v }))
 
   const submit = () => {
-    if (!form.prefix.startsWith('/')) { setErr('Prefix must start with /'); return }
+    if (!form.prefix.startsWith('/')) { setErr(t('routeModal.errPrefix')); return }
     const port = Number(form.targetPort)
-    if (!port || port < 1 || port > 65535) { setErr('Port must be 1–65535'); return }
+    if (!port || port < 1 || port > 65535) { setErr(t('routeModal.errPort')); return }
     onSave({ ...form, targetPort: port })
   }
 
@@ -174,25 +177,25 @@ function RouteModal({
     <div className="modal-overlay" onClick={e => e.target === e.currentTarget && onClose()}>
       <div className="modal-card">
         <div className="modal-title">
-          {initial ? 'Edit Route' : 'Add Route'}
+          {initial ? t('routeModal.editTitle') : t('routeModal.addTitle')}
           <button className="btn-ghost btn-xs" onClick={onClose}><IconX size={12} /></button>
         </div>
 
         <div className="modal-field">
-          <div className="modal-label">Label (optional)</div>
+          <div className="modal-label">{t('forwardModal.labelField')}</div>
           <input
             className="modal-input"
-            placeholder="e.g. Dynmap"
+            placeholder={t('forwardModal.labelPlaceholder')}
             value={form.label}
             onChange={e => set('label', e.target.value)}
           />
         </div>
 
         <div className="modal-field">
-          <div className="modal-label">Path Prefix</div>
+          <div className="modal-label">{t('routeModal.pathPrefixLabel')}</div>
           <input
             className="modal-input mono-input"
-            placeholder="/map"
+            placeholder={t('routeModal.pathPrefixPlaceholder')}
             value={form.prefix}
             onChange={e => set('prefix', e.target.value)}
           />
@@ -200,7 +203,7 @@ function RouteModal({
 
         <div style={{ display: 'flex', gap: '12px' }}>
           <div className="modal-field" style={{ flex: 1 }}>
-            <div className="modal-label">Target Port</div>
+            <div className="modal-label">{t('forwardModal.targetPortLabel')}</div>
             <input
               className="modal-input mono-input"
               type="number"
@@ -213,7 +216,7 @@ function RouteModal({
           </div>
 
           <div className="modal-field" style={{ flex: 1 }}>
-            <div className="modal-label">Rate Limit / min</div>
+            <div className="modal-label">{t('routeModal.rateLimitLabel')}</div>
             <input
               className="modal-input mono-input"
               type="number"
@@ -233,7 +236,7 @@ function RouteModal({
               onChange={e => set('enabled', e.target.checked)}
             />
             <span style={{ fontSize: '12.5px', color: 'var(--ash)' }}>
-              {form.enabled ? 'Enabled' : 'Disabled'}
+              {form.enabled ? t('forwardModal.enabled') : t('forwardModal.disabled')}
             </span>
           </label>
         </div>
@@ -243,9 +246,9 @@ function RouteModal({
         )}
 
         <div className="modal-footer">
-          <button className="btn-ghost" onClick={onClose}>Cancel</button>
+          <button className="btn-ghost" onClick={onClose}>{t('common:cancel')}</button>
           <button className="btn-primary" onClick={submit}>
-            {initial ? 'Save' : 'Add Route'}
+            {initial ? t('routeModal.saveButton') : t('routeModal.addButton')}
           </button>
         </div>
       </div>
@@ -254,6 +257,7 @@ function RouteModal({
 }
 
 export default function NetworkPage() {
+  const { t } = useTranslation(['network', 'common'])
   const qc = useQueryClient()
   const toast = useToast()
   const [section, setSection] = useState<'routes' | 'forwards'>('routes')
@@ -281,26 +285,26 @@ export default function NetworkPage() {
   const createMut = useMutation({
     mutationFn: (r: Omit<RouteMapping, 'id'>) => api.post('/network/routes', r),
     onSuccess: () => { setModal(null); invalidate() },
-    onError: (e: unknown) => toast.error(apiError(e, 'Failed to create route')),
+    onError: (e: unknown) => toast.error(apiError(e, t('toastCreateRouteFailed'))),
   })
 
   const updateMut = useMutation({
     mutationFn: ({ id, ...r }: RouteMapping) => api.put(`/network/routes/${id}`, r),
     onSuccess: () => { setModal(null); invalidate() },
-    onError: (e: unknown) => toast.error(apiError(e, 'Failed to update route')),
+    onError: (e: unknown) => toast.error(apiError(e, t('toastUpdateRouteFailed'))),
   })
 
   const deleteMut = useMutation({
     mutationFn: (id: string) => api.delete(`/network/routes/${id}`),
     onSuccess: () => { setDeletingId(null); invalidate() },
-    onError: (e: unknown) => toast.error(apiError(e, 'Failed to delete route')),
+    onError: (e: unknown) => toast.error(apiError(e, t('toastDeleteRouteFailed'))),
   })
 
   const toggleMut = useMutation({
     mutationFn: (route: RouteMapping) =>
       api.put(`/network/routes/${route.id}`, { ...route, enabled: !route.enabled }),
     onSuccess: () => invalidate(),
-    onError: () => { invalidate(); toast.error('Failed to toggle route — state reverted') },
+    onError: () => { invalidate(); toast.error(t('toastToggleRouteFailed')) },
   })
 
   const { data: forwards = [] } = useQuery<PortForward[]>({
@@ -316,26 +320,26 @@ export default function NetworkPage() {
   const createFwdMut = useMutation({
     mutationFn: (f: Omit<PortForward, 'id'>) => api.post('/network/forwards', f),
     onSuccess: () => { setFwdModal(null); invalidateFwd() },
-    onError: (e: unknown) => toast.error(apiError(e, 'Failed to create forward')),
+    onError: (e: unknown) => toast.error(apiError(e, t('toastCreateForwardFailed'))),
   })
 
   const updateFwdMut = useMutation({
     mutationFn: ({ id, ...f }: PortForward) => api.put(`/network/forwards/${id}`, f),
     onSuccess: () => { setFwdModal(null); invalidateFwd() },
-    onError: (e: unknown) => toast.error(apiError(e, 'Failed to update forward')),
+    onError: (e: unknown) => toast.error(apiError(e, t('toastUpdateForwardFailed'))),
   })
 
   const deleteFwdMut = useMutation({
     mutationFn: (id: string) => api.delete(`/network/forwards/${id}`),
     onSuccess: () => { setDeletingFwdId(null); invalidateFwd() },
-    onError: (e: unknown) => toast.error(apiError(e, 'Failed to delete forward')),
+    onError: (e: unknown) => toast.error(apiError(e, t('toastDeleteForwardFailed'))),
   })
 
   const toggleFwdMut = useMutation({
     mutationFn: (fwd: PortForward) =>
       api.put(`/network/forwards/${fwd.id}`, { ...fwd, enabled: !fwd.enabled }),
     onSuccess: () => invalidateFwd(),
-    onError: () => { invalidateFwd(); toast.error('Failed to toggle forward — state reverted') },
+    onError: () => { invalidateFwd(); toast.error(t('toastToggleForwardFailed')) },
   })
 
   const muxOn = status?.muxEnabled ?? false
@@ -347,13 +351,13 @@ export default function NetworkPage() {
   const atFwdLimit = forwards.length >= maxForwards
 
   const statusLabel = muxOn
-    ? netOn ? `routing :${status?.muxPort}` : 'routing disabled'
-    : 'multiplexer off'
+    ? netOn ? t('statusRouting', { port: status?.muxPort }) : t('statusRoutingDisabled')
+    : t('statusMultiplexerOff')
 
   return (
     <div className="net-page" style={{ display: 'flex', flexDirection: 'column', height: '100%', overflow: 'hidden' }}>
       <div className="net-header">
-        <span className="net-title">Network &amp; Routing</span>
+        <span className="net-title">{t('pageTitle')}</span>
         <span className={`net-status-pill ${muxOn && netOn ? 'on' : 'off'}`}>
           <span className="net-status-dot" />
           {statusLabel}
@@ -363,40 +367,40 @@ export default function NetworkPage() {
       {!muxOn && (
         <div className="net-banner net-banner-warn">
           <IconNetwork size={14} />
-          Multiplexer disabled — set <code style={{ fontFamily: 'var(--mono)', margin: '0 4px' }}>
+          {t('muxDisabledPrefix')} <code style={{ fontFamily: 'var(--mono)', margin: '0 4px' }}>
             server.multiplex-game-port: true
-          </code> in config.yml and restart to enable routing.
+          </code> {t('muxDisabledSuffix')}
         </div>
       )}
 
       {muxOn && !netOn && (
         <div className="net-banner net-banner-warn">
           <IconNetwork size={14} />
-          Routing disabled — set <code style={{ fontFamily: 'var(--mono)', margin: '0 4px' }}>
+          {t('routingDisabledPrefix')} <code style={{ fontFamily: 'var(--mono)', margin: '0 4px' }}>
             network.enabled: true
-          </code> in config.yml and run <code style={{ fontFamily: 'var(--mono)', margin: '0 4px' }}>/tty reload</code>.
+          </code> {t('routingDisabledMid')} <code style={{ fontFamily: 'var(--mono)', margin: '0 4px' }}>/tty reload</code>{t('routingDisabledSuffix')}
         </div>
       )}
 
       {muxOn && netOn && (
         <div className="net-banner">
           <IconNetwork size={14} />
-          HTTP on <code style={{ fontFamily: 'var(--mono)', margin: '0 4px' }}>:{status?.muxPort}</code> · longest-prefix routing · default rate limit{' '}
-          <code style={{ fontFamily: 'var(--mono)', margin: '0 4px' }}>{defaultRateLimit}/min</code> per IP
+          {t('httpOnPrefix')} <code style={{ fontFamily: 'var(--mono)', margin: '0 4px' }}>:{status?.muxPort}</code> {t('httpOnMid')}{' '}
+          <code style={{ fontFamily: 'var(--mono)', margin: '0 4px' }}>{defaultRateLimit}/min</code> {t('httpOnSuffix')}
         </div>
       )}
 
       <div style={{ display: 'flex', flex: 1, overflow: 'hidden' }}>
         {/* Sidebar */}
         <div className="mac-master-list" style={{ width: 180 }}>
-          <div className="mac-master-header">Network</div>
+          <div className="mac-master-header">{t('sidebarHeader')}</div>
           <div
             className={`mac-master-row${section === 'routes' ? ' active' : ''}`}
             onClick={() => setSection('routes')}
           >
             <div className="mac-master-info">
-              <div className="mac-master-name">HTTP Routes</div>
-              <div className="mac-master-world">{routes.length} / {maxRoutes} routes</div>
+              <div className="mac-master-name">{t('httpRoutesLabel')}</div>
+              <div className="mac-master-world">{t('routesCount', { count: routes.length, max: maxRoutes })}</div>
             </div>
           </div>
           <div
@@ -404,8 +408,8 @@ export default function NetworkPage() {
             onClick={() => setSection('forwards')}
           >
             <div className="mac-master-info">
-              <div className="mac-master-name">Port Forwards</div>
-              <div className="mac-master-world">{forwards.length} / {maxForwards} forwards</div>
+              <div className="mac-master-name">{t('portForwardsLabel')}</div>
+              <div className="mac-master-world">{t('forwardsCount', { count: forwards.length, max: maxForwards })}</div>
             </div>
           </div>
         </div>
@@ -416,16 +420,16 @@ export default function NetworkPage() {
             <>
               <div className="net-toolbar">
                 <span style={{ fontSize: '12px', color: 'var(--mist)' }}>
-                  {routes.length} / {maxRoutes} HTTP routes
+                  {t('httpRoutesCount', { count: routes.length, max: maxRoutes })}
                 </span>
                 <span style={{ flex: 1 }} />
                 <button
                   className="btn-primary btn-sm"
                   disabled={atLimit}
-                  title={atLimit ? `Route limit (${maxRoutes}) reached` : undefined}
+                  title={atLimit ? t('routeLimitReached', { max: maxRoutes }) : undefined}
                   onClick={() => setModal('add')}
                 >
-                  + Add Route
+                  {t('addRouteButton')}
                 </button>
               </div>
 
@@ -433,15 +437,15 @@ export default function NetworkPage() {
                 {routes.length === 0 ? (
                   <div className="net-empty">
                     <IconNetwork size={28} />
-                    <span>No routes configured</span>
-                    <span style={{ color: 'var(--ghost)' }}>Proxy paths to internal services</span>
+                    <span>{t('noRoutesConfigured')}</span>
+                    <span style={{ color: 'var(--ghost)' }}>{t('noRoutesHint')}</span>
                   </div>
                 ) : (
                   <table className="net-table">
                     <thead>
                       <tr>
-                        <th>Prefix</th><th></th><th>Target Port</th>
-                        <th>Label</th><th>Rate Limit</th><th>Enabled</th><th></th>
+                        <th>{t('tablePrefix')}</th><th></th><th>{t('tableTargetPort')}</th>
+                        <th>{t('tableLabel')}</th><th>{t('tableRateLimit')}</th><th>{t('tableEnabled')}</th><th></th>
                       </tr>
                     </thead>
                     <tbody>
@@ -459,16 +463,16 @@ export default function NetworkPage() {
                           </td>
                           <td>
                             <div className="net-actions">
-                              <button className="btn-ghost btn-xs" title="Edit" onClick={() => setModal(route)}>
+                              <button className="btn-ghost btn-xs" title={t('editTitle')} onClick={() => setModal(route)}>
                                 <IconPencil size={12} />
                               </button>
                               {deletingId === route.id ? (
                                 <>
-                                  <button className="btn-ghost btn-xs" style={{ color: 'var(--red)' }} onClick={() => deleteMut.mutate(route.id)}>Confirm</button>
+                                  <button className="btn-ghost btn-xs" style={{ color: 'var(--red)' }} onClick={() => deleteMut.mutate(route.id)}>{t('common:confirm')}</button>
                                   <button className="btn-ghost btn-xs" onClick={() => setDeletingId(null)}><IconX size={10} /></button>
                                 </>
                               ) : (
-                                <button className="btn-ghost btn-xs" title="Delete" onClick={() => setDeletingId(route.id)}>
+                                <button className="btn-ghost btn-xs" title={t('deleteTitle')} onClick={() => setDeletingId(route.id)}>
                                   <IconTrash size={12} />
                                 </button>
                               )}
@@ -487,16 +491,16 @@ export default function NetworkPage() {
             <>
               <div className="net-toolbar">
                 <span style={{ fontSize: '12px', color: 'var(--mist)' }}>
-                  {forwards.length} / {maxForwards} port forwards
+                  {t('portForwardsCount', { count: forwards.length, max: maxForwards })}
                 </span>
                 <span style={{ flex: 1 }} />
                 <button
                   className="btn-primary btn-sm"
                   disabled={atFwdLimit || !netOn}
-                  title={atFwdLimit ? `Forward limit (${maxForwards}) reached` : !netOn ? 'Network disabled' : undefined}
+                  title={atFwdLimit ? t('forwardLimitReached', { max: maxForwards }) : !netOn ? t('networkDisabled') : undefined}
                   onClick={() => setFwdModal('add')}
                 >
-                  + Add Forward
+                  {t('addForwardButton')}
                 </button>
               </div>
 
@@ -504,15 +508,15 @@ export default function NetworkPage() {
                 {forwards.length === 0 ? (
                   <div className="net-empty">
                     <IconNetwork size={28} />
-                    <span>No port forwards configured</span>
-                    <span style={{ color: 'var(--ghost)' }}>Forward external ports to internal services over raw TCP</span>
+                    <span>{t('noForwardsConfigured')}</span>
+                    <span style={{ color: 'var(--ghost)' }}>{t('noForwardsHint')}</span>
                   </div>
                 ) : (
                   <table className="net-table">
                     <thead>
                       <tr>
-                        <th>External Port</th><th></th><th>Target Port</th>
-                        <th>Label</th><th>Enabled</th><th></th>
+                        <th>{t('tableExternalPort')}</th><th></th><th>{t('tableTargetPort')}</th>
+                        <th>{t('tableLabel')}</th><th>{t('tableEnabled')}</th><th></th>
                       </tr>
                     </thead>
                     <tbody>
@@ -529,16 +533,16 @@ export default function NetworkPage() {
                           </td>
                           <td>
                             <div className="net-actions">
-                              <button className="btn-ghost btn-xs" title="Edit" onClick={() => setFwdModal(fwd)}>
+                              <button className="btn-ghost btn-xs" title={t('editTitle')} onClick={() => setFwdModal(fwd)}>
                                 <IconPencil size={12} />
                               </button>
                               {deletingFwdId === fwd.id ? (
                                 <>
-                                  <button className="btn-ghost btn-xs" style={{ color: 'var(--red)' }} onClick={() => deleteFwdMut.mutate(fwd.id)}>Confirm</button>
+                                  <button className="btn-ghost btn-xs" style={{ color: 'var(--red)' }} onClick={() => deleteFwdMut.mutate(fwd.id)}>{t('common:confirm')}</button>
                                   <button className="btn-ghost btn-xs" onClick={() => setDeletingFwdId(null)}><IconX size={10} /></button>
                                 </>
                               ) : (
-                                <button className="btn-ghost btn-xs" title="Delete" onClick={() => setDeletingFwdId(fwd.id)}>
+                                <button className="btn-ghost btn-xs" title={t('deleteTitle')} onClick={() => setDeletingFwdId(fwd.id)}>
                                   <IconTrash size={12} />
                                 </button>
                               )}

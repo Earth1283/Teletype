@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from 'react'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
+import i18n from './i18n'
 import { TOKEN_KEY } from './api/client'
 import { LogProvider } from './LogContext'
 import { ContextMenuProvider } from './ContextMenuProvider'
@@ -41,6 +42,11 @@ function AppearanceApplier() {
       return () => mq.removeEventListener('change', apply)
     }
   }, [mode, theme, density])
+
+  useEffect(() => {
+    document.documentElement.lang = settings.language
+    if (i18n.language !== settings.language) void i18n.changeLanguage(settings.language)
+  }, [settings.language])
 
   return null
 }

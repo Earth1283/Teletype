@@ -1,4 +1,5 @@
 import { useState, useMemo, useRef } from 'react'
+import { useTranslation } from 'react-i18next'
 import { useQuery } from '@tanstack/react-query'
 import { api, apiError } from '../api/client'
 import { useContextMenu } from '../ContextMenu'
@@ -74,6 +75,7 @@ function PlayerAvatar({ player, large = false }: { player: Player; large?: boole
 type SortKey = 'name' | 'health' | 'ping' | 'level'
 
 export default function PlayerList() {
+  const { t } = useTranslation(['players', 'common'])
   const toast = useToast()
   const { data, isLoading, error, refetch, isFetching } = useQuery<Player[]>({
     queryKey: ['players'],
@@ -101,9 +103,9 @@ export default function PlayerList() {
       await api.post('/execute', { command })
       if (successMsg) toast.success(successMsg)
     } catch (e) {
-      const msg = apiError(e, `Command failed: ${command}`)
+      const msg = apiError(e, t('players:commandFailedGeneric', { command }))
       toast.error(msg)
-      showPrompt('Command failed', msg, 'error')
+      showPrompt(t('players:commandFailedTitle'), msg, 'error')
       throw e
     }
   }
@@ -118,24 +120,24 @@ export default function PlayerList() {
   }
 
   function kick(name: string) {
-    runActionButton(`kick-${name}`, `kick ${name}`, `Kicked ${name}`)
+    runActionButton(`kick-${name}`, `kick ${name}`, t('players:toastKicked', { name }))
   }
 
   function ban(name: string) {
     setPrompt({
-      title: 'Ban player?',
-      message: `Ban ${name}? This cannot be undone from Teletype.`,
+      title: t('players:banTitle'),
+      message: t('players:banMessage', { name }),
       variant: 'danger',
-      confirmLabel: 'Ban',
-      cancelLabel: 'Cancel',
-      onConfirm: () => runCommand(`ban ${name}`, `Banned ${name}`),
+      confirmLabel: t('players:actionBan'),
+      cancelLabel: t('common:cancel'),
+      onConfirm: () => runCommand(`ban ${name}`, t('players:toastBanned', { name })),
     })
   }
 
   function runCustomAction() {
     if (!customActionPlayer || !customCommand.trim()) return
     const command = customCommand.trim().replaceAll('{player}', customActionPlayer.name)
-    runCommand(command, 'Command sent')
+    runCommand(command, t('players:commandSent'))
       .then(() => setCustomActionPlayer(null))
       .catch(() => {})
   }
@@ -147,19 +149,19 @@ export default function PlayerList() {
 
   function openPlayerCtx(e: React.MouseEvent, player: Player) {
     openContextMenu(e, [
-      { label: 'Copy Player Name', action: async () => { if (!await writeClipboard(player.name)) toast.error('Copy failed') } },
-      { label: 'Copy UUID', action: async () => { if (!await writeClipboard(player.uuid)) toast.error('Copy failed') } },
-      { label: 'Copy Skin URL', action: async () => { if (!await writeClipboard(playerSkinUrl(player.name))) toast.error('Copy failed') } },
+      { label: t('players:ctxCopyName'), action: async () => { if (!await writeClipboard(player.name)) toast.error(t('players:copyFailed')) } },
+      { label: t('players:ctxCopyUuid'), action: async () => { if (!await writeClipboard(player.uuid)) toast.error(t('players:copyFailed')) } },
+      { label: t('players:ctxCopySkinUrl'), action: async () => { if (!await writeClipboard(playerSkinUrl(player.name))) toast.error(t('players:copyFailed')) } },
       { type: 'separator' },
-      { label: 'Heal', action: () => runCommand(`effect give ${player.name} minecraft:instant_health 1 10`, `Healed ${player.name}`).catch(() => {}) },
-      { label: 'Feed', action: () => runCommand(`effect give ${player.name} minecraft:saturation 1 10`, `Fed ${player.name}`).catch(() => {}) },
-      { label: 'Send to Spawn', action: () => runCommand(`spawn ${player.name}`, `Teleported ${player.name} to spawn`).catch(() => {}) },
-      { label: 'Creative Mode', action: () => runCommand(`gamemode creative ${player.name}`, `${player.name} → Creative`).catch(() => {}) },
-      { label: 'Survival Mode', action: () => runCommand(`gamemode survival ${player.name}`, `${player.name} → Survival`).catch(() => {}) },
-      { label: 'Custom Command...', action: () => openCustomAction(player) },
+      { label: t('players:ctxHeal'), action: () => runCommand(`effect give ${player.name} minecraft:instant_health 1 10`, t('players:toastHealed', { name: player.name })).catch(() => {}) },
+      { label: t('players:ctxFeed'), action: () => runCommand(`effect give ${player.name} minecraft:saturation 1 10`, t('players:toastFed', { name: player.name })).catch(() => {}) },
+      { label: t('players:ctxSendToSpawn'), action: () => runCommand(`spawn ${player.name}`, t('players:toastSpawn', { name: player.name })).catch(() => {}) },
+      { label: t('players:ctxCreativeMode'), action: () => runCommand(`gamemode creative ${player.name}`, t('players:toastToCreative', { name: player.name })).catch(() => {}) },
+      { label: t('players:ctxSurvivalMode'), action: () => runCommand(`gamemode survival ${player.name}`, t('players:toastToSurvival', { name: player.name })).catch(() => {}) },
+      { label: t('players:ctxCustomCommand'), action: () => openCustomAction(player) },
       { type: 'separator' },
-      { label: 'Kick Player', action: () => kick(player.name) },
-      { label: 'Ban Player', danger: true, action: () => ban(player.name) },
+      { label: t('players:ctxKickPlayer'), action: () => kick(player.name) },
+      { label: t('players:ctxBanPlayer'), danger: true, action: () => ban(player.name) },
     ], { kind: 'player', name: player.name, uuid: player.uuid })
   }
 
@@ -224,28 +226,28 @@ export default function PlayerList() {
     } finally {
       setLoadingAction(null)
     }
-    if (failed === 0) toast.success(`${label} — ${targets.length} player${targets.length === 1 ? '' : 's'}`)
-    else toast.error(`${label} failed for ${failed} of ${targets.length} players`)
+    if (failed === 0) toast.success(t('players:bulkToastSuccess', { label, count: targets.length }))
+    else toast.error(t('players:bulkToastFailure', { label, failed, total: targets.length }))
   }
 
   function bulkKick() {
     setPrompt({
-      title: `Kick ${checkedPlayers.length} players?`,
-      message: `Disconnect ${checkedPlayers.map(p => p.name).join(', ')} from the server?`,
-      confirmLabel: 'Kick all',
-      cancelLabel: 'Cancel',
-      onConfirm: () => bulkRun('bulk-kick', 'Kicked', n => `kick ${n}`),
+      title: t('players:confirmKickTitle', { count: checkedPlayers.length }),
+      message: t('players:confirmKickMessage', { names: checkedPlayers.map(p => p.name).join(', ') }),
+      confirmLabel: t('players:actionKickAll'),
+      cancelLabel: t('common:cancel'),
+      onConfirm: () => bulkRun('bulk-kick', t('players:toastLabelKicked'), n => `kick ${n}`),
     })
   }
 
   function bulkBan() {
     setPrompt({
-      title: `Ban ${checkedPlayers.length} players?`,
-      message: `Ban ${checkedPlayers.map(p => p.name).join(', ')}? This cannot be undone from Teletype.`,
+      title: t('players:confirmBanTitle', { count: checkedPlayers.length }),
+      message: t('players:confirmBanMessage', { names: checkedPlayers.map(p => p.name).join(', ') }),
       variant: 'danger',
-      confirmLabel: 'Ban all',
-      cancelLabel: 'Cancel',
-      onConfirm: () => bulkRun('bulk-ban', 'Banned', n => `ban ${n}`),
+      confirmLabel: t('players:actionBanAll'),
+      cancelLabel: t('common:cancel'),
+      onConfirm: () => bulkRun('bulk-ban', t('players:toastLabelBanned'), n => `ban ${n}`),
     })
   }
 
@@ -255,13 +257,13 @@ export default function PlayerList() {
   return (
     <div style={{ display: 'flex', flexDirection: 'column', height: '100%', overflow: 'hidden' }}>
       <div className="section-header" style={{ padding: '12px 16px', flexShrink: 0 }}>
-        <span className="section-title">Players</span>
-        <span className="section-count">{count} online</span>
+        <span className="section-title">{t('players:sectionTitle')}</span>
+        <span className="section-count">{t('players:onlineCount', { count })}</span>
         <div className="section-actions">
           <button
             className="refresh-btn"
             onClick={() => refetch()}
-            title="Refresh"
+            title={t('common:refresh')}
             style={{ opacity: isFetching ? 0.4 : 1 }}
           >
             <IconRefresh size={13} />
@@ -272,7 +274,7 @@ export default function PlayerList() {
       <div className="mac-master-detail">
         <div className="mac-master-list">
           <div className="mac-master-header" style={{ flexDirection: 'column', gap: 6, padding: '8px 10px' }}>
-            <span>{count} Online</span>
+            <span>{t('players:onlineCountLabel', { count })}</span>
             <div className="player-sort-bar">
               {(['name', 'health', 'ping', 'level'] as SortKey[]).map(k => (
                 <button
@@ -280,7 +282,7 @@ export default function PlayerList() {
                   className={`player-sort-btn${sortBy === k ? ' active' : ''}`}
                   onClick={() => toggleSort(k)}
                 >
-                  {k}{sortBy === k ? (sortDir === 1 ? ' ↑' : ' ↓') : ''}
+                  {t(`players:sort${k.charAt(0).toUpperCase()}${k.slice(1)}`)}{sortBy === k ? (sortDir === 1 ? ' ↑' : ' ↓') : ''}
                 </button>
               ))}
             </div>
@@ -295,7 +297,7 @@ export default function PlayerList() {
               </div>
             </div>
           ))}
-          {error && <div style={{ padding: '12px 14px', fontSize: 12, color: 'var(--red)' }}>Failed to load players</div>}
+          {error && <div style={{ padding: '12px 14px', fontSize: 12, color: 'var(--red)' }}>{t('players:failedToLoad')}</div>}
 
           {sortedPlayers.map((p, idx) => (
             <div
@@ -309,7 +311,7 @@ export default function PlayerList() {
                 className="player-check"
                 checked={checked.has(p.uuid)}
                 readOnly
-                aria-label={`Select ${p.name}`}
+                aria-label={t('players:selectPlayerAria', { name: p.name })}
                 onClick={e => { e.stopPropagation(); toggleCheck(idx, p.uuid, e.shiftKey) }}
               />
               <PlayerAvatar player={p} />
@@ -322,26 +324,26 @@ export default function PlayerList() {
 
           {checkedPlayers.length > 0 && (
             <div className="bulk-bar">
-              <span className="bulk-count">{checkedPlayers.length} selected</span>
+              <span className="bulk-count">{t('players:selectedCount', { count: checkedPlayers.length })}</span>
               <button className="bulk-btn" disabled={!!loadingAction}
-                onClick={() => bulkRun('bulk-heal', 'Healed', n => `effect give ${n} minecraft:instant_health 1 10`)}>
-                Heal
+                onClick={() => bulkRun('bulk-heal', t('players:toastLabelHealed'), n => `effect give ${n} minecraft:instant_health 1 10`)}>
+                {t('players:actionHeal')}
               </button>
               <button className="bulk-btn" disabled={!!loadingAction}
-                onClick={() => bulkRun('bulk-feed', 'Fed', n => `effect give ${n} minecraft:saturation 1 10`)}>
-                Feed
+                onClick={() => bulkRun('bulk-feed', t('players:toastLabelFed'), n => `effect give ${n} minecraft:saturation 1 10`)}>
+                {t('players:actionFeed')}
               </button>
               <button className="bulk-btn" disabled={!!loadingAction}
-                onClick={() => bulkRun('bulk-surv', 'Survival', n => `gamemode survival ${n}`)}>
-                Survival
+                onClick={() => bulkRun('bulk-surv', t('players:toastLabelSurvival'), n => `gamemode survival ${n}`)}>
+                {t('players:actionSurvival')}
               </button>
               <button className="bulk-btn" disabled={!!loadingAction}
-                onClick={() => bulkRun('bulk-crea', 'Creative', n => `gamemode creative ${n}`)}>
-                Creative
+                onClick={() => bulkRun('bulk-crea', t('players:toastLabelCreative'), n => `gamemode creative ${n}`)}>
+                {t('players:actionCreative')}
               </button>
-              <button className="bulk-btn" disabled={!!loadingAction} onClick={bulkKick}>Kick</button>
-              <button className="bulk-btn danger" disabled={!!loadingAction} onClick={bulkBan}>Ban</button>
-              <button className="bulk-btn clear" title="Clear selection" onClick={() => { setChecked(new Set()); lastCheckIdx.current = null }}>
+              <button className="bulk-btn" disabled={!!loadingAction} onClick={bulkKick}>{t('players:actionKick')}</button>
+              <button className="bulk-btn danger" disabled={!!loadingAction} onClick={bulkBan}>{t('players:actionBan')}</button>
+              <button className="bulk-btn clear" title={t('players:actionClearSelection')} onClick={() => { setChecked(new Set()); lastCheckIdx.current = null }}>
                 ✕
               </button>
             </div>
@@ -355,8 +357,8 @@ export default function PlayerList() {
                 <path d="M23 21v-2a4 4 0 0 0-3-3.87" />
                 <path d="M16 3.13a4 4 0 0 1 0 7.75" />
               </svg>
-              <div className="player-empty-title">Server is empty</div>
-              <div className="player-empty-sub">No players online right now</div>
+              <div className="player-empty-title">{t('players:emptyTitle')}</div>
+              <div className="player-empty-sub">{t('players:emptySubtitle')}</div>
             </div>
           )}
         </div>
@@ -365,10 +367,10 @@ export default function PlayerList() {
           {selectedGone ? (
             <div className="mac-detail-empty">
               <div className="mac-detail-empty-text" style={{ color: 'var(--ghost)', fontSize: 12 }}>
-                Player went offline
+                {t('players:playerOffline')}
               </div>
               <button className="btn-ghost btn-xs" style={{ marginTop: 8 }} onClick={() => setSelected(null)}>
-                Dismiss
+                {t('players:dismiss')}
               </button>
             </div>
           ) : !sel ? (
@@ -377,7 +379,7 @@ export default function PlayerList() {
                 <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" /><circle cx="9" cy="7" r="4" />
                 <path d="M23 21v-2a4 4 0 0 0-3-3.87" /><path d="M16 3.13a4 4 0 0 1 0 7.75" />
               </svg>
-              <div className="mac-detail-empty-text">Select a player</div>
+              <div className="mac-detail-empty-text">{t('players:selectPlayer')}</div>
             </div>
           ) : (
             <div className="mac-player-detail">
@@ -386,11 +388,11 @@ export default function PlayerList() {
 
               <div className="mac-player-meta-card">
                 <div className="mac-player-meta-row">
-                  <span className="mac-player-meta-label">World</span>
+                  <span className="mac-player-meta-label">{t('players:metaWorld')}</span>
                   <span className="mac-player-meta-value" style={{ fontFamily: 'var(--mono)', fontSize: 11 }}>{sel.world}</span>
                 </div>
                 <div className="mac-player-meta-row">
-                  <span className="mac-player-meta-label">Health</span>
+                  <span className="mac-player-meta-label">{t('players:metaHealth')}</span>
                   <span className="mac-player-meta-value">
                     <div className="mac-health-bar">
                       {Array.from({ length: 10 }).map((_, i) => (
@@ -407,28 +409,28 @@ export default function PlayerList() {
                   </span>
                 </div>
                 <div className="mac-player-meta-row">
-                  <span className="mac-player-meta-label">UUID</span>
+                  <span className="mac-player-meta-label">{t('players:metaUuid')}</span>
                   <span className="mac-player-meta-value" style={{ fontFamily: 'var(--mono)', fontSize: 10, color: 'var(--mist)' }}>
                     {sel.uuid.slice(0, 8)}…
                   </span>
                 </div>
                 <div className="mac-player-meta-row">
-                  <span className="mac-player-meta-label">Game Mode</span>
-                  <span className="mac-player-meta-value">{sel.gameMode ?? 'unknown'}</span>
+                  <span className="mac-player-meta-label">{t('players:metaGameMode')}</span>
+                  <span className="mac-player-meta-value">{sel.gameMode ?? t('players:gameModeUnknown')}</span>
                 </div>
               </div>
 
               <div className="grid grid-cols-3 gap-2">
                 <div className="rounded-md border border-border bg-surface px-2.5 py-2 text-center">
-                  <div className="font-mono text-[9px] uppercase tracking-wide text-text-muted">Food</div>
+                  <div className="font-mono text-[9px] uppercase tracking-wide text-text-muted">{t('players:statFood')}</div>
                   <div className="mt-0.5 font-mono text-base text-text-primary">{sel.foodLevel ?? '—'}</div>
                 </div>
                 <div className="rounded-md border border-border bg-surface px-2.5 py-2 text-center">
-                  <div className="font-mono text-[9px] uppercase tracking-wide text-text-muted">Level</div>
+                  <div className="font-mono text-[9px] uppercase tracking-wide text-text-muted">{t('players:statLevel')}</div>
                   <div className="mt-0.5 font-mono text-base text-text-primary">{sel.level ?? '—'}</div>
                 </div>
                 <div className="rounded-md border border-border bg-surface px-2.5 py-2 text-center">
-                  <div className="font-mono text-[9px] uppercase tracking-wide text-text-muted">Ping</div>
+                  <div className="font-mono text-[9px] uppercase tracking-wide text-text-muted">{t('players:statPing')}</div>
                   <div className="mt-0.5 font-mono text-base" style={{ color: pingColor(sel.ping) }}>
                     {typeof sel.ping === 'number' ? `${sel.ping}` : '—'}
                   </div>
@@ -439,16 +441,16 @@ export default function PlayerList() {
                 <button
                   className="mac-player-action-btn"
                   disabled={loadingAction === `heal-${sel.name}`}
-                  onClick={() => runActionButton(`heal-${sel.name}`, `effect give ${sel.name} minecraft:instant_health 1 10`, `Healed ${sel.name}`)}
+                  onClick={() => runActionButton(`heal-${sel.name}`, `effect give ${sel.name} minecraft:instant_health 1 10`, t('players:toastHealed', { name: sel.name }))}
                 >
-                  {loadingAction === `heal-${sel.name}` ? '…' : 'Heal'}
+                  {loadingAction === `heal-${sel.name}` ? '…' : t('players:actionHeal')}
                 </button>
                 <button
                   className="mac-player-action-btn"
                   disabled={loadingAction === `feed-${sel.name}`}
-                  onClick={() => runActionButton(`feed-${sel.name}`, `effect give ${sel.name} minecraft:saturation 1 10`, `Fed ${sel.name}`)}
+                  onClick={() => runActionButton(`feed-${sel.name}`, `effect give ${sel.name} minecraft:saturation 1 10`, t('players:toastFed', { name: sel.name }))}
                 >
-                  {loadingAction === `feed-${sel.name}` ? '…' : 'Feed'}
+                  {loadingAction === `feed-${sel.name}` ? '…' : t('players:actionFeed')}
                 </button>
               </div>
 
@@ -456,32 +458,32 @@ export default function PlayerList() {
                 <button
                   className="mac-player-action-btn"
                   disabled={loadingAction === `surv-${sel.name}`}
-                  onClick={() => runActionButton(`surv-${sel.name}`, `gamemode survival ${sel.name}`, `${sel.name} → Survival`)}
+                  onClick={() => runActionButton(`surv-${sel.name}`, `gamemode survival ${sel.name}`, t('players:toastToSurvival', { name: sel.name }))}
                 >
-                  {loadingAction === `surv-${sel.name}` ? '…' : 'Survival'}
+                  {loadingAction === `surv-${sel.name}` ? '…' : t('players:actionSurvival')}
                 </button>
                 <button
                   className="mac-player-action-btn"
                   disabled={loadingAction === `crea-${sel.name}`}
-                  onClick={() => runActionButton(`crea-${sel.name}`, `gamemode creative ${sel.name}`, `${sel.name} → Creative`)}
+                  onClick={() => runActionButton(`crea-${sel.name}`, `gamemode creative ${sel.name}`, t('players:toastToCreative', { name: sel.name }))}
                 >
-                  {loadingAction === `crea-${sel.name}` ? '…' : 'Creative'}
+                  {loadingAction === `crea-${sel.name}` ? '…' : t('players:actionCreative')}
                 </button>
               </div>
 
               <div className="mac-player-detail-actions">
                 <button className="mac-player-action-btn" onClick={() => openCustomAction(sel)}>
-                  Custom
+                  {t('players:actionCustom')}
                 </button>
                 <button
                   className="mac-player-action-btn"
                   disabled={loadingAction === `kick-${sel.name}`}
                   onClick={() => kick(sel.name)}
                 >
-                  {loadingAction === `kick-${sel.name}` ? '…' : 'Kick'}
+                  {loadingAction === `kick-${sel.name}` ? '…' : t('players:actionKick')}
                 </button>
                 <button className="mac-player-action-btn danger" onClick={() => ban(sel.name)}>
-                  Ban
+                  {t('players:actionBan')}
                 </button>
               </div>
             </div>
@@ -492,8 +494,8 @@ export default function PlayerList() {
       {customActionPlayer && (
         <div className="modal-overlay" onClick={e => { if (e.target === e.currentTarget) setCustomActionPlayer(null) }}>
           <div className="modal-card">
-            <div className="modal-title">Custom player command</div>
-            <div className="modal-label">Command for {customActionPlayer.name}</div>
+            <div className="modal-title">{t('players:customModalTitle')}</div>
+            <div className="modal-label">{t('players:customModalLabel', { name: customActionPlayer.name })}</div>
             <input
               className="modal-input mono-input"
               value={customCommand}
@@ -502,11 +504,11 @@ export default function PlayerList() {
               autoFocus
             />
             <div className="prompt-modal-message" style={{ marginTop: 8 }}>
-              Use {'{player}'} as the player placeholder. Commands run as console.
+              {t('players:customPlaceholderNote')}
             </div>
             <div className="modal-footer">
-              <button className="btn-ghost" onClick={() => setCustomActionPlayer(null)}>Cancel</button>
-              <button className="btn-primary" onClick={runCustomAction} disabled={!customCommand.trim()}>Run</button>
+              <button className="btn-ghost" onClick={() => setCustomActionPlayer(null)}>{t('common:cancel')}</button>
+              <button className="btn-primary" onClick={runCustomAction} disabled={!customCommand.trim()}>{t('players:actionRun')}</button>
             </div>
           </div>
         </div>

@@ -1,0 +1,34 @@
+{
+  "kpis.entriesLabel": "Entrées (page)",
+  "kpis.topActor": "Principal acteur",
+  "kpis.topAction": "Action principale",
+  "kpis.actionsCount": "{{count}} actions",
+  "kpis.timesCount": "{{count}} fois",
+
+  "toolbar.title": "Journal d'audit",
+  "toolbar.refreshing": "Actualisation…",
+  "toolbar.entriesCount": "{{count}} entrées",
+  "toolbar.filterByActorPlaceholder": "Filtrer par acteur…",
+  "toolbar.allActions": "Toutes les actions",
+  "toolbar.reset": "Réinitialiser",
+  "toolbar.exportCsv": "Exporter en CSV",
+
+  "contextMenu.copyDetail": "Copier le détail",
+  "contextMenu.copyRow": "Copier la ligne",
+  "contextMenu.filterByActor": "Filtrer par acteur",
+  "contextMenu.filterByAction": "Filtrer par action",
+  "contextMenu.copyFailed": "Échec de la copie",
+
+  "emptyState.title": "Aucune entrée d'audit",
+  "emptyState.hintFiltered": "Essayez d'effacer les filtres",
+  "emptyState.hintDefault": "Les actions que vous effectuez apparaîtront ici",
+
+  "columns.timestamp": "Horodatage",
+  "columns.actor": "Acteur",
+  "columns.ip": "IP",
+  "columns.action": "Action",
+  "columns.detail": "Détail",
+
+  "pagination.previous": "← Précédent",
+  "pagination.next": "Suivant →"
+}

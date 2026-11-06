@@ -1,0 +1,18 @@
+{
+  "title": "Live Console",
+  "searchPlaceholder": "Search logs…",
+  "precise": "Precise",
+  "fuzzy": "Fuzzy",
+  "searchLogs": "Search logs",
+  "clearConsole": "Clear console",
+  "scrollToBottom": "Scroll to bottom",
+  "bottom": "Bottom",
+  "connected": "connected",
+  "connecting": "connecting",
+  "commandPlaceholder": "Enter server command… (Tab to complete)",
+  "send": "Send",
+  "copyMessageOnly": "Copy Message Only",
+  "copyLine": "Copy Line",
+  "copyFailed": "Copy failed",
+  "quickActions": "Quick Actions"
+}

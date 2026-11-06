@@ -1,0 +1,18 @@
+{
+  "title": "Console en direct",
+  "searchPlaceholder": "Rechercher dans les logs…",
+  "precise": "Précis",
+  "fuzzy": "Approximatif",
+  "searchLogs": "Rechercher dans les logs",
+  "clearConsole": "Effacer la console",
+  "scrollToBottom": "Défiler vers le bas",
+  "bottom": "Bas",
+  "connected": "connecté",
+  "connecting": "connexion en cours",
+  "commandPlaceholder": "Entrer une commande serveur… (Tab pour compléter)",
+  "send": "Envoyer",
+  "copyMessageOnly": "Copier le message seulement",
+  "copyLine": "Copier la ligne",
+  "copyFailed": "Échec de la copie",
+  "quickActions": "Actions rapides"
+}

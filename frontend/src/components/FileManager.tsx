@@ -1,4 +1,5 @@
 import { useState, useRef, useEffect, lazy, Suspense } from 'react'
+import { useTranslation } from 'react-i18next'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { api, apiError, apiStatus, downloadViaToken } from '../api/client'
 import { useContextMenu, type ContextMenuItem } from '../ContextMenu'
@@ -237,6 +238,7 @@ interface UploadItem {
 }
 
 export default function FileManager() {
+  const { t } = useTranslation(['files', 'common'])
   const [cwd, setCwd] = useState('')
   const [history, setHistory] = useState<string[]>([''])
   const [historyIdx, setHistoryIdx] = useState(0)
@@ -438,7 +440,7 @@ export default function FileManager() {
       setJustSaved(false)
     } catch (e) {
       if (apiStatus(e) === 415) downloadFile(entry)
-      else showPrompt('Cannot open file', apiError(e, 'The selected file could not be opened.'), 'error')
+      else showPrompt(t('error.cannotOpenTitle'), apiError(e, t('error.cannotOpenBody')), 'error')
     }
   }
 
@@ -446,7 +448,7 @@ export default function FileManager() {
     try {
       await downloadViaToken('/files/download-token', { path: entry.path })
     } catch (e) {
-      showPrompt('Download failed', apiError(e, 'The file could not be downloaded.'), 'error')
+      showPrompt(t('error.fetchFailedTitle'), apiError(e, t('error.downloadFailedBody')), 'error')
     }
   }
 
@@ -467,15 +469,15 @@ export default function FileManager() {
     } catch (e) {
       if (apiStatus(e) === 409) {
         setPrompt({
-          title: 'File changed on disk',
-          message: `${editing.path} was modified by something else after you opened it. Overwrite those changes with your version?`,
+          title: t('saveConflict.title'),
+          message: t('saveConflict.message', { path: editing.path }),
           variant: 'danger',
-          confirmLabel: 'Overwrite',
-          cancelLabel: 'Keep editing',
+          confirmLabel: t('saveConflict.overwrite'),
+          cancelLabel: t('saveConflict.keepEditing'),
           onConfirm: () => saveFile(true),
         })
       } else {
-        showPrompt('Save failed', apiError(e, 'The file could not be saved.'), 'error')
+        showPrompt(t('error.saveFailedTitle'), apiError(e, t('error.saveFailedBody')), 'error')
       }
     }
     finally { isSavingRef.current = false; setSaving(false) }
@@ -484,13 +486,13 @@ export default function FileManager() {
   async function deleteEntries(entriesToDelete: FileEntry[]) {
     if (entriesToDelete.length === 0) return
     const single = entriesToDelete.length === 1
-    const label = single ? `"${entriesToDelete[0].name}"` : `${entriesToDelete.length} items`
+    const label = single ? `"${entriesToDelete[0].name}"` : t('deleteConfirm.itemsLabel', { count: entriesToDelete.length })
     setPrompt({
-      title: single ? 'Delete item?' : 'Delete selected items?',
-      message: `Delete ${label}? This cannot be undone from Teletype.`,
+      title: single ? t('deleteConfirm.titleSingle') : t('deleteConfirm.titleMultiple'),
+      message: t('deleteConfirm.message', { label }),
       variant: 'danger',
-      confirmLabel: 'Delete',
-      cancelLabel: 'Cancel',
+      confirmLabel: t('common:delete'),
+      cancelLabel: t('common:cancel'),
       onConfirm: async () => {
         try {
           for (const entry of entriesToDelete) {
@@ -499,7 +501,7 @@ export default function FileManager() {
           clearSelection()
           invalidateFiles()
         } catch (e) {
-          showPrompt('Delete failed', apiError(e, 'The selected item could not be deleted.'), 'error')
+          showPrompt(t('error.deleteFailedTitle'), apiError(e, t('error.deleteFailedBody')), 'error')
           throw e
         }
       },
@@ -528,13 +530,13 @@ export default function FileManager() {
       clearSelection()
       invalidateFiles()
     } catch (e) {
-      showPrompt('Paste failed', apiError(e, 'The selected item could not be pasted here.'), 'error')
+      showPrompt(t('error.pasteFailedTitle'), apiError(e, t('error.pasteFailedBody')), 'error')
     }
   }
 
   async function copyPaths(entriesToCopy: FileEntry[]) {
     const ok = await writeClipboard(entriesToCopy.map(entry => entry.path).join('\n'))
-    if (!ok) toast.error('Copy failed')
+    if (!ok) toast.error(t('error.copyFailed'))
   }
 
   async function doRename() {
@@ -544,7 +546,7 @@ export default function FileManager() {
     try {
       await api.patch('/files/rename', { from: modal.entry.path, to })
       setModal(null); invalidate()
-    } catch (e) { showPrompt('Rename failed', apiError(e, 'The item could not be renamed.'), 'error') }
+    } catch (e) { showPrompt(t('error.renameFailedTitle'), apiError(e, t('error.renameFailedBody')), 'error') }
   }
 
   async function doMkdir() {
@@ -553,7 +555,7 @@ export default function FileManager() {
     try {
       await api.post('/files/mkdir', null, { params: { path } })
       setModal(null); invalidate()
-    } catch (e) { showPrompt('Folder not created', apiError(e, 'The folder could not be created.'), 'error') }
+    } catch (e) { showPrompt(t('error.mkdirFailedTitle'), apiError(e, t('error.mkdirFailedBody')), 'error') }
   }
 
   async function doFetch() {
@@ -566,7 +568,7 @@ export default function FileManager() {
         fileName: fetchName.trim() || undefined,
       })
       setModal(null); setFetchUrl(''); setFetchName(''); invalidate()
-    } catch (e) { showPrompt('Download failed', apiError(e, 'The file could not be fetched.'), 'error') }
+    } catch (e) { showPrompt(t('error.fetchFailedTitle'), apiError(e, t('error.fetchFailedBody')), 'error') }
     finally { setFetchLoading(false) }
   }
 
@@ -588,7 +590,7 @@ export default function FileManager() {
       await api.post('/files/decompress', { path: modal.entry.path, destPath })
       setModal(null); invalidateFiles()
     } catch (e) {
-      showPrompt('Decompress failed', apiError(e, 'The archive could not be decompressed.'), 'error')
+      showPrompt(t('error.decompressFailedTitle'), apiError(e, t('error.decompressFailedBody')), 'error')
     } finally { setDecompressLoading(false) }
   }
 
@@ -714,7 +716,7 @@ export default function FileManager() {
         patchUploadItem(item.id, {
           status: 'error',
           loaded: 0,
-          error: apiError(e, 'Upload failed'),
+          error: apiError(e, t('error.uploadFailed')),
         })
       }
     }
@@ -764,68 +766,68 @@ export default function FileManager() {
 
     const items: ContextMenuItem[] = []
     if (isBulk) {
-      items.push({ type: 'header', label: `${contextEntries.length} items selected` })
+      items.push({ type: 'header', label: t('contextMenu.itemsSelected', { count: contextEntries.length }) })
     } else {
-      items.push({ label: 'Open', action: () => handleIconActivate(entry) })
+      items.push({ label: t('contextMenu.open'), action: () => handleIconActivate(entry) })
       if (!entry.isDirectory) {
-        items.push({ label: 'Download', action: () => downloadFile(entry) })
+        items.push({ label: t('download'), action: () => downloadFile(entry) })
       }
       if (!entry.isDirectory && isArchive(entry.name)) {
-        items.push({ label: 'Decompress...', action: () => openDecompressModal(entry) })
+        items.push({ label: t('contextMenu.decompressEllipsis'), action: () => openDecompressModal(entry) })
       }
     }
     items.push(
-      { label: isBulk ? 'Copy' : 'Copy Item', action: () => setFileActionClipboard('copy', contextEntries) },
-      { label: isBulk ? 'Cut' : 'Cut Item', action: () => setFileActionClipboard('cut', contextEntries) },
-      { label: isBulk ? 'Copy Paths' : 'Copy Path', action: () => copyPaths(contextEntries) },
+      { label: isBulk ? t('common:copy') : t('contextMenu.copyItem'), action: () => setFileActionClipboard('copy', contextEntries) },
+      { label: isBulk ? t('contextMenu.cut') : t('contextMenu.cutItem'), action: () => setFileActionClipboard('cut', contextEntries) },
+      { label: isBulk ? t('contextMenu.copyPaths') : t('contextMenu.copyPath'), action: () => copyPaths(contextEntries) },
       { type: 'separator' },
     )
     if (!isBulk && entry.isDirectory) {
       if (fileClipboard) {
         items.push({
-          label: `Paste ${clipboardCount} Item${clipboardCount === 1 ? '' : 's'} Into Folder`,
+          label: t('contextMenu.pasteIntoFolder', { count: clipboardCount }),
           action: () => pasteClipboard(entry.path),
         })
       }
       items.push({
-        label: 'Add to Favorites',
+        label: t('contextMenu.addToFavorites'),
         disabled: favs.some(f => f.path === entry.path),
         action: () => addFav(entry.name, entry.path),
       })
     }
     if (!isBulk) {
       items.push(
-        { label: 'Rename', action: () => openModal({ type: 'rename', entry }, entry.name) },
+        { label: t('rename'), action: () => openModal({ type: 'rename', entry }, entry.name) },
         { type: 'separator' },
       )
     }
-    items.push({ label: isBulk ? 'Delete Selected' : 'Delete', danger: true, action: () => deleteEntries(contextEntries) })
+    items.push({ label: isBulk ? t('contextMenu.deleteSelected') : t('common:delete'), danger: true, action: () => deleteEntries(contextEntries) })
     openContextMenu(e, items, { kind: 'file', path: entry.path, isDirectory: entry.isDirectory })
   }
 
   function openFolderCtx(e: React.MouseEvent) {
     const items: ContextMenuItem[] = [
-      { label: 'New Folder', action: () => openModal({ type: 'mkdir' }) },
-      { label: 'Upload Files...', action: () => fileInputRef.current?.click() },
-      { label: 'Fetch from URL...', action: () => { setFetchUrl(''); setFetchName(''); setModal({ type: 'fetch' }) } },
+      { label: t('contextMenu.newFolder'), action: () => openModal({ type: 'mkdir' }) },
+      { label: t('contextMenu.uploadFiles'), action: () => fileInputRef.current?.click() },
+      { label: t('contextMenu.fetchFromUrl'), action: () => { setFetchUrl(''); setFetchName(''); setModal({ type: 'fetch' }) } },
       { type: 'separator' },
     ]
     if (fileClipboard) {
       items.push({
-        label: `Paste ${clipboardCount} Item${clipboardCount === 1 ? '' : 's'}`,
+        label: t('contextMenu.paste', { count: clipboardCount }),
         action: () => pasteClipboard(cwd),
       })
     }
     items.push(
-      { label: 'Select All', disabled: displayEntries.length === 0, action: selectAllVisible },
-      { label: 'Clear Selection', disabled: selectedPaths.length === 0, action: clearSelection },
+      { label: t('contextMenu.selectAll'), disabled: displayEntries.length === 0, action: selectAllVisible },
+      { label: t('contextMenu.clearSelection'), disabled: selectedPaths.length === 0, action: clearSelection },
       { type: 'separator' },
       {
-        label: 'Add Current Folder to Favorites',
+        label: t('contextMenu.addCurrentFolderToFavorites'),
         disabled: favs.some(f => f.path === cwd),
-        action: () => addFav(cwd.split('/').filter(Boolean).pop() || 'Server Root', cwd),
+        action: () => addFav(cwd.split('/').filter(Boolean).pop() || t('sidebarFav.root'), cwd),
       },
-      { label: 'Copy Folder Path', disabled: !cwd, action: async () => { if (!await writeClipboard(cwd)) toast.error('Copy failed') } },
+      { label: t('contextMenu.copyFolderPath'), disabled: !cwd, action: async () => { if (!await writeClipboard(cwd)) toast.error(t('error.copyFailed')) } },
     )
     openContextMenu(e, items, { kind: 'folderBackground', path: cwd })
   }
@@ -833,10 +835,10 @@ export default function FileManager() {
   function openFavoriteCtx(e: React.MouseEvent, fav: SidebarFav) {
     const isDefault = DEFAULT_FAVS.some(d => d.id === fav.id)
     openContextMenu(e, [
-      { label: 'Open Favorite', action: () => navigate(fav.path) },
-      { label: 'Copy Path', disabled: !fav.path, action: async () => { if (!await writeClipboard(fav.path)) toast.error('Copy failed') } },
+      { label: t('contextMenu.openFavorite'), action: () => navigate(fav.path) },
+      { label: t('contextMenu.copyPath'), disabled: !fav.path, action: async () => { if (!await writeClipboard(fav.path)) toast.error(t('error.copyFailed')) } },
       { type: 'separator' },
-      { label: 'Remove from Favorites', disabled: isDefault, danger: true, action: () => removeFav(fav.id) },
+      { label: t('sidebarFav.remove'), disabled: isDefault, danger: true, action: () => removeFav(fav.id) },
     ], { kind: 'favorite', id: fav.id, path: fav.path })
   }
 
@@ -855,9 +857,9 @@ export default function FileManager() {
   const uploadingNow = uploadItems.filter(item => item.status === 'uploading')
   const activeUpload = uploadingNow[0] ?? uploadItems.find(item => item.status === 'queued') ?? null
   const activeUploadLabel = activeUpload
-    ? `File ${activeUpload.index + 1} of ${uploadItems.length}: ${activeUpload.name}`
+    ? t('upload.activeFile', { index: activeUpload.index + 1, total: uploadItems.length, name: activeUpload.name })
     : uploadItems.length > 0
-      ? `${uploadDone} of ${uploadItems.length} files complete`
+      ? t('upload.filesComplete', { done: uploadDone, total: uploadItems.length })
       : ''
 
   return (
@@ -865,15 +867,15 @@ export default function FileManager() {
 
       {/* ── Finder toolbar ────────────────────────────────────────────── */}
       <div className="finder-toolbar">
-        <button className="finder-nav-btn" disabled={!canGoBack} onClick={goBack} title="Back">
+        <button className="finder-nav-btn" disabled={!canGoBack} onClick={goBack} title={t('common:back')}>
           <IconChevronLeft size={11} />
         </button>
-        <button className="finder-nav-btn" disabled={!canGoForward} onClick={goForward} title="Forward">
+        <button className="finder-nav-btn" disabled={!canGoForward} onClick={goForward} title={t('toolbar.forward')}>
           <IconChevronRight size={11} />
         </button>
 
         <div className="finder-breadcrumbs">
-          <span className="fm-crumb" onClick={() => navigate('')}>Server Root</span>
+          <span className="fm-crumb" onClick={() => navigate('')}>{t('sidebarFav.root')}</span>
           {breadcrumbs.map((seg, i) => {
             const path = breadcrumbs.slice(0, i + 1).join('/')
             return (
@@ -891,7 +893,7 @@ export default function FileManager() {
         <div className="finder-view-toggle">
           <button
             className={`finder-view-btn${effectiveView === 'icons' ? ' active' : ''}`}
-            title="Icon view"
+            title={t('toolbar.iconView')}
             onClick={() => setViewMode('icons')}
           >
             <svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor">
@@ -903,7 +905,7 @@ export default function FileManager() {
           </button>
           <button
             className={`finder-view-btn${effectiveView === 'list' ? ' active' : ''}`}
-            title="List view"
+            title={t('toolbar.listView')}
             onClick={() => setViewMode('list')}
           >
             <IconList size={13} />
@@ -912,19 +914,19 @@ export default function FileManager() {
 
         <button
           className={`icon-btn${searchOpen ? ' active' : ''}`}
-          title="Search files"
+          title={t('toolbar.searchFiles')}
           onClick={() => { setSearchOpen(v => !v); if (searchOpen) setSearchQuery('') }}
         >
           <IconSearch size={13} />
         </button>
         <button className="pill-btn" onClick={() => { setFetchUrl(''); setFetchName(''); setModal({ type: 'fetch' }) }}>
-          <IconGlobe size={13} />Fetch
+          <IconGlobe size={13} />{t('toolbar.fetch')}
         </button>
         <button className="pill-btn" onClick={() => openModal({ type: 'mkdir' })}>
-          <IconFolderPlus size={13} />New Folder
+          <IconFolderPlus size={13} />{t('contextMenu.newFolder')}
         </button>
         <button className="pill-btn primary" onClick={() => fileInputRef.current?.click()}>
-          <IconUpload size={13} />Upload
+          <IconUpload size={13} />{t('toolbar.upload')}
         </button>
         <input ref={fileInputRef} type="file" multiple hidden onChange={(e) => upload(e.target.files)} />
       </div>
@@ -933,22 +935,22 @@ export default function FileManager() {
         <div className="fm-upload-panel">
           <div className="fm-upload-summary">
             <div className="fm-upload-title">
-              {uploadRunning ? 'Uploading files' : uploadFailed ? 'Upload finished with errors' : 'Upload complete'}
+              {uploadRunning ? t('upload.uploading') : uploadFailed ? t('upload.finishedWithErrors') : t('upload.complete')}
             </div>
             <div className="fm-upload-meta">
-              {fmtSize(uploadLoaded)} / {fmtSize(uploadTotal)} transferred
+              {t('upload.transferred', { loaded: fmtSize(uploadLoaded), total: fmtSize(uploadTotal) })}
               <span> {uploadPercent}%</span>
-              <span> {uploadDone}/{uploadItems.length} files</span>
-              {uploadFailed > 0 && <span className="fm-upload-error-count"> {uploadFailed} failed</span>}
+              <span> {t('upload.filesCount', { done: uploadDone, total: uploadItems.length })}</span>
+              {uploadFailed > 0 && <span className="fm-upload-error-count"> {t('upload.failedCount', { count: uploadFailed })}</span>}
             </div>
             <div className="fm-upload-current">{activeUploadLabel}</div>
           </div>
           <div className="fm-upload-actions">
             {!uploadRunning && (
-              <button className="btn-ghost btn-xs" onClick={() => setUploadSnapshot([])}>Dismiss</button>
+              <button className="btn-ghost btn-xs" onClick={() => setUploadSnapshot([])}>{t('upload.dismiss')}</button>
             )}
           </div>
-          <div className="fm-upload-bar" aria-label="Upload progress">
+          <div className="fm-upload-bar" aria-label={t('upload.progressAria')}>
             <div className="fm-upload-bar-fill" style={{ transform: `scaleX(${uploadPercent / 100})` }} />
           </div>
           <div className="fm-upload-files">
@@ -960,7 +962,7 @@ export default function FileManager() {
                   <span className="fm-upload-file-size">
                     {item.status === 'error' ? item.error : `${fmtSize(Math.min(item.loaded, item.size))} / ${fmtSize(item.size)}`}
                   </span>
-                  <span className="fm-upload-file-pct">{item.status === 'queued' ? 'Queued' : `${pct}%`}</span>
+                  <span className="fm-upload-file-pct">{item.status === 'queued' ? t('upload.queued') : `${pct}%`}</span>
                 </div>
               )
             })}
@@ -970,22 +972,22 @@ export default function FileManager() {
 
       {selectedEntries.length > 1 && (
         <div className="fm-selection-bar">
-          <span>{selectedEntries.length} selected</span>
-          <button className="btn-ghost btn-xs" onClick={() => setFileActionClipboard('copy', selectedEntries)}>Copy</button>
-          <button className="btn-ghost btn-xs" onClick={() => setFileActionClipboard('cut', selectedEntries)}>Cut</button>
-          <button className="btn-ghost btn-xs danger" onClick={() => deleteEntries(selectedEntries)}>Delete</button>
-          <button className="btn-ghost btn-xs" onClick={clearSelection}>Clear</button>
+          <span>{t('selection.count', { count: selectedEntries.length })}</span>
+          <button className="btn-ghost btn-xs" onClick={() => setFileActionClipboard('copy', selectedEntries)}>{t('common:copy')}</button>
+          <button className="btn-ghost btn-xs" onClick={() => setFileActionClipboard('cut', selectedEntries)}>{t('contextMenu.cut')}</button>
+          <button className="btn-ghost btn-xs danger" onClick={() => deleteEntries(selectedEntries)}>{t('common:delete')}</button>
+          <button className="btn-ghost btn-xs" onClick={clearSelection}>{t('selection.clear')}</button>
         </div>
       )}
 
       {/* ── Inline mkdir form ──────────────────────────────────────────── */}
       {modal?.type === 'mkdir' && (
         <div className="fm-inline-form">
-          <input className="text-input" autoFocus placeholder="New folder name"
+          <input className="text-input" autoFocus placeholder={t('mkdir.placeholder')}
             value={modalInput} onChange={(e) => setModalInput(e.target.value)}
             onKeyDown={(e) => { if (e.key === 'Enter') doMkdir(); if (e.key === 'Escape') setModal(null) }} />
-          <button className="pill-btn primary" onClick={doMkdir}>Create</button>
-          <button className="pill-btn" onClick={() => setModal(null)}>Cancel</button>
+          <button className="pill-btn primary" onClick={doMkdir}>{t('mkdir.create')}</button>
+          <button className="pill-btn" onClick={() => setModal(null)}>{t('common:cancel')}</button>
         </div>
       )}
 
@@ -997,21 +999,21 @@ export default function FileManager() {
             <input
               className="text-input fm-search-input"
               autoFocus
-              placeholder="Search filenames…"
+              placeholder={t('search.placeholder')}
               value={searchQuery}
               onChange={e => setSearchQuery(e.target.value)}
               spellCheck={false}
             />
             <div className="fm-scope-toggle">
-              <button className={`scope-btn${searchScope === 'local' ? ' active' : ''}`} onClick={() => setSearchScope('local')}>Local</button>
-              <button className={`scope-btn${searchScope === 'global' ? ' active' : ''}`} onClick={() => setSearchScope('global')}>Global</button>
+              <button className={`scope-btn${searchScope === 'local' ? ' active' : ''}`} onClick={() => setSearchScope('local')}>{t('search.local')}</button>
+              <button className={`scope-btn${searchScope === 'global' ? ' active' : ''}`} onClick={() => setSearchScope('global')}>{t('search.global')}</button>
             </div>
           </div>
           <div className="fuzzy-slider-wrap fm-fuzzy">
-            <span className="fuzzy-label">Precise</span>
+            <span className="fuzzy-label">{t('search.precise')}</span>
             <input type="range" min={0} max={100} value={fuzzyLevel}
               onChange={e => setFuzzyLevel(+e.target.value)} className="fuzzy-slider" />
-            <span className="fuzzy-label">Fuzzy</span>
+            <span className="fuzzy-label">{t('search.fuzzy')}</span>
           </div>
         </div>
       )}
@@ -1022,7 +1024,7 @@ export default function FileManager() {
         {/* Sidebar */}
         {!editing && (
           <div className="finder-sidebar">
-            <div className="finder-sidebar-header">Favorites</div>
+            <div className="finder-sidebar-header">{t('sidebarFav.header')}</div>
             {favs.map(fav => (
               <div
                 key={fav.id}
@@ -1031,19 +1033,19 @@ export default function FileManager() {
                 onContextMenu={e => {
                   openFavoriteCtx(e, fav)
                 }}
-                title={fav.path || 'Server Root'}
+                title={fav.path || t('sidebarFav.root')}
               >
                 <span className="finder-sidebar-icon">
                   {fav.id === 'root' ? <SidebarRootIcon /> :
                    fav.id === 'logs' ? <SidebarLogIcon /> :
                    <SidebarFolderIcon />}
                 </span>
-                <span className="finder-sidebar-label">{fav.label}</span>
+                <span className="finder-sidebar-label">{DEFAULT_FAV_IDS.has(fav.id) ? t(`sidebarFav.${fav.id}`) : fav.label}</span>
                 {!DEFAULT_FAVS.find(d => d.id === fav.id) && (
                   <button
                     className="finder-sidebar-remove"
                     onClick={e => { e.stopPropagation(); removeFav(fav.id) }}
-                    title="Remove from Favorites"
+                    title={t('sidebarFav.remove')}
                   >✕</button>
                 )}
               </div>
@@ -1055,15 +1057,15 @@ export default function FileManager() {
         <div className={`finder-main${editing ? ' with-editor' : ''}`} onContextMenu={openFolderCtx}>
 
           {/* Loading / error */}
-          {isLoading && <div className="dim" style={{ padding: 12 }}>Loading…</div>}
-          {error && <div className="err" style={{ padding: 12 }}>Failed to read directory</div>}
+          {isLoading && <div className="dim" style={{ padding: 12 }}>{t('common:loading')}</div>}
+          {error && <div className="err" style={{ padding: 12 }}>{t('error.readDirFailed')}</div>}
 
           {/* Search results always use list view */}
           {searchOpen && searchQuery.trim() ? (
             <div className="fm-file-list" style={{ flex: 1 }} onClick={clearSelection}>
-              {searching && <div className="dim" style={{ padding: '8px 10px' }}>Searching…</div>}
+              {searching && <div className="dim" style={{ padding: '8px 10px' }}>{t('search.searching')}</div>}
               {!searching && searchResults.length === 0 && (
-                <div className="dim" style={{ padding: '8px 10px' }}>No results for "{searchQuery}"</div>
+                <div className="dim" style={{ padding: '8px 10px' }}>{t('search.noResults', { query: searchQuery })}</div>
               )}
               {searchResults.map(entry => (
                 <div key={entry.path} className={`fm-row${selectedSet.has(entry.path) ? ' selected' : ''}`}
@@ -1082,7 +1084,7 @@ export default function FileManager() {
                   {!entry.isDirectory && <span className="fm-row-size">{fmtSize(entry.size)}</span>}
                   <div className="fm-row-actions" onClick={(e) => e.stopPropagation()}>
                     {!entry.isDirectory && (
-                      <button className="row-action-btn" title="Download" onClick={() => downloadFile(entry)}>
+                      <button className="row-action-btn" title={t('download')} onClick={() => downloadFile(entry)}>
                         <IconDownload size={12} />
                       </button>
                     )}
@@ -1099,7 +1101,7 @@ export default function FileManager() {
                   className={`finder-icon-item${selectedPaths.includes('..') ? ' selected' : ''}`}
                   onClick={e => { e.stopPropagation(); selectOnly('..') }}
                   onDoubleClick={e => { e.stopPropagation(); navigateToParent() }}
-                  title="Parent folder"
+                  title={t('sidebarFav.parentFolder')}
                 >
                   <div className="finder-icon-squircle" style={{ background: 'linear-gradient(145deg, #6b7280, #374151)' }}>
                     <svg viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg">
@@ -1160,19 +1162,19 @@ export default function FileManager() {
                   {!editing && <span className="fm-row-date">{fmtDate(entry.lastModified)}</span>}
                   <div className="fm-row-actions" onClick={e => e.stopPropagation()}>
                     {!entry.isDirectory && (
-                      <button className="row-action-btn" title="Download" onClick={() => downloadFile(entry)}>
+                      <button className="row-action-btn" title={t('download')} onClick={() => downloadFile(entry)}>
                         <IconDownload size={12} />
                       </button>
                     )}
                     {!entry.isDirectory && isArchive(entry.name) && (
-                      <button className="row-action-btn" title="Decompress" onClick={() => openDecompressModal(entry)}>
+                      <button className="row-action-btn" title={t('decompress')} onClick={() => openDecompressModal(entry)}>
                         <IconArchive size={12} />
                       </button>
                     )}
-                    <button className="row-action-btn" title="Rename" onClick={() => openModal({ type: 'rename', entry }, entry.name)}>
+                    <button className="row-action-btn" title={t('rename')} onClick={() => openModal({ type: 'rename', entry }, entry.name)}>
                       <IconPencil size={12} />
                     </button>
-                    <button className="row-action-btn del" title="Delete" onClick={() => deleteEntry(entry)}>
+                    <button className="row-action-btn del" title={t('common:delete')} onClick={() => deleteEntry(entry)}>
                       <IconTrash size={12} />
                     </button>
                   </div>
@@ -1190,10 +1192,10 @@ export default function FileManager() {
               <span className="fm-editor-path">{editing.path}</span>
               <button className={`pill-btn primary${justSaved ? ' success' : ''}`} onClick={() => saveFile()} disabled={saving || justSaved}>
                 {justSaved ? <IconCheck size={13} /> : <IconSave size={13} />}
-                {justSaved ? 'Saved' : saving ? 'Saving…' : 'Save'}
+                {justSaved ? t('editor.saved') : saving ? t('editor.saving') : t('common:save')}
               </button>
               <button className="pill-btn" onClick={() => setEditing(null)}>
-                <IconX size={13} />Close
+                <IconX size={13} />{t('common:close')}
               </button>
             </div>
             <Suspense fallback={<EditorLoading />}>
@@ -1207,14 +1209,14 @@ export default function FileManager() {
       {modal?.type === 'rename' && (
         <div className="modal-overlay" onClick={() => setModal(null)}>
           <div className="modal-card" onClick={(e) => e.stopPropagation()}>
-            <div className="modal-title">Rename "{modal.entry.name}"</div>
-            <div className="modal-label">New name</div>
+            <div className="modal-title">{t('renameModal.title', { name: modal.entry.name })}</div>
+            <div className="modal-label">{t('renameModal.newNameLabel')}</div>
             <input className="text-input" style={{ width: '100%' }} autoFocus
               value={modalInput} onChange={(e) => setModalInput(e.target.value)}
               onKeyDown={(e) => { if (e.key === 'Enter') doRename(); if (e.key === 'Escape') setModal(null) }} />
             <div className="modal-footer">
-              <button className="pill-btn" onClick={() => setModal(null)}>Cancel</button>
-              <button className="pill-btn primary" onClick={doRename}>Rename</button>
+              <button className="pill-btn" onClick={() => setModal(null)}>{t('common:cancel')}</button>
+              <button className="pill-btn primary" onClick={doRename}>{t('rename')}</button>
             </div>
           </div>
         </div>
@@ -1226,25 +1228,25 @@ export default function FileManager() {
           <div className="modal-card" onClick={(e) => e.stopPropagation()}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 16 }}>
               <IconGlobe size={15} />
-              <div className="modal-title" style={{ margin: 0 }}>Download file from URL</div>
+              <div className="modal-title" style={{ margin: 0 }}>{t('fetchModal.title')}</div>
             </div>
-            <div className="modal-label">URL</div>
+            <div className="modal-label">{t('fetchModal.urlLabel')}</div>
             <input className="text-input" style={{ width: '100%', marginBottom: 12 }}
               autoFocus type="url" placeholder="https://example.com/file.jar"
               value={fetchUrl} onChange={(e) => setFetchUrl(e.target.value)}
               onKeyDown={(e) => { if (e.key === 'Enter') doFetch(); if (e.key === 'Escape') setModal(null) }} />
-            <div className="modal-label">Save as (optional)</div>
+            <div className="modal-label">{t('fetchModal.saveAsLabel')}</div>
             <input className="text-input" style={{ width: '100%' }}
-              placeholder="Leave blank to use filename from URL"
+              placeholder={t('fetchModal.saveAsPlaceholder')}
               value={fetchName} onChange={(e) => setFetchName(e.target.value)}
               onKeyDown={(e) => { if (e.key === 'Enter') doFetch(); if (e.key === 'Escape') setModal(null) }} />
             <div style={{ marginTop: 8, fontFamily: 'var(--mono)', fontSize: 11, color: 'var(--mist)' }}>
-              Destination: /{cwd || '(root)'}
+              {t('fetchModal.destination', { path: cwd || t('rootPath') })}
             </div>
             <div className="modal-footer">
-              <button className="pill-btn" onClick={() => setModal(null)}>Cancel</button>
+              <button className="pill-btn" onClick={() => setModal(null)}>{t('common:cancel')}</button>
               <button className="pill-btn primary" onClick={doFetch} disabled={fetchLoading || !fetchUrl.trim()}>
-                <IconDownload size={13} />{fetchLoading ? 'Downloading…' : 'Download'}
+                <IconDownload size={13} />{fetchLoading ? t('fetchModal.downloading') : t('download')}
               </button>
             </div>
           </div>
@@ -1258,7 +1260,7 @@ export default function FileManager() {
             <div className="decompress-header">
               <div className="decompress-header-icon"><IconArchive size={17} /></div>
               <div className="decompress-header-text">
-                <div className="modal-title" style={{ margin: 0 }}>Decompress archive</div>
+                <div className="modal-title" style={{ margin: 0 }}>{t('decompressModal.title')}</div>
                 <div className="decompress-header-sub" title={modal.entry.name}>
                   {modal.entry.name} · {fmtSize(modal.entry.size)}
                 </div>
@@ -1271,8 +1273,8 @@ export default function FileManager() {
                   onChange={() => setDecompressMode('here')} />
                 <span className="decompress-option-radio" aria-hidden="true" />
                 <span className="decompress-option-text">
-                  <span className="decompress-option-title">Extract to current folder</span>
-                  <span className="decompress-option-desc">/{cwd || '(root)'}</span>
+                  <span className="decompress-option-title">{t('decompressModal.extractHere')}</span>
+                  <span className="decompress-option-desc">/{cwd || t('rootPath')}</span>
                 </span>
               </label>
               <label className={`decompress-option${decompressMode === 'new' ? ' selected' : ''}`}>
@@ -1280,24 +1282,24 @@ export default function FileManager() {
                   onChange={() => setDecompressMode('new')} />
                 <span className="decompress-option-radio" aria-hidden="true" />
                 <span className="decompress-option-text">
-                  <span className="decompress-option-title">Extract to a new folder</span>
+                  <span className="decompress-option-title">{t('decompressModal.extractNew')}</span>
                   {decompressMode === 'new' ? (
                     <input className="text-input decompress-folder-input" style={{ width: '100%' }}
-                      autoFocus placeholder="New folder name" onClick={(e) => e.stopPropagation()}
+                      autoFocus placeholder={t('mkdir.placeholder')} onClick={(e) => e.stopPropagation()}
                       value={decompressFolderName} onChange={(e) => setDecompressFolderName(e.target.value)}
                       onKeyDown={(e) => { if (e.key === 'Enter') doDecompress(); if (e.key === 'Escape') setModal(null) }} />
                   ) : (
-                    <span className="decompress-option-desc">Choose a folder name</span>
+                    <span className="decompress-option-desc">{t('decompressModal.chooseFolderName')}</span>
                   )}
                 </span>
               </label>
             </div>
 
             <div className="modal-footer">
-              <button className="pill-btn" onClick={() => setModal(null)}>Cancel</button>
+              <button className="pill-btn" onClick={() => setModal(null)}>{t('common:cancel')}</button>
               <button className="pill-btn primary" onClick={doDecompress}
                 disabled={decompressLoading || (decompressMode === 'new' && !decompressFolderName.trim())}>
-                <IconArchive size={13} />{decompressLoading ? 'Decompressing…' : 'Decompress'}
+                <IconArchive size={13} />{decompressLoading ? t('decompressModal.decompressing') : t('decompress')}
               </button>
             </div>
           </div>
@@ -1308,14 +1310,14 @@ export default function FileManager() {
       {conflict?.step === 'choice' && (
         <div className="modal-overlay" onClick={() => resolveConflict(null)}>
           <div className="modal-card" onClick={(e) => e.stopPropagation()}>
-            <div className="modal-title">File already exists</div>
+            <div className="modal-title">{t('conflict.title')}</div>
             <div className="modal-label" style={{ marginBottom: 16 }}>
-              "{conflict.file.name}" already exists in this folder. Replace the existing file, or save this upload under a different name.
+              {t('conflict.message', { name: conflict.file.name })}
             </div>
             <div className="modal-footer">
-              <button className="pill-btn" onClick={() => resolveConflict(null)}>Cancel</button>
-              <button className="pill-btn" onClick={() => setConflict(c => c && { ...c, step: 'rename' })}>Save As...</button>
-              <button className="pill-btn primary" onClick={() => resolveConflict(conflict.file)}>Replace</button>
+              <button className="pill-btn" onClick={() => resolveConflict(null)}>{t('common:cancel')}</button>
+              <button className="pill-btn" onClick={() => setConflict(c => c && { ...c, step: 'rename' })}>{t('conflict.saveAs')}</button>
+              <button className="pill-btn primary" onClick={() => resolveConflict(conflict.file)}>{t('conflict.replace')}</button>
             </div>
           </div>
         </div>
@@ -1324,8 +1326,8 @@ export default function FileManager() {
       {conflict?.step === 'rename' && (
         <div className="modal-overlay" onClick={() => resolveConflict(null)}>
           <div className="modal-card" onClick={(e) => e.stopPropagation()}>
-            <div className="modal-title">Save as</div>
-            <div className="modal-label">New name</div>
+            <div className="modal-title">{t('conflict.saveAsTitle')}</div>
+            <div className="modal-label">{t('renameModal.newNameLabel')}</div>
             <input className="text-input" style={{ width: '100%' }} autoFocus
               value={conflict.renameValue}
               onFocus={(e) => {
@@ -1335,8 +1337,8 @@ export default function FileManager() {
               onChange={(e) => setConflict(c => c && { ...c, renameValue: e.target.value })}
               onKeyDown={(e) => { if (e.key === 'Enter') confirmConflictRename(); if (e.key === 'Escape') resolveConflict(null) }} />
             <div className="modal-footer">
-              <button className="pill-btn" onClick={() => resolveConflict(null)}>Cancel</button>
-              <button className="pill-btn primary" disabled={!conflict.renameValue.trim()} onClick={confirmConflictRename}>Save</button>
+              <button className="pill-btn" onClick={() => resolveConflict(null)}>{t('common:cancel')}</button>
+              <button className="pill-btn primary" disabled={!conflict.renameValue.trim()} onClick={confirmConflictRename}>{t('common:save')}</button>
             </div>
           </div>
         </div>

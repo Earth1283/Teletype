@@ -1,4 +1,5 @@
 import { memo, useEffect, useId, useMemo, useRef, useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import {
   ComposedChart, Area,
   XAxis, YAxis, CartesianGrid, Tooltip,
@@ -141,6 +142,7 @@ function logLevel(line: string): string {
 // ── Tooltips ─────────────────────────────────────────────────────────────────
 
 function SimpleTooltip({ active, payload }: ChartTooltipProps<ProcessedSnap>) {
+  const { t } = useTranslation('glance')
   const snap = payload?.[0]?.payload
   if (!active || !snap) return null
   return (
@@ -148,9 +150,9 @@ function SimpleTooltip({ active, payload }: ChartTooltipProps<ProcessedSnap>) {
       <div className="glance-tooltip-time">{fmtTimeFull(snap.timestamp)}</div>
       <div className="glance-tooltip-metrics">
         {[
-          { label: 'TPS', val: snap.tps1.toFixed(2) },
-          { label: 'Tick', val: `${snap.tickTimeMs.toFixed(1)}ms` },
-          { label: 'Mem', val: fmtMem(snap.memUsedMb) },
+          { label: t('metricLabel.tps'), val: snap.tps1.toFixed(2) },
+          { label: t('metricLabel.tick'), val: `${snap.tickTimeMs.toFixed(1)}ms` },
+          { label: t('metricLabel.mem'), val: fmtMem(snap.memUsedMb) },
         ].map(r => (
           <div key={r.label} className="tooltip-metric-row">
             <span className="tm-sigma" /><span className="tm-label">{r.label}</span>
@@ -173,6 +175,7 @@ interface IncidentTooltipProps extends ChartTooltipProps<ProcessedSnap> {
 function IncidentTooltip({
   active, payload, allStats, thresholds, getLogsAround, logWindowMs, onJumpToTs,
 }: IncidentTooltipProps) {
+  const { t } = useTranslation('glance')
   if (!active || !payload?.length) return null
   const snap = payload[0].payload as ProcessedSnap
 
@@ -182,33 +185,33 @@ function IncidentTooltip({
   if (allStats.tps1.std > 0.05) {
     const z = (snap.tps1 - allStats.tps1.mean) / allStats.tps1.std
     if (z < -thresholds.tps) anomalies.push({
-      label: 'TPS', z,
+      label: t('metricLabel.tps'), z,
       val: snap.tps1.toFixed(1), mean: allStats.tps1.mean.toFixed(1),
-      heuristic: snap.tps1 < 10 ? 'Server near-freeze' : snap.tps1 < 15 ? 'Significant lag event' : 'TPS below target',
+      heuristic: snap.tps1 < 10 ? t('heuristic.tpsNearFreeze') : snap.tps1 < 15 ? t('heuristic.tpsSignificantLag') : t('heuristic.tpsBelowTarget'),
     })
   }
   if (allStats.tickTimeMs.std > 0.5) {
     const z = (snap.tickTimeMs - allStats.tickTimeMs.mean) / allStats.tickTimeMs.std
     if (z > thresholds.tick) anomalies.push({
-      label: 'Tick', z,
+      label: t('metricLabel.tick'), z,
       val: `${Math.round(snap.tickTimeMs)}ms`, mean: `${Math.round(allStats.tickTimeMs.mean)}ms`,
-      heuristic: snap.tickTimeMs > 100 ? 'Main thread stalled' : 'Server lag spike',
+      heuristic: snap.tickTimeMs > 100 ? t('heuristic.mainThreadStalled') : t('heuristic.serverLagSpike'),
     })
   }
   if (allStats.memPct.std > 0.001) {
     const z = (snap.memPct - allStats.memPct.mean) / allStats.memPct.std
     if (z > thresholds.mem) anomalies.push({
-      label: 'Mem', z,
+      label: t('metricLabel.mem'), z,
       val: fmtMem(snap.memUsedMb), mean: fmtMem(Math.round(allStats.memPct.mean * snap.memMaxMb)),
-      heuristic: snap.memPct > 0.9 ? 'Memory pressure critical' : 'Memory surge detected',
+      heuristic: snap.memPct > 0.9 ? t('heuristic.memPressureCritical') : t('heuristic.memSurgeDetected'),
     })
   }
   if (allStats.cpuPercent.std > 0.5 && snap.cpuPercent != null && snap.cpuPercent >= 0) {
     const z = (snap.cpuPercent - allStats.cpuPercent.mean) / allStats.cpuPercent.std
     if (z > thresholds.cpu) anomalies.push({
-      label: 'CPU', z,
+      label: t('metricLabel.cpu'), z,
       val: `${snap.cpuPercent.toFixed(0)}%`, mean: `${allStats.cpuPercent.mean.toFixed(0)}%`,
-      heuristic: snap.cpuPercent > 90 ? 'Host CPU saturated' : 'Host CPU spike',
+      heuristic: snap.cpuPercent > 90 ? t('heuristic.hostCpuSaturated') : t('heuristic.hostCpuSpike'),
     })
   }
   anomalies.sort((a, b) => Math.abs(b.z) - Math.abs(a.z))
@@ -237,15 +240,15 @@ function IncidentTooltip({
         )) : (
           <>
             <div className="tooltip-metric-row">
-              <span className="tm-sigma" /><span className="tm-label">TPS</span>
+              <span className="tm-sigma" /><span className="tm-label">{t('metricLabel.tps')}</span>
               <span className="tm-value">{snap.tps1.toFixed(1)}</span><span className="tm-mean">/20</span>
             </div>
             <div className="tooltip-metric-row">
-              <span className="tm-sigma" /><span className="tm-label">Tick</span>
+              <span className="tm-sigma" /><span className="tm-label">{t('metricLabel.tick')}</span>
               <span className="tm-value">{Math.round(snap.tickTimeMs)}ms</span><span className="tm-mean" />
             </div>
             <div className="tooltip-metric-row">
-              <span className="tm-sigma" /><span className="tm-label">Mem</span>
+              <span className="tm-sigma" /><span className="tm-label">{t('metricLabel.mem')}</span>
               <span className="tm-value">{fmtMem(snap.memUsedMb)}</span><span className="tm-mean" />
             </div>
           </>
@@ -253,7 +256,7 @@ function IncidentTooltip({
       </div>
       {nearbyLogs.length > 0 && (
         <div className="glance-tooltip-logs">
-          <div className="tooltip-log-header">nearest log</div>
+          <div className="tooltip-log-header">{t('nearestLog')}</div>
           {nearbyLogs.slice(0, 3).map((l, i) => {
             const clean = stripLogPrefix(stripAnsi(l.line))
             return (
@@ -269,7 +272,7 @@ function IncidentTooltip({
           className="glance-tooltip-jump"
           onMouseDown={e => { e.stopPropagation(); onJumpToTs(snap.timestamp) }}
         >
-          jump to log →
+          {t('jumpToLog')}
         </button>
       )}
     </div>
@@ -312,6 +315,7 @@ const GlanceChart = memo(function GlanceChart({
   greyBeardMode, showBifurcation, logCorrelation,
   gcEvents, showGcLabels = false, showGcHint = false,
 }: GlanceChartProps) {
+  const { t } = useTranslation('glance')
   const sKey = statsKey ?? dataKey
   const latest = data[data.length - 1]
   const currentVal = latest ? (latest[dataKey] as number) : 0
@@ -418,7 +422,7 @@ const GlanceChart = memo(function GlanceChart({
               />
               <ReferenceLine
                 x={bifurTs} stroke="var(--border-hi)" strokeDasharray="2 3" strokeWidth={1}
-                label={{ value: 'focus', position: 'insideTopRight', fill: 'var(--ghost)', fontSize: 8, fontFamily: 'var(--mono)' }}
+                label={{ value: t('focusLabel'), position: 'insideTopRight', fill: 'var(--ghost)', fontSize: 8, fontFamily: 'var(--mono)' }}
               />
             </>
           )}
@@ -432,7 +436,7 @@ const GlanceChart = memo(function GlanceChart({
               strokeWidth={1}
               strokeOpacity={0.5}
               label={showGcLabels ? {
-                value: `GC ${fmtGcDuration(event.durationMs)}`,
+                value: t('gcDurationLabel', { duration: fmtGcDuration(event.durationMs) }),
                 position: 'insideTopLeft',
                 fill: 'var(--blue)',
                 fontSize: 7,
@@ -456,7 +460,7 @@ const GlanceChart = memo(function GlanceChart({
       </ResponsiveContainer>
       {showGcHint && gcEvents && gcEvents.length > 0 && !greyBeardMode && (
         <div className="glance-gc-hint">
-          GC markers are JVM JMX events. Short windows label duration.
+          {t('gcHint')}
         </div>
       )}
     </div>
@@ -588,9 +592,10 @@ function SpeedoGauge({ label, value, displayValue, subLine, min, max, zones, sig
 }
 
 function UptimeDisplay({ uptimeStr }: { uptimeStr: string }) {
+  const { t } = useTranslation('glance')
   return (
     <div className="speedo-uptime">
-      <div className="speedo-uptime-label">Uptime</div>
+      <div className="speedo-uptime-label">{t('speedo.uptime')}</div>
       <div className="speedo-uptime-value">{uptimeStr}</div>
     </div>
   )
@@ -606,6 +611,7 @@ function GlanceLogViewer({ clickedTs, onClear, isOpen, onToggle }: {
   isOpen: boolean
   onToggle: () => void
 }) {
+  const { t } = useTranslation('glance')
   const { tsLogs } = useLogLines()
   const virtuosoRef = useRef<VirtuosoHandle>(null)
   const highlightRange = clickedTs === null ? null : { from: clickedTs - HIGHLIGHT_WINDOW_MS, to: clickedTs + HIGHLIGHT_WINDOW_MS }
@@ -636,7 +642,7 @@ function GlanceLogViewer({ clickedTs, onClear, isOpen, onToggle }: {
         <button
           className="glance-log-toggle-btn"
           onClick={onToggle}
-          title={isOpen ? 'Collapse log panel' : 'Expand log panel'}
+          title={isOpen ? t('logPanel.collapse') : t('logPanel.expand')}
         >
           <IconChevronRight
             size={11}
@@ -647,19 +653,19 @@ function GlanceLogViewer({ clickedTs, onClear, isOpen, onToggle }: {
           />
         </button>
         {isOpen && <>
-          <span className="glance-log-title">{isFiltered ? 'Errors' : 'Logs'}</span>
+          <span className="glance-log-title">{isFiltered ? t('logPanel.errorsTitle') : t('logPanel.logsTitle')}</span>
           {clickedTs !== null ? (
             <>
               <span className="glance-log-ts-badge">{fmtTime(clickedTs)} ±5s</span>
-              <button className="glance-log-clear" onClick={onClear} title="Clear highlight">×</button>
+              <button className="glance-log-clear" onClick={onClear} title={t('logPanel.clearHighlight')}>×</button>
             </>
           ) : (
             <button
               className="glance-log-filter-btn"
               onClick={() => setShowAll(v => !v)}
-              title={showAll ? 'Filter to warnings/errors' : 'Show all logs'}
+              title={showAll ? t('logPanel.filterToWarnings') : t('logPanel.showAllLogs')}
             >
-              {showAll ? 'errors' : 'all'}
+              {showAll ? t('logPanel.errorsToggle') : t('logPanel.allToggle')}
             </button>
           )}
         </>}
@@ -682,7 +688,7 @@ function GlanceLogViewer({ clickedTs, onClear, isOpen, onToggle }: {
           components={{
             EmptyPlaceholder: () => (
               <div className="glance-log-empty">
-                {isFiltered ? 'no warnings or errors' : 'waiting for logs…'}
+                {isFiltered ? t('logPanel.noWarningsOrErrors') : t('logPanel.waitingForLogs')}
               </div>
             ),
           }}
@@ -695,6 +701,7 @@ function GlanceLogViewer({ clickedTs, onClear, isOpen, onToggle }: {
 // ── Main page ─────────────────────────────────────────────────────────────────
 
 export default function GlancePage() {
+  const { t } = useTranslation(['glance', 'common'])
   const [windowMin, setWindowMin] = useState<WindowMin>(5)
   const [clickedTs, setClickedTs] = useState<number | null>(null)
   const [logPanelOpen, setLogPanelOpen] = useState(true)
@@ -834,15 +841,15 @@ export default function GlancePage() {
 
         {hasError && (
           <div className="glance-error-banner">
-            <span>⚠ Failed to fetch metrics</span>
-            <button className="btn-ghost btn-xs" onClick={retryAll}>Retry</button>
+            <span>{t('errorBanner.failedToFetch')}</span>
+            <button className="btn-ghost btn-xs" onClick={retryAll}>{t('common:retry')}</button>
           </div>
         )}
 
         {/* Status bar */}
         <div className="glance-status-bar">
           <span className={badgeClass}>{status.toUpperCase()}{gbm ? ' (GBM)' : ''}</span>
-          <span className="glance-status-uptime">up {uptimeStr}</span>
+          <span className="glance-status-uptime">{t('statusBar.up', { uptime: uptimeStr })}</span>
           <span style={{ flex: 1 }} />
           <span className="glance-live-badge">
             <span className="glance-live-dot" />
@@ -852,36 +859,36 @@ export default function GlancePage() {
             <button
               className="glance-show-logs-btn"
               onClick={() => setLogPanelOpen(true)}
-              title="Show log panel"
+              title={t('statusBar.showLogPanel')}
             >
               <IconChevronLeft size={11} />
-              logs
+              {t('statusBar.logsButton')}
             </button>
           )}
         </div>
 
         {/* Speedo rail */}
         <div className="speedo-rail">
-          <SpeedoGauge label="TPS 1m"
+          <SpeedoGauge label={t('speedo.tps1m')}
             value={current?.tps1 ?? null}
             displayValue={current ? current.tps1.toFixed(2) : '—'}
             subLine="/ 20"
             min={0} max={20} zones={zones.tps} sigma={tpsSigma} />
-          <SpeedoGauge label="Tick Time"
+          <SpeedoGauge label={t('speedo.tickTime')}
             value={current?.tickTimeMs ?? null}
             displayValue={current ? `${Math.round(current.tickTimeMs)}ms` : '—'}
-            subLine={`< ${gs.msptYellowAbove}ms good`}
+            subLine={t('speedo.tickGood', { value: gs.msptYellowAbove })}
             min={0} max={200} zones={zones.tick} sigma={tickSigma} />
-          <SpeedoGauge label="Memory"
+          <SpeedoGauge label={t('speedo.memory')}
             value={current ? memP : null}
             displayValue={current ? `${Math.round(memP * 100)}%` : '—'}
             subLine={current ? `${fmtMem(current.memUsedMb)}/${fmtMem(current.memMaxMb)}` : undefined}
             min={0} max={1} zones={zones.mem} sigma={memSigma} />
-          <SpeedoGauge label="CPU"
+          <SpeedoGauge label={t('speedo.cpu')}
             value={current?.cpuPercent != null && current.cpuPercent >= 0 ? current.cpuPercent : null}
             displayValue={current?.cpuPercent != null && current.cpuPercent >= 0 ? `${current.cpuPercent.toFixed(1)}%` : '—'}
             min={0} max={100} zones={zones.cpu} />
-          <SpeedoGauge label="Sys RAM"
+          <SpeedoGauge label={t('speedo.sysRam')}
             value={current?.sysMemUsedMb != null && current.sysMemTotalMb
               ? (current.sysMemUsedMb / current.sysMemTotalMb) * 100 : null}
             displayValue={current?.sysMemUsedMb != null && current.sysMemTotalMb
@@ -889,7 +896,7 @@ export default function GlancePage() {
             subLine={current?.sysMemUsedMb != null && current.sysMemTotalMb
               ? `${fmtMem(current.sysMemUsedMb)}/${fmtMem(current.sysMemTotalMb)}` : undefined}
             min={0} max={100} zones={zones.mem} />
-          <SpeedoGauge label="Disk"
+          <SpeedoGauge label={t('speedo.disk')}
             value={current?.diskUsedGb != null && current.diskTotalGb && current.diskTotalGb > 0
               ? (current.diskUsedGb / current.diskTotalGb) * 100 : null}
             displayValue={current?.diskUsedGb != null && current.diskTotalGb && current.diskTotalGb > 0
@@ -923,28 +930,28 @@ export default function GlancePage() {
 
         {/* Charts */}
         {data.length === 0 ? (
-          <div className="glance-empty">Waiting for metrics…</div>
+          <div className="glance-empty">{t('emptyState.waitingForMetrics')}</div>
         ) : (
           <>
             {gs.showChartTps && (
-              <GlanceChart {...SHARED} title="TPS" dataKey="tps1"
+              <GlanceChart {...SHARED} title={t('metricLabel.tps')} dataKey="tps1"
                 color={tpsColor(current?.tps1 ?? 20)} yDomain={[0, 21]}
                 yFormatter={v => v.toFixed(0)} stats={allStats.tps1} chartId="tps" />
             )}
             {gs.showChartTick && (
-              <GlanceChart {...SHARED} title="Tick Time" dataKey="tickTimeMs"
+              <GlanceChart {...SHARED} title={t('speedo.tickTime')} dataKey="tickTimeMs"
                 color={tickColor(current?.tickTimeMs ?? 0)} yDomain={[0, 'auto']}
                 yFormatter={v => `${Math.round(v)}ms`} stats={allStats.tickTimeMs} chartId="tick" />
             )}
             {gs.showChartMem && (
-              <GlanceChart {...SHARED} title="Memory" dataKey="memUsedMb" statsKey="memPct"
+              <GlanceChart {...SHARED} title={t('speedo.memory')} dataKey="memUsedMb" statsKey="memPct"
                 color={memColor(memP)} yDomain={[0, memMaxMb]}
                 yFormatter={fmtMem} stats={allStats.memPct} chartId="mem"
                 gcEvents={!gbm ? gcEvents : undefined}
                 showGcLabels={windowMin <= 15 && gcEvents.length <= MAX_GC_LABELS} showGcHint />
             )}
             {gs.showChartCpu && hasCpuData && (
-              <GlanceChart {...SHARED} title="Host CPU" dataKey="cpuPercent"
+              <GlanceChart {...SHARED} title={t('chartTitle.hostCpu')} dataKey="cpuPercent"
                 color={cpuColor(current!.cpuPercent!)} yDomain={[0, 100]}
                 yFormatter={v => `${v.toFixed(0)}%`} stats={allStats.cpuPercent} chartId="cpu" />
             )}

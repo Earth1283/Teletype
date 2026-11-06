@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import { IconX } from '../../Icons'
 import type { CreateCategoryRequest } from './actionTypes'
 
@@ -11,6 +12,7 @@ interface Props {
 }
 
 export default function NewCategoryModal({ onClose, onCreate, pending }: Props) {
+  const { t } = useTranslation(['actions', 'common'])
   const [name, setName] = useState('')
   const [color, setColor] = useState('#a78bfa')
 
@@ -23,26 +25,26 @@ export default function NewCategoryModal({ onClose, onCreate, pending }: Props) 
     <div className="modal-overlay" onClick={e => { if (e.target === e.currentTarget) onClose() }}>
       <div className="modal-card" style={{ maxWidth: 360 }}>
         <div className="modal-title">
-          <span>New Category</span>
+          <span>{t('actions:newCategoryModal.title')}</span>
           <button className="icon-btn" onClick={onClose}><IconX size={14} /></button>
         </div>
 
         <div className="modal-field">
-          <label className="modal-label">Name</label>
+          <label className="modal-label">{t('actions:newCategoryModal.nameLabel')}</label>
           <input className="modal-input" value={name} onChange={e => setName(e.target.value)}
-            placeholder="e.g. Economy" autoFocus
+            placeholder={t('actions:newCategoryModal.namePlaceholder')} autoFocus
             onKeyDown={e => { if (e.key === 'Enter') save() }} />
         </div>
 
         <div className="modal-field">
-          <label className="modal-label">Color</label>
+          <label className="modal-label">{t('actions:newCategoryModal.colorLabel')}</label>
           <div className="color-presets">
             {PRESETS.map(c => (
               <button key={c} className={`color-swatch${color === c ? ' selected' : ''}`}
                 style={{ background: c }} onClick={() => setColor(c)} title={c} />
             ))}
             <input type="color" className="color-custom" value={color}
-              onChange={e => setColor(e.target.value)} title="Custom color" />
+              onChange={e => setColor(e.target.value)} title={t('actions:newCategoryModal.customColorTitle')} />
           </div>
         </div>
 
@@ -51,13 +53,13 @@ export default function NewCategoryModal({ onClose, onCreate, pending }: Props) 
             color,
             background: `${color}26`,
             border: `1px solid ${color}55`,
-          }}>{name || 'Preview'}</span>
+          }}>{name || t('actions:newCategoryModal.previewPlaceholder')}</span>
         </div>
 
         <div className="modal-footer">
-          <button className="btn-ghost" onClick={onClose}>Cancel</button>
+          <button className="btn-ghost" onClick={onClose}>{t('common:cancel')}</button>
           <button className="btn-primary" onClick={save} disabled={!name.trim() || pending}>
-            {pending ? 'Creating…' : 'Create Category'}
+            {pending ? t('actions:newCategoryModal.creating') : t('actions:newCategoryModal.create')}
           </button>
         </div>
       </div>

@@ -1,3 +1,10 @@
+# ── Language ───────────────────────────────────────────────────────────────
+# Language for console/command messages (plugins/Teletype/languages/*.yml).
+# Built-in: en, es, fr, zh. Drop your own translated file in that folder and
+# set its filename (without .yml) here to use it. Falls back to English for
+# any key missing from the chosen file. Takes effect on /tty reload or restart.
+language: en
+
 # ── Web server ───────────────────────────────────────────────────────────────
 server:
   # Port the embedded HTTP server listens on.

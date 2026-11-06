@@ -1,0 +1,16 @@
+{
+  "title": "Keyboard Shortcuts",
+  "groupGlobal": "Global",
+  "groupConsole": "Console",
+  "groupContext": "Context",
+  "showShortcuts": "Show keyboard shortcuts",
+  "openPalette": "Open command palette",
+  "jumpToTab": "Jump to tab (sidebar order)",
+  "jumpToSettings": "Jump to Settings",
+  "closeDialog": "Close dialog / overlay",
+  "navigateHistory": "Navigate command history",
+  "tabComplete": "Tab-complete command",
+  "focusSearch": "Focus search bar",
+  "clearCompletions": "Clear completions / close search",
+  "openContextWheel": "Open context wheel (right-click hold)"
+}
