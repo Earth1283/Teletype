@@ -10,8 +10,8 @@ Teletype generates `plugins/Teletype/config.yml` on first start. All keys and th
 server:
   port: 8080                   # HTTP listen port
   https-port: 8443             # HTTPS port (only when tls.enabled: true)
-  cors-origins: []             # Empty = allow any origin (anyHost). Non-empty = only listed origins are allowed.
-  max-websocket-connections: 8 # Max simultaneous authenticated WebSocket clients
+  cors-origins: []             # Additional browser origins allowed for API and console WebSocket access
+  max-websocket-connections: 8 # Max simultaneous console WebSocket clients, including clients awaiting login
   trust-proxy-headers: false   # Trust HTTPS/client IP headers from a hosting panel proxy
 
   # Port multiplexer — share one port between the web panel and Minecraft game traffic
@@ -21,11 +21,18 @@ server:
   multiplex-max-connections: 1024 # Concurrent mux connections (players + browsers); extras are refused
 ```
 
-`cors-origins` example for a specific origin:
+The panel's own origin is allowed by default. Use `server.cors-origins` to allow
+an additional browser frontend by scheme, host, and port.
+
 ```yaml
-cors-origins:
-  - "https://my.panel.example.com"
+server:
+  cors-origins:
+    - "https://my.panel.example.com"
 ```
+
+If a trusted reverse proxy terminates HTTPS, have it pass the public scheme,
+host, and port so that Teletype can recognize the panel's origin. Enable
+`server.trust-proxy-headers` only when direct access to the backend is blocked.
 
 ### Port Multiplexer
 

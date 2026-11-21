@@ -105,12 +105,12 @@ class TtyCommand(private val plugin: Teletype) : CommandExecutor, TabCompleter {
         val uuid = runCatching { UUID.fromString(args[1]) }.getOrNull()
             ?: run { plugin.messages.send(sender, "command.verify.invalid-uuid"); return }
 
-        val challenge = plugin.challengeStore.getPending(uuid)
+        val challengeAddress = plugin.challengeStore.verificationAddress(uuid)
             ?: run { plugin.messages.send(sender, "command.verify.not-found"); return }
 
         if (sender is Player && plugin.teletypeConfig.disallowPlayerVerify) {
             val playerIp = normalizeIp(sender.address?.address?.hostAddress)
-            val challengeIp = normalizeIp(challenge.remoteAddress)
+            val challengeIp = normalizeIp(challengeAddress)
             val matchingIpAllowed = plugin.teletypeConfig.allowPlayerVerifyMatchingIp &&
                 playerIp != null &&
                 challengeIp != null &&
@@ -135,7 +135,7 @@ class TtyCommand(private val plugin: Teletype) : CommandExecutor, TabCompleter {
         val jwt = plugin.jwtService.issueToken(subject = sender.name, expiryMinutes = plugin.teletypeConfig.jwtExpiryMinutes)
         if (plugin.challengeStore.verify(uuid, jwt)) {
             plugin.messages.send(sender, "command.verify.success")
-            plugin.auditAsync("auth_verify", "web login approved", sender.name, challenge.remoteAddress)
+            plugin.auditAsync("auth_verify", "web login approved", sender.name, challengeAddress)
         } else {
             plugin.messages.send(sender, "command.verify.not-found")
         }

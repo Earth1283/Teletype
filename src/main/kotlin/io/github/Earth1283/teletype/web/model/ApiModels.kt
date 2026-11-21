@@ -30,7 +30,7 @@ data class PlayerInfo(
 data class ExecuteRequest(val command: String)
 
 @Serializable
-data class ChallengeResponse(val uuid: String, val message: String)
+data class ChallengeResponse(val uuid: String, val message: String, val pollToken: String)
 
 @Serializable
 data class TokenResponse(val token: String)

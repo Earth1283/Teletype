@@ -242,9 +242,9 @@ const server = http.createServer(async (req, res) => {
   // ── Auth (bypass — always verify immediately) ──────────────────────────────
   if (m === 'POST' && path === '/api/auth/challenge') {
     await readBody(req)
-    return json(res, { uuid: 'dev', message: 'Development mode — auto-verifying. No action needed.' })
+    return json(res, { uuid: 'dev', pollToken: 'dev-poll-token', message: 'Development mode — auto-verifying. No action needed.' })
   }
-  if ((m === 'POST' || m === 'GET') && path.startsWith('/api/auth/poll/')) {
+  if (m === 'GET' && path === '/api/auth/poll/dev' && req.headers.authorization === 'Bearer dev-poll-token') {
     return json(res, { status: 'verified', token: 'dev-token' })
   }
 

@@ -66,6 +66,8 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.json.Json
 import java.net.InetAddress
+import java.net.URI
+import java.net.URISyntaxException
 import java.security.MessageDigest
 import java.util.concurrent.ConcurrentHashMap
 import java.util.logging.Level
@@ -133,6 +135,7 @@ class WebServer(private val plugin: Teletype) {
     fun stop() {
         server?.stop(1000, 5000)
         server = null
+        plugin.challengeStore.clear()
         downloadTokens.clear()
     }
 
@@ -155,6 +158,7 @@ class WebServer(private val plugin: Teletype) {
         install(WebSockets) {
             pingPeriodMillis = 30_000L
             timeoutMillis = 60_000L
+            maxFrameSize = 64 * 1024L
         }
 
         install(ContentNegotiation) {
@@ -165,8 +169,9 @@ class WebServer(private val plugin: Teletype) {
 
         install(SecurityHeaders)
 
+        val allowedOrigins = cfg.corsOrigins.mapNotNull(::parseBrowserOrigin).toSet()
         install(CORS) {
-            if (cfg.corsOrigins.isEmpty()) anyHost() else cfg.corsOrigins.forEach { allowOrigin(it) }
+            allowOrigins { parseBrowserOrigin(it) in allowedOrigins }
             allowHeader(HttpHeaders.Authorization)
             allowHeader(HttpHeaders.ContentType)
             exposeHeader(LAST_MODIFIED_HEADER)
@@ -213,14 +218,6 @@ class WebServer(private val plugin: Teletype) {
                 plugin.logger.log(Level.SEVERE, "Unhandled error on ${call.request.httpMethod.value} ${call.request.path()}", cause)
                 call.respond(HttpStatusCode.InternalServerError, ErrorResponse("Internal server error — see the server console for details"))
             }
-        }
-    }
-
-    private fun io.ktor.server.plugins.cors.CORSConfig.allowOrigin(origin: String) {
-        runCatching {
-            val uri = java.net.URI(origin)
-            val authority = if (uri.port != -1) "${uri.host}:${uri.port}" else uri.host
-            if (authority != null) allowHost(authority, schemes = listOf(uri.scheme ?: "https"))
         }
     }
 
@@ -289,8 +286,31 @@ class WebServer(private val plugin: Teletype) {
     }
 }
 
+private fun parseBrowserOrigin(value: String): Triple<String, String, Int>? {
+    val uri = try {
+        URI(value)
+    } catch (_: URISyntaxException) {
+        return null
+    }
+    val scheme = uri.scheme?.lowercase()
+    val defaultPort = when (scheme) {
+        "https" -> 443
+        "http" -> 80
+        else -> return null
+    }
+    val host = uri.host?.lowercase() ?: return null
+    if (uri.rawUserInfo != null || uri.rawQuery != null || uri.rawFragment != null ||
+        uri.rawPath !in listOf("", "/") || uri.port !in -1..65535 || uri.port == 0
+    ) return null
+    return Triple(scheme, host, if (uri.port == -1) defaultPort else uri.port)
+}
+
 private val SecurityHeaders = createApplicationPlugin("SecurityHeaders") {
     onCall { call ->
+        val path = call.request.path()
+        if (path.equals("/api", ignoreCase = true) || path.startsWith("/api/", ignoreCase = true)) {
+            call.response.header(HttpHeaders.CacheControl, "no-store")
+        }
         call.response.header("X-Content-Type-Options", "nosniff")
         call.response.header("X-Frame-Options", "DENY")
         call.response.header("Content-Security-Policy", "frame-ancestors 'none'")

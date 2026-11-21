@@ -1,5 +1,8 @@
 package io.github.Earth1283.teletype.auth
 
+import com.auth0.jwt.JWT
+import com.auth0.jwt.algorithms.Algorithm
+import java.time.Instant
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNotNull
@@ -31,6 +34,16 @@ class JwtServiceTest {
         val token = service.issueToken(subject = "console", expiryMinutes = -1)
 
         assertNull(service.verify(token))
+    }
+
+    @Test
+    fun `session tokens require an expiration and a named subject`() {
+        val service = JwtService("test-secret")
+        val algorithm = Algorithm.HMAC256("test-secret")
+        val withIssuer = JWT.create().withIssuer(JwtService.ISSUER)
+
+        assertNull(service.verify(withIssuer.withSubject("console").sign(algorithm)))
+        assertNull(service.verify(withIssuer.withExpiresAt(Instant.now().plusSeconds(60)).withSubject(" ").sign(algorithm)))
     }
 
     @Test

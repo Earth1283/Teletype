@@ -28,7 +28,8 @@ Request a new login challenge. No authentication required.
 ```json
 {
   "uuid": "3f2a9c1d-...",
-  "message": "Run `/tty verify 3f2a9c1d-...` in-game or in the server console"
+  "message": "Run `tty verify 3f2a9c1d-...` in the Minecraft console to authenticate",
+  "pollToken": "<private polling token>"
 }
 ```
 
@@ -40,13 +41,15 @@ The issued JWT's subject is the name of whoever ran `/tty verify` (a player name
 
 ### `GET /api/auth/poll/{uuid}`
 
-Poll for the result of a challenge. Call this repeatedly (every 1–2 seconds) after requesting a challenge.
+Poll for the result using the `pollToken` returned by the challenge endpoint.
+Keep it private and pass it as `Authorization: Bearer <pollToken>` on each poll.
+An approved challenge returns a JWT once.
 
 | Status | Meaning |
 |--------|---------|
 | `202` | Pending — `/tty verify` not yet run |
 | `200` | Verified — JWT included in response |
-| `404` | UUID unknown or expired (TTL: 5 min default) |
+| `404` | Polling token missing or invalid, or UUID unknown, expired, or already redeemed (TTL: 5 min default) |
 
 **Response 200 (verified):**
 ```json
@@ -93,7 +96,11 @@ The upgrade is rate limited by its own IP-keyed bucket (20/min). The server ping
 | `command` | Command string | Execute as console sender. Audited as `console_command`. |
 | `tab_complete` | Partial command string | Request tab completions. Server responds with a `tab_complete` message. |
 
-Tab completions are fetched via `CommandMap.tabComplete()` on the Bukkit main thread with a 500 ms timeout. Max concurrent connections: 8 (configurable via `server.max-websocket-connections`).
+Tab completions are fetched via `CommandMap.tabComplete()` on the Bukkit main
+thread with a 500 ms timeout. The server accepts incoming messages up to 64 KiB.
+The default cap of 8 concurrent connections includes clients waiting to
+authenticate and can be changed with `server.max-websocket-connections`.
+Additional browser origins can be allowed with `server.cors-origins`.
 
 ---
 

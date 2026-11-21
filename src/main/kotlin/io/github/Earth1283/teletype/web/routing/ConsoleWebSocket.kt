@@ -1,6 +1,5 @@
 package io.github.Earth1283.teletype.web.routing
 
-import com.auth0.jwt.interfaces.DecodedJWT
 import io.github.Earth1283.teletype.Teletype
 import io.github.Earth1283.teletype.console.ConsoleBroadcaster
 import io.github.Earth1283.teletype.console.ConsoleLine
@@ -54,44 +53,62 @@ suspend fun DefaultWebSocketServerSession.consoleWebSocket(plugin: Teletype) {
         return
     }
 
-    val authMsg = withTimeoutOrNull(AUTH_TIMEOUT_MS) { receiveMessage() }?.takeIf { it.type == "auth" && it.payload.isNotBlank() } ?: return close(UNAUTHORIZED)
-    val token = plugin.jwtService.verify(authMsg.payload) ?: return close(UNAUTHORIZED)
-
     if (activeConsoleSockets.incrementAndGet() > plugin.teletypeConfig.maxWebSocketConnections) {
         activeConsoleSockets.decrementAndGet()
         close(CloseReason(CloseReason.Codes.TRY_AGAIN_LATER, "Too many console connections"))
         return
     }
+    try {
+        authenticateAndStream(plugin)
+    } finally {
+        activeConsoleSockets.decrementAndGet()
+    }
+}
+
+private suspend fun DefaultWebSocketServerSession.authenticateAndStream(plugin: Teletype) {
+    val authMsg = withTimeoutOrNull(AUTH_TIMEOUT_MS) { receiveMessage() }
+        ?.takeIf { it.type == "auth" && it.payload.isNotBlank() } ?: return close(UNAUTHORIZED)
+    val jwtService = plugin.jwtService
+    val token = jwtService.verify(authMsg.payload) ?: return close(UNAUTHORIZED)
+    val expiresAt = token.expiresAt.time
+    fun sessionIsValid() = jwtService === plugin.jwtService && System.currentTimeMillis() < expiresAt
 
     val broadcaster = plugin.consoleBroadcaster
     val resumeAfterSeq = if (authMsg.epoch == broadcaster.epoch) authMsg.seq ?: -1 else -1
-    val actor = token.subject ?: "unknown"
+    val actor = token.subject
     val ip = call.request.origin.remoteAddress
 
     ConsoleSessions.add(this)
-    val expiryJob = launch { closeWhenExpired(token) }
-    val streamJob = launch { streamLogs(broadcaster, resumeAfterSeq) }
-
     try {
-        while (true) {
-            val msg = receiveMessage() ?: break
-            if (msg.payload.isBlank()) continue
-            when (msg.type) {
-                "command" -> {
-                    dispatchConsoleCommand(plugin, msg.payload)
-                    plugin.auditAsync("console_command", msg.payload, actor, ip)
-                }
-                "tab_complete" -> {
-                    val completions = tabComplete(plugin, msg.payload)
-                    send(Frame.Text(json.encodeToString(WsMessage("tab_complete", json.encodeToString(stringList, completions)))))
+        if (!sessionIsValid()) return close(UNAUTHORIZED)
+        val expiryJob = launch {
+            delay((expiresAt - System.currentTimeMillis()).coerceAtLeast(0))
+            close(UNAUTHORIZED)
+        }
+        val streamJob = launch { streamLogs(broadcaster, resumeAfterSeq) }
+        try {
+            while (true) {
+                val msg = receiveMessage() ?: break
+                if (!sessionIsValid()) return close(UNAUTHORIZED)
+                if (msg.payload.isBlank()) continue
+                when (msg.type) {
+                    "command" -> Bukkit.getScheduler().runTask(plugin, Runnable {
+                        if (!sessionIsValid()) return@Runnable
+                        TeletypeCommandOrigin.run { Bukkit.dispatchCommand(Bukkit.getConsoleSender(), msg.payload) }
+                        plugin.auditAsync("console_command", msg.payload, actor, ip)
+                    })
+                    "tab_complete" -> {
+                        val completions = tabComplete(plugin, msg.payload)
+                        send(Frame.Text(json.encodeToString(WsMessage("tab_complete", json.encodeToString(stringList, completions)))))
+                    }
                 }
             }
+        } finally {
+            streamJob.cancel()
+            expiryJob.cancel()
         }
     } finally {
-        streamJob.cancel()
-        expiryJob.cancel()
         ConsoleSessions.remove(this)
-        activeConsoleSockets.decrementAndGet()
     }
 }
 
@@ -101,12 +118,6 @@ private suspend fun DefaultWebSocketServerSession.receiveMessage(): WsMessage? {
         if (frame !is Frame.Text) continue
         runCatching { json.decodeFromString<WsMessage>(frame.readText()) }.getOrNull()?.let { return it }
     }
-}
-
-private suspend fun DefaultWebSocketServerSession.closeWhenExpired(token: DecodedJWT) {
-    val expiresAt = token.expiresAt?.time ?: return
-    delay((expiresAt - System.currentTimeMillis()).coerceAtLeast(0))
-    close(UNAUTHORIZED)
 }
 
 private suspend fun DefaultWebSocketServerSession.streamLogs(broadcaster: ConsoleBroadcaster, resumeAfterSeq: Long) {
@@ -126,12 +137,6 @@ private suspend fun DefaultWebSocketServerSession.streamLogs(broadcaster: Consol
         )
         send(Frame.Text(json.encodeToString(message)))
     }
-}
-
-private fun dispatchConsoleCommand(plugin: Teletype, command: String) {
-    Bukkit.getScheduler().runTask(plugin, Runnable {
-        TeletypeCommandOrigin.run { Bukkit.dispatchCommand(Bukkit.getConsoleSender(), command) }
-    })
 }
 
 private suspend fun tabComplete(plugin: Teletype, partial: String): List<String> =

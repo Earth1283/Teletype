@@ -5,6 +5,8 @@ import { IconCheck, IconCopy, TeletypeLogo } from '../Icons'
 
 interface Props { onAuth: () => void }
 
+interface ChallengeResponse { uuid: string; pollToken: string }
+
 export default function AuthSetup({ onAuth }: Props) {
   const [uuid, setUuid] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
@@ -12,27 +14,33 @@ export default function AuthSetup({ onAuth }: Props) {
   const [copied, setCopied] = useState(false)
   const [copyFailed, setCopyFailed] = useState(false)
   const [verified, setVerified] = useState(false)
-  const polling = useRef(false)
   const animFrame = useRef<ReturnType<typeof setTimeout> | null>(null)
   const copiedTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
   const handoffTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   useEffect(() => {
-    async function poll(id: string) {
-      while (polling.current) {
+    const controller = new AbortController()
+    const { signal } = controller
+
+    async function poll(id: string, pollToken: string) {
+      while (!signal.aborted) {
         try {
-          const res = await axios.get(`/api/auth/poll/${id}`)
+          const res = await axios.get(`/api/auth/poll/${id}`, {
+            headers: { Authorization: `Bearer ${pollToken}` },
+            signal,
+          })
+          if (signal.aborted) return
+          setError(null)
           if (res.data.status === 'verified' && res.data.token) {
             localStorage.setItem(TOKEN_KEY, res.data.token)
-            polling.current = false
             setVerified(true)
             handoffTimer.current = setTimeout(onAuth, handoffDelayMs())
             return
           }
         } catch (err) {
+          if (signal.aborted) return
           if (axios.isAxiosError(err)) {
             if (err.response?.status === 404) {
-              polling.current = false
               setError('Verification challenge expired or was already used. Refresh to create a new challenge.')
               return
             }
@@ -47,12 +55,11 @@ export default function AuthSetup({ onAuth }: Props) {
       }
     }
 
-    axios.post('/api/auth/challenge')
-      .then((res) => {
-        const id: string = res.data.uuid
+    axios.post<ChallengeResponse>('/api/auth/challenge', null, { signal })
+      .then(({ data: { uuid: id, pollToken } }) => {
+        if (signal.aborted) return
         setUuid(id)
-        polling.current = true
-        poll(id)
+        void poll(id, pollToken)
         // Typewriter reveal of the UUID
         let i = 0
         const reveal = () => {
@@ -62,10 +69,12 @@ export default function AuthSetup({ onAuth }: Props) {
         }
         animFrame.current = setTimeout(reveal, 200)
       })
-      .catch((err) => setError(authRequestError(err)))
+      .catch((err) => {
+        if (!signal.aborted) setError(authRequestError(err))
+      })
 
     return () => {
-      polling.current = false
+      controller.abort()
       if (animFrame.current) clearTimeout(animFrame.current)
       if (copiedTimer.current) clearTimeout(copiedTimer.current)
       if (handoffTimer.current) clearTimeout(handoffTimer.current)

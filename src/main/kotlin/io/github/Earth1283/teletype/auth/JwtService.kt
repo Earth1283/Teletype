@@ -10,7 +10,11 @@ import java.util.Date
 
 class JwtService(secret: String) {
     private val algorithm = Algorithm.HMAC256(secret)
-    val verifier: JWTVerifier = JWT.require(algorithm).withIssuer(ISSUER).build()
+    val verifier: JWTVerifier = JWT.require(algorithm)
+        .withIssuer(ISSUER)
+        .withClaim("exp") { claim, _ -> claim.asInstant() != null }
+        .withClaim("sub") { claim, _ -> !claim.asString().isNullOrBlank() }
+        .build()
 
     fun issueToken(subject: String, expiryMinutes: Long = 1440): String =
         JWT.create()

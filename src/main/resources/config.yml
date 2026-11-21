@@ -7,11 +7,12 @@ server:
   # HTTPS port (only used when tls.enabled: true).
   https-port: 8443
 
-  # Allowed CORS origins. Empty = allow all (fine for local/development/private use).
+  # Additional allowed browser origins for the API and console WebSocket.
+  # An empty list allows only the panel's own origin.
   # Example: ["https://panel.example.com", "http://localhost:3000"]
   cors-origins: []
 
-  # Cap on simultaneous authenticated WebSocket connections.
+  # Cap on simultaneous console WebSocket connections, including those awaiting login.
   max-websocket-connections: 8
 
   # Trust HTTPS/client IP headers from a reverse proxy or hosting panel.

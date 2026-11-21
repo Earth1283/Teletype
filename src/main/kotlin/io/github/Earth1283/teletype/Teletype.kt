@@ -38,7 +38,7 @@ class Teletype : JavaPlugin() {
     lateinit var teletypeConfig: TeletypeConfig
     lateinit var messages: MessageConfig
     lateinit var challengeStore: ChallengeStore
-    lateinit var jwtService: JwtService
+    @Volatile lateinit var jwtService: JwtService
     lateinit var consoleBroadcaster: ConsoleBroadcaster
     lateinit var metricsDatabase: MetricsDatabase
     lateinit var metricsCollector: MetricsCollector
@@ -64,7 +64,7 @@ class Teletype : JavaPlugin() {
         messages = MessageConfig(this).also { it.load() }
         startupLine("CONFIG", "Configuration loaded", "web=${bindSummary()}, tls=${enabled(teletypeConfig.tlsEnabled)}")
 
-        challengeStore = ChallengeStore(this)
+        challengeStore = ChallengeStore(ttlSeconds = { teletypeConfig.challengeTtlSeconds })
         jwtService = JwtService(teletypeConfig.jwtSecret)
         startupLine("AUTH", "JWT service initialized", "expiry=${teletypeConfig.jwtExpiryMinutes}m, require-op=${enabled(teletypeConfig.requireOp)}")
 
@@ -164,6 +164,7 @@ class Teletype : JavaPlugin() {
         saveConfig()
         teletypeConfig = TeletypeConfig(this)
         jwtService = JwtService(teletypeConfig.jwtSecret)
+        challengeStore.clear()
         if (::webServer.isInitialized) webServer.downloadTokens.clear()
         ConsoleSessions.closeAllUnauthorized(this)
     }
