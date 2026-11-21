@@ -1,0 +1,15 @@
+{
+  "executeLabel": "执行：{{command}}",
+  "sendToConsole": "发送到服务器控制台",
+  "categoryConsole": "控制台",
+  "runAgain": "再次运行",
+  "categoryRecent": "最近",
+  "categoryNavigate": "导航",
+  "categoryQuickActions": "快捷操作",
+  "categorySnippets": "片段",
+  "searchPlaceholder": "搜索命令、片段，或输入 run <cmd>…",
+  "noResults": "未找到与“{{query}}”匹配的结果",
+  "hintNavigate": "导航",
+  "hintRun": "运行",
+  "hintClose": "关闭"
+}

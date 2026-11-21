@@ -1,6 +1,7 @@
 import { Component, type ErrorInfo, type ReactNode } from 'react'
+import { withTranslation, type WithTranslation } from 'react-i18next'
 
-interface Props {
+interface Props extends WithTranslation {
   children: ReactNode
   label?: string
 }
@@ -9,7 +10,7 @@ interface State {
   error: Error | null
 }
 
-export class ErrorBoundary extends Component<Props, State> {
+class ErrorBoundaryBase extends Component<Props, State> {
   state: State = { error: null }
 
   static getDerivedStateFromError(error: Error): State {
@@ -24,16 +25,17 @@ export class ErrorBoundary extends Component<Props, State> {
 
   render() {
     const { error } = this.state
+    const { t } = this.props
     if (error) {
       return (
         <div className="error-boundary">
           <div className="error-boundary-icon">⚠</div>
           <div className="error-boundary-title">
-            {this.props.label ?? 'Something went wrong'}
+            {this.props.label ?? t('errors:genericTitle')}
           </div>
           <div className="error-boundary-detail">{error.message}</div>
           <button className="btn-ghost btn-sm" onClick={this.reset} style={{ marginTop: 8 }}>
-            Reload tab
+            {t('errors:reloadTab')}
           </button>
         </div>
       )
@@ -41,3 +43,5 @@ export class ErrorBoundary extends Component<Props, State> {
     return this.props.children
   }
 }
+
+export const ErrorBoundary = withTranslation('errors')(ErrorBoundaryBase)

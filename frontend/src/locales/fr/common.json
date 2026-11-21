@@ -1,0 +1,19 @@
+{
+  "ok": "OK",
+  "cancel": "Annuler",
+  "save": "Enregistrer",
+  "close": "Fermer",
+  "delete": "Supprimer",
+  "edit": "Modifier",
+  "confirm": "Confirmer",
+  "loading": "Chargement…",
+  "error": "Erreur",
+  "search": "Rechercher",
+  "yes": "Oui",
+  "no": "Non",
+  "back": "Retour",
+  "copy": "Copier",
+  "copied": "Copié",
+  "refresh": "Actualiser",
+  "retry": "Réessayer"
+}

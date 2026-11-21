@@ -1,7 +1,9 @@
 import { useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import { IconX } from '../Icons'
 
 export default function InsecureHttpBanner() {
+  const { t } = useTranslation('auth')
   const [dismissed, setDismissed] = useState(() => sessionStorage.getItem('teletype-insecure-http-dismissed') === 'true')
 
   if (window.location.protocol !== 'http:') return null
@@ -15,12 +17,10 @@ export default function InsecureHttpBanner() {
   return (
     <div className="insecure-http-banner" role="alert">
       <div className="insecure-http-banner-copy">
-        <strong>HTTP is not safe.</strong>
-        <span>
-          This Teletype session is not encrypted. People between your browser and host can read or change traffic.
-        </span>
+        <strong>{t('insecureHttp.title')}</strong>
+        <span>{t('insecureHttp.body')}</span>
       </div>
-      <button className="insecure-http-dismiss" type="button" aria-label="Dismiss HTTP warning" onClick={dismiss}>
+      <button className="insecure-http-dismiss" type="button" aria-label={t('insecureHttp.dismiss')} onClick={dismiss}>
         <IconX size={14} />
       </button>
     </div>

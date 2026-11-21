@@ -1,0 +1,16 @@
+{
+  "title": "键盘快捷键",
+  "groupGlobal": "全局",
+  "groupConsole": "控制台",
+  "groupContext": "上下文",
+  "showShortcuts": "显示键盘快捷键",
+  "openPalette": "打开命令面板",
+  "jumpToTab": "跳转到标签页（按侧边栏顺序）",
+  "jumpToSettings": "跳转到设置",
+  "closeDialog": "关闭对话框/覆盖层",
+  "navigateHistory": "浏览命令历史",
+  "tabComplete": "Tab 补全命令",
+  "focusSearch": "聚焦搜索栏",
+  "clearCompletions": "清除补全/关闭搜索",
+  "openContextWheel": "打开上下文轮盘（按住右键）"
+}

@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import {
   BarChart, Bar, LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid, LabelList,
@@ -100,6 +101,7 @@ function shortClass(name: string) {
 // ── Event Summary Modal ────────────────────────────────────────────────────────
 
 function EventSummaryModal({ recording, onClose }: { recording: JfrRecording; onClose: () => void }) {
+  const { t } = useTranslation(['profiling', 'common'])
   const { data: profile, isLoading, error } = useQuery<ParsedProfile>({
     queryKey: ['jfr-events', recording.id],
     queryFn: () => api.get(`/profiling/recording/${recording.id}/events`).then(r => r.data),
@@ -110,21 +112,21 @@ function EventSummaryModal({ recording, onClose }: { recording: JfrRecording; on
     <div className="modal-overlay" onClick={e => e.target === e.currentTarget && onClose()}>
       <div className="prof-event-modal">
         <div className="modal-title">
-          <span>Event Summary — {recording.name}</span>
+          <span>{t('eventModal.title', { name: recording.name })}</span>
           <button className="btn-ghost btn-xs" onClick={onClose}><IconX size={12} /></button>
         </div>
 
         {isLoading && (
           <div className="prof-events-loading">
             <IconFlightRecorder size={28} />
-            <span>Parsing JFR events…</span>
-            <span style={{ color: 'var(--ghost)', fontSize: '12px' }}>Large files may take a moment</span>
+            <span>{t('eventModal.parsingEvents')}</span>
+            <span style={{ color: 'var(--ghost)', fontSize: '12px' }}>{t('eventModal.largeFileHint')}</span>
           </div>
         )}
 
         {error && (
           <div style={{ color: 'var(--red)', fontSize: '13px', padding: '24px 0', textAlign: 'center' }}>
-            {apiError(error, 'Failed to parse recording')}
+            {apiError(error, t('eventModal.failedToParse'))}
           </div>
         )}
 
@@ -132,25 +134,25 @@ function EventSummaryModal({ recording, onClose }: { recording: JfrRecording; on
           <div className="prof-event-body">
             <div className="prof-event-stats">
               <div className="prof-stat-chip">
-                <span className="prof-stat-label">Duration</span>
+                <span className="prof-stat-label">{t('eventModal.duration')}</span>
                 <span className="prof-stat-value">{fmtDuration(profile.durationMs)}</span>
               </div>
               <div className="prof-stat-chip">
-                <span className="prof-stat-label">GC Pauses</span>
+                <span className="prof-stat-label">{t('eventModal.gcPauses')}</span>
                 <span className="prof-stat-value">{profile.gcPauses.length}</span>
               </div>
               <div className="prof-stat-chip">
-                <span className="prof-stat-label">Peak Threads</span>
+                <span className="prof-stat-label">{t('eventModal.peakThreads')}</span>
                 <span className="prof-stat-value">{profile.threadCount || '—'}</span>
               </div>
               {profile.heapSummary && (
                 <>
                   <div className="prof-stat-chip">
-                    <span className="prof-stat-label">Heap Used</span>
+                    <span className="prof-stat-label">{t('eventModal.heapUsed')}</span>
                     <span className="prof-stat-value">{profile.heapSummary.usedMb.toFixed(0)} MB</span>
                   </div>
                   <div className="prof-stat-chip">
-                    <span className="prof-stat-label">Heap Reserved</span>
+                    <span className="prof-stat-label">{t('eventModal.heapReserved')}</span>
                     <span className="prof-stat-value">{profile.heapSummary.reservedMb.toFixed(0)} MB</span>
                   </div>
                 </>
@@ -159,7 +161,7 @@ function EventSummaryModal({ recording, onClose }: { recording: JfrRecording; on
 
             {profile.cpuSamples.length > 0 && (
               <div className="prof-event-section">
-                <div className="prof-event-section-title">CPU Load</div>
+                <div className="prof-event-section-title">{t('eventModal.cpuLoad')}</div>
                 <ResponsiveContainer width="100%" height={120}>
                   <LineChart data={profile.cpuSamples.filter((_, i) => i % Math.max(1, Math.floor(profile.cpuSamples.length / 120)) === 0)}>
                     <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" vertical={false} />
@@ -177,7 +179,7 @@ function EventSummaryModal({ recording, onClose }: { recording: JfrRecording; on
                           <div style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 6, padding: '6px 10px', fontSize: 12 }}>
                             {payload.map(p => (
                               <div key={String(p.dataKey)} style={{ color: p.color }}>
-                                {p.dataKey === 'machineTotal' ? 'System' : 'JVM'}: {(Number(p.value || 0) * 100).toFixed(1)}%
+                                {p.dataKey === 'machineTotal' ? t('eventModal.systemLabel') : t('eventModal.jvmLabel')}: {(Number(p.value || 0) * 100).toFixed(1)}%
                               </div>
                             ))}
                           </div>
@@ -189,15 +191,15 @@ function EventSummaryModal({ recording, onClose }: { recording: JfrRecording; on
                   </LineChart>
                 </ResponsiveContainer>
                 <div style={{ display: 'flex', gap: 12, fontSize: 11, color: 'var(--mist)', marginTop: 4 }}>
-                  <span><span style={{ color: 'var(--amber)' }}>——</span> JVM user</span>
-                  <span><span style={{ color: 'var(--mist)' }}>——</span> System total</span>
+                  <span><span style={{ color: 'var(--amber)' }}>——</span> {t('eventModal.jvmUserLegend')}</span>
+                  <span><span style={{ color: 'var(--mist)' }}>——</span> {t('eventModal.systemTotalLegend')}</span>
                 </div>
               </div>
             )}
 
             {profile.gcPauses.length > 0 && (
               <div className="prof-event-section">
-                <div className="prof-event-section-title">GC Pauses ({profile.gcPauses.length} events)</div>
+                <div className="prof-event-section-title">{t('eventModal.gcPausesTitle', { count: profile.gcPauses.length })}</div>
                 <ResponsiveContainer width="100%" height={110}>
                   <BarChart
                     data={profile.gcPauses.filter((_, i) => i % Math.max(1, Math.floor(profile.gcPauses.length / 200)) === 0)}
@@ -215,7 +217,7 @@ function EventSummaryModal({ recording, onClose }: { recording: JfrRecording; on
                         if (!active || !payload?.length) return null
                         return (
                           <div style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 6, padding: '6px 10px', fontSize: 12, color: 'var(--ash)' }}>
-                            Pause: {Number(payload[0]?.value || 0).toFixed(2)}ms
+                            {t('eventModal.pauseTooltip', { value: Number(payload[0]?.value || 0).toFixed(2) })}
                           </div>
                         )
                       }}
@@ -224,8 +226,8 @@ function EventSummaryModal({ recording, onClose }: { recording: JfrRecording; on
                   </BarChart>
                 </ResponsiveContainer>
                 <div style={{ fontSize: 11, color: 'var(--ghost)', marginTop: 4 }}>
-                  Total pause time: {fmtMs(profile.gcPauses.reduce((s, p) => s + p.durationMs, 0))}
-                  {' · '}Max pause: {fmtMs(Math.max(...profile.gcPauses.map(p => p.durationMs)))}
+                  {t('eventModal.totalPauseTime', { value: fmtMs(profile.gcPauses.reduce((s, p) => s + p.durationMs, 0)) })}
+                  {' · '}{t('eventModal.maxPause', { value: fmtMs(Math.max(...profile.gcPauses.map(p => p.durationMs))) })}
                 </div>
               </div>
             )}
@@ -234,7 +236,7 @@ function EventSummaryModal({ recording, onClose }: { recording: JfrRecording; on
               const topLocks = profile.topLocks.slice(0, 10).map(l => ({ ...l, shortName: shortClass(l.className) }))
               return (
                 <div className="prof-event-section">
-                  <div className="prof-event-section-title">Top Lock Contention</div>
+                  <div className="prof-event-section-title">{t('eventModal.topLockContention')}</div>
                   <ResponsiveContainer width="100%" height={Math.max(90, topLocks.length * 26)}>
                     <BarChart layout="vertical" data={topLocks} margin={{ top: 4, right: 52, bottom: 4, left: 4 }}>
                       <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" horizontal={false} />
@@ -254,7 +256,7 @@ function EventSummaryModal({ recording, onClose }: { recording: JfrRecording; on
                           return (
                             <div className="rounded-sm border border-border bg-surface px-2.5 py-1.5 font-mono text-[11px] text-text-primary">
                               <div className="mb-0.5" title={d.className}>{d.shortName}</div>
-                              <div className="text-text-muted">{fmtMs(d.totalBlockedMs)} · {d.count.toLocaleString()} events</div>
+                              <div className="text-text-muted">{t('eventModal.lockEventsCount', { value: fmtMs(d.totalBlockedMs), count: d.count.toLocaleString() })}</div>
                             </div>
                           )
                         }}
@@ -271,14 +273,14 @@ function EventSummaryModal({ recording, onClose }: { recording: JfrRecording; on
                   </ResponsiveContainer>
                   <details className="mt-2">
                     <summary className="cursor-pointer font-mono text-[10px] uppercase tracking-wide text-text-muted hover:text-text-secondary">
-                      View exact counts
+                      {t('eventModal.viewExactCounts')}
                     </summary>
                     <table className="prof-lock-table mt-1.5">
                       <thead>
                         <tr>
-                          <th>Class</th>
-                          <th>Total Blocked</th>
-                          <th>Count</th>
+                          <th>{t('eventModal.classHeader')}</th>
+                          <th>{t('eventModal.totalBlockedHeader')}</th>
+                          <th>{t('eventModal.countHeader')}</th>
                         </tr>
                       </thead>
                       <tbody>
@@ -298,14 +300,14 @@ function EventSummaryModal({ recording, onClose }: { recording: JfrRecording; on
 
             {profile.gcPauses.length === 0 && profile.cpuSamples.length === 0 && profile.topLocks.length === 0 && (
               <div style={{ color: 'var(--ghost)', fontSize: 13, padding: '16px 0', textAlign: 'center' }}>
-                No event data found — recording may use a template that does not include these event types.
+                {t('eventModal.noEventData')}
               </div>
             )}
           </div>
         )}
 
         <div className="modal-footer">
-          <button className="btn-ghost" onClick={onClose}>Close</button>
+          <button className="btn-ghost" onClick={onClose}>{t('common:close')}</button>
         </div>
       </div>
     </div>
@@ -318,6 +320,7 @@ function StartRecordingModal({ onClose, onStart }: {
   onClose: () => void
   onStart: (req: { name: string; template: string; maxDurationSec: number; maxSizeMb: number }) => void
 }) {
+  const { t } = useTranslation(['profiling', 'common'])
   const [form, setForm] = useState({ name: '', template: 'default', maxDurationSec: 60, maxSizeMb: 0 })
 
   const set = <K extends keyof typeof form>(k: K, v: typeof form[K]) =>
@@ -327,35 +330,35 @@ function StartRecordingModal({ onClose, onStart }: {
     <div className="modal-overlay" onClick={e => e.target === e.currentTarget && onClose()}>
       <div className="modal-card">
         <div className="modal-title">
-          Start Manual Recording
+          {t('startModal.title')}
           <button className="btn-ghost btn-xs" onClick={onClose}><IconX size={12} /></button>
         </div>
 
         <div className="modal-field">
-          <div className="modal-label">Name</div>
+          <div className="modal-label">{t('startModal.nameLabel')}</div>
           <input
             className="modal-input"
-            placeholder="e.g. lag-spike-diagnosis"
+            placeholder={t('startModal.namePlaceholder')}
             value={form.name}
             onChange={e => set('name', e.target.value)}
           />
         </div>
 
         <div className="modal-field">
-          <div className="modal-label">Template</div>
+          <div className="modal-label">{t('startModal.templateLabel')}</div>
           <select
             className="modal-select modal-select-full"
             value={form.template}
             onChange={e => set('template', e.target.value)}
           >
-            <option value="default">default — low overhead (&lt;1%)</option>
-            <option value="profile">profile — detailed (~2-5% overhead)</option>
+            <option value="default">{t('startModal.templateDefaultOption')}</option>
+            <option value="profile">{t('startModal.templateProfileOption')}</option>
           </select>
         </div>
 
         <div style={{ display: 'flex', gap: 12 }}>
           <div className="modal-field" style={{ flex: 1 }}>
-            <div className="modal-label">Max Duration (sec)</div>
+            <div className="modal-label">{t('startModal.maxDurationLabel')}</div>
             <input
               className="modal-input mono-input"
               type="number"
@@ -364,10 +367,10 @@ function StartRecordingModal({ onClose, onStart }: {
               value={form.maxDurationSec}
               onChange={e => set('maxDurationSec', Number(e.target.value))}
             />
-            <div className="prof-field-hint">0 = no limit</div>
+            <div className="prof-field-hint">{t('startModal.noLimitHint')}</div>
           </div>
           <div className="modal-field" style={{ flex: 1 }}>
-            <div className="modal-label">Max Size (MB)</div>
+            <div className="modal-label">{t('startModal.maxSizeLabel')}</div>
             <input
               className="modal-input mono-input"
               type="number"
@@ -376,14 +379,14 @@ function StartRecordingModal({ onClose, onStart }: {
               value={form.maxSizeMb}
               onChange={e => set('maxSizeMb', Number(e.target.value))}
             />
-            <div className="prof-field-hint">0 = no limit</div>
+            <div className="prof-field-hint">{t('startModal.noLimitHint')}</div>
           </div>
         </div>
 
         <div className="modal-footer">
-          <button className="btn-ghost" onClick={onClose}>Cancel</button>
+          <button className="btn-ghost" onClick={onClose}>{t('common:cancel')}</button>
           <button className="btn-primary" onClick={() => { onStart(form); onClose() }}>
-            Start Recording
+            {t('startModal.startButton')}
           </button>
         </div>
       </div>
@@ -398,6 +401,7 @@ function ContinuousConfigModal({ current, onClose, onApply }: {
   onClose: () => void
   onApply: (cfg: { maxDiskMb: number; maxAgeSec: number; template: string; dumpOnExit: boolean }) => void
 }) {
+  const { t } = useTranslation(['profiling', 'common'])
   const [form, setForm] = useState({
     maxDiskMb: current.maxDiskMb,
     maxAgeSec: current.maxAgeSec,
@@ -412,25 +416,25 @@ function ContinuousConfigModal({ current, onClose, onApply }: {
     <div className="modal-overlay" onClick={e => e.target === e.currentTarget && onClose()}>
       <div className="modal-card">
         <div className="modal-title">
-          Configure Continuous Recording
+          {t('configModal.title')}
           <button className="btn-ghost btn-xs" onClick={onClose}><IconX size={12} /></button>
         </div>
 
         <div className="modal-field">
-          <div className="modal-label">Template</div>
+          <div className="modal-label">{t('configModal.templateLabel')}</div>
           <select
             className="modal-select modal-select-full"
             value={form.template}
             onChange={e => set('template', e.target.value)}
           >
-            <option value="default">default — low overhead (&lt;1%)</option>
-            <option value="profile">profile — detailed (~2-5% overhead)</option>
+            <option value="default">{t('configModal.templateDefaultOption')}</option>
+            <option value="profile">{t('configModal.templateProfileOption')}</option>
           </select>
         </div>
 
         <div style={{ display: 'flex', gap: 12 }}>
           <div className="modal-field" style={{ flex: 1 }}>
-            <div className="modal-label">Max Disk (MB)</div>
+            <div className="modal-label">{t('configModal.maxDiskLabel')}</div>
             <input
               className="modal-input mono-input"
               type="number"
@@ -442,7 +446,7 @@ function ContinuousConfigModal({ current, onClose, onApply }: {
             />
           </div>
           <div className="modal-field" style={{ flex: 1 }}>
-            <div className="modal-label">Max Age (sec)</div>
+            <div className="modal-label">{t('configModal.maxAgeLabel')}</div>
             <input
               className="modal-input mono-input"
               type="number"
@@ -462,20 +466,19 @@ function ContinuousConfigModal({ current, onClose, onApply }: {
               onChange={e => set('dumpOnExit', e.target.checked)}
             />
             <span style={{ fontSize: '12.5px', color: 'var(--ash)' }}>
-              Dump to disk on JVM exit (crash protection)
+              {t('configModal.dumpOnExitLabel')}
             </span>
           </label>
         </div>
 
         <div style={{ fontSize: 11.5, color: 'var(--ghost)', marginBottom: 16, lineHeight: 1.5 }}>
-          Changes take effect immediately — the continuous recording restarts with the new settings.
-          Unsaved buffer data is lost.
+          {t('configModal.restartNotice')}
         </div>
 
         <div className="modal-footer">
-          <button className="btn-ghost" onClick={onClose}>Cancel</button>
+          <button className="btn-ghost" onClick={onClose}>{t('common:cancel')}</button>
           <button className="btn-primary" onClick={() => { onApply(form); onClose() }}>
-            Apply &amp; Restart
+            {t('configModal.applyButton')}
           </button>
         </div>
       </div>
@@ -486,6 +489,7 @@ function ContinuousConfigModal({ current, onClose, onApply }: {
 // ── Main Page ─────────────────────────────────────────────────────────────────
 
 export default function ProfilingPage() {
+  const { t } = useTranslation(['profiling', 'common'])
   const qc = useQueryClient()
   const toast = useToast()
   const [viewEvents, setViewEvents] = useState<JfrRecording | null>(null)
@@ -513,43 +517,43 @@ export default function ProfilingPage() {
 
   const startContinuousMut = useMutation({
     mutationFn: (req: object) => api.post('/profiling/continuous/start', req),
-    onSuccess: () => { invalidate(); toast.success('Continuous recording started') },
-    onError: (e: unknown) => toast.error(apiError(e, 'Failed to start recording')),
+    onSuccess: () => { invalidate(); toast.success(t('toastContinuousStarted')) },
+    onError: (e: unknown) => toast.error(apiError(e, t('toastStartFailed'))),
   })
 
   const stopContinuousMut = useMutation({
     mutationFn: () => api.post('/profiling/continuous/stop'),
-    onSuccess: () => { invalidate(); toast.success('Continuous recording stopped') },
-    onError: (e: unknown) => toast.error(apiError(e, 'Failed to stop recording')),
+    onSuccess: () => { invalidate(); toast.success(t('toastContinuousStopped')) },
+    onError: (e: unknown) => toast.error(apiError(e, t('toastStopFailed'))),
   })
 
   const dumpMut = useMutation({
     mutationFn: (name: string) => api.post('/profiling/continuous/dump', { name }),
-    onSuccess: () => { invalidate(); toast.success('Buffer dumped to disk'); setDumpName('') },
-    onError: (e: unknown) => toast.error(apiError(e, 'Failed to dump buffer')),
+    onSuccess: () => { invalidate(); toast.success(t('toastBufferDumped')); setDumpName('') },
+    onError: (e: unknown) => toast.error(apiError(e, t('toastDumpFailed'))),
   })
 
   const startNamedMut = useMutation({
     mutationFn: (req: object) => api.post('/profiling/recording/start', req),
-    onSuccess: () => { invalidate(); toast.success('Recording started') },
-    onError: (e: unknown) => toast.error(apiError(e, 'Failed to start recording')),
+    onSuccess: () => { invalidate(); toast.success(t('toastRecordingStarted')) },
+    onError: (e: unknown) => toast.error(apiError(e, t('toastStartFailed'))),
   })
 
   const stopNamedMut = useMutation({
     mutationFn: (id: string) => api.post(`/profiling/recording/${id}/stop`),
-    onSuccess: () => { invalidate(); toast.success('Recording stopped') },
-    onError: (e: unknown) => toast.error(apiError(e, 'Failed to stop recording')),
+    onSuccess: () => { invalidate(); toast.success(t('toastRecordingStopped')) },
+    onError: (e: unknown) => toast.error(apiError(e, t('toastStopFailed'))),
   })
 
   const deleteMut = useMutation({
     mutationFn: (id: string) => api.delete(`/profiling/recording/${id}`),
-    onSuccess: () => { setDeletingId(null); invalidate(); toast.success('Recording deleted') },
-    onError: (e: unknown) => toast.error(apiError(e, 'Failed to delete recording')),
+    onSuccess: () => { setDeletingId(null); invalidate(); toast.success(t('toastRecordingDeleted')) },
+    onError: (e: unknown) => toast.error(apiError(e, t('toastDeleteFailed'))),
   })
 
   const handleDownload = (rec: JfrRecording) => {
     downloadViaToken(`/profiling/recording/${rec.id}/download-token`)
-      .catch(() => toast.error('Failed to download recording'))
+      .catch(() => toast.error(t('toastDownloadFailed')))
   }
 
 
@@ -568,18 +572,17 @@ export default function ProfilingPage() {
       <div className="prof-header">
         <div className="prof-title-row">
           <IconFlightRecorder size={16} />
-          <span className="prof-title">Profiling</span>
+          <span className="prof-title">{t('pageTitle')}</span>
           {!isLoading && (
             <span className={`prof-avail-pill ${jfrOk ? 'ok' : 'unavail'}`}>
               <span className="prof-avail-dot" />
-              {jfrOk ? 'JFR available' : 'JFR unavailable'}
+              {jfrOk ? t('jfrAvailable') : t('jfrUnavailable')}
             </span>
           )}
         </div>
         {!jfrOk && !statusLoading && (
           <div className="prof-banner prof-banner-warn">
-            Java Flight Recorder is not available on this JVM. JFR requires HotSpot JDK 9 or later.
-            All recording endpoints are disabled.
+            {t('jfrUnavailableBanner')}
           </div>
         )}
       </div>
@@ -587,30 +590,30 @@ export default function ProfilingPage() {
       {/* ── Continuous Recording ─────────────────────────── */}
       <div className="prof-section">
         <div className="prof-section-header">
-          <span className="prof-section-title">Continuous Recording</span>
+          <span className="prof-section-title">{t('continuousRecordingTitle')}</span>
           <span className={`prof-status-pill ${contRunning ? 'running' : 'stopped'}`}>
             <span className="prof-status-dot" />
-            {contRunning ? 'recording' : 'stopped'}
+            {contRunning ? t('statusRecording') : t('statusStopped')}
           </span>
         </div>
 
         {cfg && (
           <div className="prof-cfg-grid">
             <div className="prof-cfg-item">
-              <span className="prof-cfg-label">Max Disk</span>
+              <span className="prof-cfg-label">{t('maxDisk')}</span>
               <span className="prof-cfg-val">{cfg.maxDiskMb} MB</span>
             </div>
             <div className="prof-cfg-item">
-              <span className="prof-cfg-label">Max Age</span>
+              <span className="prof-cfg-label">{t('maxAge')}</span>
               <span className="prof-cfg-val">{fmtDuration(cfg.maxAgeSec * 1000)}</span>
             </div>
             <div className="prof-cfg-item">
-              <span className="prof-cfg-label">Template</span>
+              <span className="prof-cfg-label">{t('template')}</span>
               <span className="prof-cfg-val">{cfg.template}</span>
             </div>
             <div className="prof-cfg-item">
-              <span className="prof-cfg-label">Dump on Exit</span>
-              <span className="prof-cfg-val">{cfg.dumpOnExit ? 'yes' : 'no'}</span>
+              <span className="prof-cfg-label">{t('dumpOnExit')}</span>
+              <span className="prof-cfg-val">{cfg.dumpOnExit ? t('common:yes') : t('common:no')}</span>
             </div>
             {recInfo && (() => {
               const usedMb = recInfo.totalSizeBytes / 1_048_576
@@ -618,7 +621,7 @@ export default function ProfilingPage() {
               const color = pct > 0.9 ? 'var(--status-critical)' : pct > 0.75 ? 'var(--status-serious)' : pct > 0.5 ? 'var(--status-warning)' : 'var(--status-good)'
               return (
                 <div className="prof-cfg-item">
-                  <span className="prof-cfg-label">Total Saved</span>
+                  <span className="prof-cfg-label">{t('totalSaved')}</span>
                   <span className="prof-cfg-val">{fmtBytes(recInfo.totalSizeBytes)} / {recInfo.maxTotalDiskMb} MB</span>
                   <div className="mt-1.5 h-1 w-full overflow-hidden rounded-full bg-border/50">
                     <div className="h-full rounded-full" style={{ width: `${pct * 100}%`, background: color }} />
@@ -636,7 +639,7 @@ export default function ProfilingPage() {
               disabled={!jfrOk || startContinuousMut.isPending}
               onClick={() => startContinuousMut.mutate({})}
             >
-              <IconPlay size={12} /> Start
+              <IconPlay size={12} /> {t('startButton')}
             </button>
           ) : (
             <button
@@ -644,7 +647,7 @@ export default function ProfilingPage() {
               disabled={stopContinuousMut.isPending}
               onClick={() => stopContinuousMut.mutate()}
             >
-              Stop
+              {t('stopButton')}
             </button>
           )}
 
@@ -653,13 +656,13 @@ export default function ProfilingPage() {
             disabled={!jfrOk || !cfg}
             onClick={() => setShowConfigModal(true)}
           >
-            Configure
+            {t('configureButton')}
           </button>
 
           <div className="prof-dump-row">
             <input
               className="modal-input prof-dump-input"
-              placeholder="Dump name (optional)"
+              placeholder={t('dumpNamePlaceholder')}
               value={dumpName}
               onChange={e => setDumpName(e.target.value)}
               disabled={!contRunning}
@@ -668,9 +671,9 @@ export default function ProfilingPage() {
               className="btn-ghost btn-sm"
               disabled={!contRunning || dumpMut.isPending}
               onClick={() => dumpMut.mutate(dumpName)}
-              title="Snapshot the rolling buffer to disk now"
+              title={t('dumpNowTitle')}
             >
-              <IconDownload size={12} /> Dump Now
+              <IconDownload size={12} /> {t('dumpNowButton')}
             </button>
           </div>
         </div>
@@ -679,18 +682,18 @@ export default function ProfilingPage() {
       {/* ── Manual Recording ─────────────────────────────── */}
       <div className="prof-section">
         <div className="prof-section-header">
-          <span className="prof-section-title">Manual Recordings</span>
+          <span className="prof-section-title">{t('manualRecordingsTitle')}</span>
           <button
             className="btn-primary btn-sm"
             disabled={!jfrOk}
             onClick={() => setShowStartModal(true)}
           >
-            + New Recording
+            {t('newRecordingButton')}
           </button>
         </div>
 
         {activeRecordings.length === 0 ? (
-          <div className="prof-empty-hint">No recordings currently running.</div>
+          <div className="prof-empty-hint">{t('noRecordingsRunning')}</div>
         ) : (
           <div className="prof-active-list">
             {activeRecordings.map(rec => (
@@ -698,18 +701,18 @@ export default function ProfilingPage() {
                 <div className="prof-active-info">
                   <span className="prof-active-name">{rec.name}</span>
                   <span className="prof-active-meta">
-                    {rec.template} · started {fmtTime(rec.startTimeMs)}
+                    {t('activeMeta', { template: rec.template, time: fmtTime(rec.startTimeMs) })}
                   </span>
                 </div>
                 <span className="prof-status-pill running" style={{ marginLeft: 'auto' }}>
-                  <span className="prof-status-dot" />recording
+                  <span className="prof-status-dot" />{t('statusRecording')}
                 </span>
                 <button
                   className="btn-ghost btn-sm"
                   disabled={stopNamedMut.isPending}
                   onClick={() => stopNamedMut.mutate(rec.id)}
                 >
-                  Stop
+                  {t('stopButton')}
                 </button>
               </div>
             ))}
@@ -720,24 +723,24 @@ export default function ProfilingPage() {
       {/* ── Saved Recordings ─────────────────────────────── */}
       <div className="prof-section prof-section-grow">
         <div className="prof-section-header">
-          <span className="prof-section-title">Saved Recordings</span>
+          <span className="prof-section-title">{t('savedRecordingsTitle')}</span>
           <button
             className="btn-ghost btn-xs"
             onClick={invalidate}
-            title="Refresh"
+            title={t('common:refresh')}
           >
             <IconRefresh size={12} />
           </button>
         </div>
 
         {recsLoading && savedRecordings.length === 0 ? (
-          <div className="prof-empty-hint">Loading…</div>
+          <div className="prof-empty-hint">{t('common:loading')}</div>
         ) : savedRecordings.length === 0 ? (
           <div className="prof-empty-state">
             <IconFlightRecorder size={28} />
-            <span>No saved recordings</span>
+            <span>{t('noSavedRecordings')}</span>
             <span style={{ color: 'var(--ghost)', fontSize: 12 }}>
-              Dump the buffer or stop a manual recording to see it here
+              {t('noSavedRecordingsHint')}
             </span>
           </div>
         ) : (
@@ -756,8 +759,8 @@ export default function ProfilingPage() {
                     {manualBytes > 0 && <div className="rounded-r-full" style={{ width: `${100 - dumpPct}%`, background: 'var(--chart-cat-2)' }} />}
                   </div>
                   <span className="flex shrink-0 items-center gap-3 whitespace-nowrap font-mono text-[10px] text-text-muted">
-                    <span className="flex items-center gap-1.5"><span className="h-2 w-2 rounded-full" style={{ background: 'var(--chart-cat-1)' }} />dump {fmtBytes(dumpBytes)}</span>
-                    <span className="flex items-center gap-1.5"><span className="h-2 w-2 rounded-full" style={{ background: 'var(--chart-cat-2)' }} />manual {fmtBytes(manualBytes)}</span>
+                    <span className="flex items-center gap-1.5"><span className="h-2 w-2 rounded-full" style={{ background: 'var(--chart-cat-1)' }} />{t('dumpLegend', { size: fmtBytes(dumpBytes) })}</span>
+                    <span className="flex items-center gap-1.5"><span className="h-2 w-2 rounded-full" style={{ background: 'var(--chart-cat-2)' }} />{t('manualLegend', { size: fmtBytes(manualBytes) })}</span>
                   </span>
                 </div>
               )
@@ -765,12 +768,12 @@ export default function ProfilingPage() {
             <table className="prof-table">
               <thead>
                 <tr>
-                  <th>Name</th>
-                  <th>Type</th>
-                  <th>Started</th>
-                  <th>Duration</th>
-                  <th>Size</th>
-                  <th>Template</th>
+                  <th>{t('tableName')}</th>
+                  <th>{t('tableType')}</th>
+                  <th>{t('tableStarted')}</th>
+                  <th>{t('tableDuration')}</th>
+                  <th>{t('tableSize')}</th>
+                  <th>{t('tableTemplate')}</th>
                   <th></th>
                 </tr>
               </thead>
@@ -782,7 +785,7 @@ export default function ProfilingPage() {
                     </td>
                     <td>
                       <span className={`prof-type-badge ${rec.type === 'CONTINUOUS_DUMP' ? 'dump' : 'manual'}`}>
-                        {rec.type === 'CONTINUOUS_DUMP' ? 'dump' : 'manual'}
+                        {rec.type === 'CONTINUOUS_DUMP' ? t('typeDump') : t('typeManual')}
                       </span>
                     </td>
                     <td>
@@ -803,14 +806,14 @@ export default function ProfilingPage() {
                       <div className="net-actions">
                         <button
                           className="btn-ghost btn-xs"
-                          title="View event summary"
+                          title={t('viewEventSummaryTitle')}
                           onClick={() => setViewEvents(rec)}
                         >
-                          View
+                          {t('viewButton')}
                         </button>
                         <button
                           className="btn-ghost btn-xs"
-                          title="Download .jfr file"
+                          title={t('downloadTitle')}
                           onClick={() => handleDownload(rec)}
                         >
                           <IconDownload size={12} />
@@ -822,7 +825,7 @@ export default function ProfilingPage() {
                               style={{ color: 'var(--red)' }}
                               onClick={() => deleteMut.mutate(rec.id)}
                             >
-                              Confirm
+                              {t('common:confirm')}
                             </button>
                             <button className="btn-ghost btn-xs" onClick={() => setDeletingId(null)}>
                               <IconX size={10} />
@@ -831,7 +834,7 @@ export default function ProfilingPage() {
                         ) : (
                           <button
                             className="btn-ghost btn-xs"
-                            title="Delete recording"
+                            title={t('deleteTitle')}
                             onClick={() => setDeletingId(rec.id)}
                           >
                             <IconTrash size={12} />

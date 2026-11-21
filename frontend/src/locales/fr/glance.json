@@ -1,0 +1,51 @@
+{
+  "metricLabel.tps": "TPS",
+  "metricLabel.tick": "Tick",
+  "metricLabel.mem": "Mém.",
+  "metricLabel.cpu": "CPU",
+
+  "heuristic.tpsNearFreeze": "Serveur proche du gel",
+  "heuristic.tpsSignificantLag": "Événement de lag important",
+  "heuristic.tpsBelowTarget": "TPS sous l'objectif",
+  "heuristic.mainThreadStalled": "Thread principal bloqué",
+  "heuristic.serverLagSpike": "Pic de lag serveur",
+  "heuristic.memPressureCritical": "Pression mémoire critique",
+  "heuristic.memSurgeDetected": "Pic de mémoire détecté",
+  "heuristic.hostCpuSaturated": "CPU hôte saturé",
+  "heuristic.hostCpuSpike": "Pic de CPU hôte",
+
+  "nearestLog": "log le plus proche",
+  "jumpToLog": "aller au log →",
+  "gcHint": "Les marqueurs GC sont des événements JMX de la JVM. Les fenêtres courtes affichent la durée.",
+  "focusLabel": "focus",
+  "gcDurationLabel": "GC {{duration}}",
+
+  "speedo.tps1m": "TPS 1m",
+  "speedo.tickTime": "Temps de tick",
+  "speedo.memory": "Mémoire",
+  "speedo.cpu": "CPU",
+  "speedo.sysRam": "RAM système",
+  "speedo.disk": "Disque",
+  "speedo.uptime": "Disponibilité",
+  "speedo.tickGood": "< {{value}}ms bon",
+
+  "logPanel.collapse": "Réduire le panneau de logs",
+  "logPanel.expand": "Développer le panneau de logs",
+  "logPanel.errorsTitle": "Erreurs",
+  "logPanel.logsTitle": "Logs",
+  "logPanel.clearHighlight": "Effacer le surlignage",
+  "logPanel.filterToWarnings": "Filtrer sur avertissements/erreurs",
+  "logPanel.showAllLogs": "Afficher tous les logs",
+  "logPanel.errorsToggle": "erreurs",
+  "logPanel.allToggle": "tout",
+  "logPanel.waitingForLogs": "en attente de logs…",
+  "logPanel.noWarningsOrErrors": "aucun avertissement ni erreur",
+
+  "errorBanner.failedToFetch": "⚠ Échec de la récupération des métriques",
+  "statusBar.up": "actif depuis {{uptime}}",
+  "statusBar.showLogPanel": "Afficher le panneau de logs",
+  "statusBar.logsButton": "logs",
+
+  "emptyState.waitingForMetrics": "En attente des métriques…",
+  "chartTitle.hostCpu": "CPU hôte"
+}

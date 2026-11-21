@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react'
+import { useTranslation } from 'react-i18next'
 import {
   ContextMenuContext,
   type ContextMenuItem,
@@ -21,6 +22,7 @@ function actionableItems(items: ContextMenuItem[]) {
 }
 
 export function ContextMenuProvider({ children }: { children: ReactNode }) {
+  const { t } = useTranslation('contextMenu')
   const { settings } = useSettings()
   const [menu, setMenu] = useState<ContextMenuState | null>(null)
   const [wheel, setWheel] = useState<ContextWheelState | null>(null)
@@ -282,7 +284,7 @@ export function ContextMenuProvider({ children }: { children: ReactNode }) {
           onMouseDown={event => event.stopPropagation()}
           onContextMenu={event => event.preventDefault()}
         >
-          <button className="ctx-wheel-center" onClick={closeContextMenu} title="Close context wheel">
+          <button className="ctx-wheel-center" onClick={closeContextMenu} title={t('contextMenu:closeContextWheel')}>
             ×
           </button>
           {wheel.items.map((item, index) => {

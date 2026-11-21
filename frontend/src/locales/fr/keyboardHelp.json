@@ -1,0 +1,16 @@
+{
+  "title": "Raccourcis clavier",
+  "groupGlobal": "Global",
+  "groupConsole": "Console",
+  "groupContext": "Contexte",
+  "showShortcuts": "Afficher les raccourcis clavier",
+  "openPalette": "Ouvrir la palette de commandes",
+  "jumpToTab": "Aller à l'onglet (ordre de la barre latérale)",
+  "jumpToSettings": "Aller aux paramètres",
+  "closeDialog": "Fermer la boîte de dialogue / le panneau",
+  "navigateHistory": "Naviguer dans l'historique des commandes",
+  "tabComplete": "Compléter la commande avec Tab",
+  "focusSearch": "Focus sur la barre de recherche",
+  "clearCompletions": "Effacer les complétions / fermer la recherche",
+  "openContextWheel": "Ouvrir la roue contextuelle (clic droit maintenu)"
+}

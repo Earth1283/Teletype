@@ -241,14 +241,14 @@ class TtyCommand(private val plugin: Teletype) : CommandExecutor, TabCompleter {
         val cfg = plugin.teletypeConfig
         val dataFolder = plugin.dataFolder
         val configFile = File(dataFolder, "config.yml")
-        val messagesFile = File(dataFolder, "messages.yml")
+        val messagesFile = File(dataFolder, "languages/${plugin.teletypeConfig.language}.yml")
         val metricsDb = File(dataFolder, "teletype-metrics.db")
         val auditDb = File(dataFolder, "teletype-audit.db")
 
         return buildList {
             add(fileCheck("Data folder", dataFolder, expectDirectory = true, requireWrite = true))
             add(fileCheck("config.yml", configFile, expectDirectory = false, requireWrite = true))
-            add(fileCheck("messages.yml", messagesFile, expectDirectory = false, requireWrite = true))
+            add(fileCheck("Language file", messagesFile, expectDirectory = false, requireWrite = true))
             add(
                 if (plugin.javaClass.classLoader.getResource("webroot/index.html") != null) {
                     DoctorCheck(Level.PASS, "Web assets", "webroot/index.html is bundled")

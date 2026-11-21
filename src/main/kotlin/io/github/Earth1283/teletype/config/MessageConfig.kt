@@ -11,11 +11,31 @@ import java.io.File
 class MessageConfig(private val plugin: Teletype) {
     private val mm = MiniMessage.miniMessage()
     private lateinit var cfg: YamlConfiguration
+    private lateinit var fallback: YamlConfiguration
+
+    companion object {
+        /** Languages bundled in the plugin jar, under the languages directory. */
+        val BUNDLED_LANGUAGES = listOf("en", "es", "fr", "zh")
+    }
 
     fun load() {
-        plugin.saveResource("messages.yml", false)
-        ConfigUpdater.update(plugin, "messages.yml")
-        cfg = YamlConfiguration.loadConfiguration(File(plugin.dataFolder, "messages.yml"))
+        for (code in BUNDLED_LANGUAGES) {
+            val resourcePath = "languages/$code.yml"
+            plugin.saveResource(resourcePath, false)
+            ConfigUpdater.update(plugin, resourcePath)
+        }
+
+        fallback = YamlConfiguration.loadConfiguration(File(plugin.dataFolder, "languages/en.yml"))
+
+        var language = plugin.teletypeConfig.language
+        var languageFile = File(plugin.dataFolder, "languages/$language.yml")
+        if (!languageFile.exists()) {
+            plugin.logger.warning("Unknown language '$language' (no plugins/Teletype/languages/$language.yml). Falling back to English.")
+            language = "en"
+            languageFile = File(plugin.dataFolder, "languages/en.yml")
+        }
+
+        cfg = YamlConfiguration.loadConfiguration(languageFile)
     }
 
     /**
@@ -24,10 +44,11 @@ class MessageConfig(private val plugin: Teletype) {
      * Placeholder values are tag-escaped so user-provided strings can't inject formatting.
      */
     fun get(key: String, vararg placeholders: Pair<String, String>): Component {
-        val prefix = cfg.getString("prefix") ?: "<bold><aqua>Teletype</aqua></bold> <dark_gray>»</dark_gray> "
-        var raw = cfg.getString(key)
+        val prefix = cfg.getString("prefix") ?: fallback.getString("prefix")
+            ?: "<bold><aqua>Teletype</aqua></bold> <dark_gray>»</dark_gray> "
+        var raw = cfg.getString(key) ?: fallback.getString(key)
         if (raw == null) {
-            plugin.logger.warning("Missing messages.yml key: $key")
+            plugin.logger.warning("Missing language key: $key")
             return mm.deserialize("<red>[missing: $key]</red>")
         }
         if (raw.isBlank()) return Component.empty()
@@ -42,7 +63,7 @@ class MessageConfig(private val plugin: Teletype) {
             if (plugin.isEnabled) {
                 Bukkit.getScheduler().runTask(plugin, Runnable { console(key, *placeholders) })
             } else {
-                plugin.logger.info(mm.stripTags((cfg.getString(key) ?: key).replace("{prefix}", "")))
+                plugin.logger.info(mm.stripTags((cfg.getString(key) ?: fallback.getString(key) ?: key).replace("{prefix}", "")))
             }
             return
         }

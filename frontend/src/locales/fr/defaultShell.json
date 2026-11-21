@@ -1,0 +1,19 @@
+{
+  "signOut": "Déconnexion",
+  "online": "en ligne",
+  "offline": "hors ligne",
+  "exitMobileView": "Quitter la vue mobile",
+  "switchToMobileView": "Passer en vue mobile",
+  "commandPalette": "Palette de commandes",
+  "openCommandPalette": "Ouvrir la palette de commandes",
+  "collapseSidebar": "Réduire la barre latérale",
+  "expandSidebar": "Développer la barre latérale",
+  "commandPaletteHint": "Palette de commandes (⌘K)",
+  "searchOrRunCommand": "Rechercher ou exécuter une commande",
+  "tpsTooltip": "TPS, 100 dernières secondes",
+  "tps": "tps",
+  "primaryNavigation": "Navigation principale",
+  "closeMenu": "Fermer le menu",
+  "more": "Plus",
+  "executeFailed": "{{name}} a échoué"
+}

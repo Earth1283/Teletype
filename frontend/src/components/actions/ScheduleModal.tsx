@@ -1,4 +1,6 @@
 import { useState } from 'react'
+import { useTranslation } from 'react-i18next'
+import type { TFunction } from 'i18next'
 import { IconX, IconClock } from '../../Icons'
 import type { Snippet, CreateScheduleRequest } from './actionTypes'
 
@@ -18,45 +20,48 @@ const UNIT_MS: Record<TimeUnit, number> = {
   days:    86_400_000,
 }
 
-function validateCron(expr: string): { valid: boolean; error?: string } {
+function validateCron(expr: string, t: TFunction): { valid: boolean; error?: string } {
   const parts = expr.trim().split(/\s+/)
-  if (parts.length !== 5) return { valid: false, error: 'Expected 5 fields: minute hour day month weekday' }
+  if (parts.length !== 5) return { valid: false, error: t('actions:scheduleModal.cron.expectedFields') }
   const ranges = [[0,59],[0,23],[1,31],[1,12],[0,7]]
   const names  = ['minute','hour','day','month','weekday']
   for (let i = 0; i < 5; i++) {
     const p = parts[i]
     if (p === '*') continue
+    const field = t(`actions:scheduleModal.cron.field.${names[i]}`)
     if (/^\*\/\d+$/.test(p)) {
       const step = parseInt(p.split('/')[1])
-      if (step < 1) return { valid: false, error: `${names[i]}: step /${step} out of range` }
+      if (step < 1) return { valid: false, error: t('actions:scheduleModal.cron.stepOutOfRange', { field, step }) }
       continue
     }
     for (const seg of p.split(',')) {
       if (/-/.test(seg)) {
         const [a, b] = seg.split('-').map(Number)
         if (isNaN(a)||isNaN(b)||a>b||a<ranges[i][0]||b>ranges[i][1])
-          return { valid: false, error: `${names[i]}: "${seg}" out of range` }
+          return { valid: false, error: t('actions:scheduleModal.cron.segOutOfRange', { field, seg }) }
       } else {
         const n = Number(seg)
         if (isNaN(n)||n<ranges[i][0]||n>ranges[i][1])
-          return { valid: false, error: `${names[i]}: ${n} out of range` }
+          return { valid: false, error: t('actions:scheduleModal.cron.valueOutOfRange', { field, value: n }) }
       }
     }
   }
   return { valid: true }
 }
 
-function describeCron(expr: string): string {
+function describeCron(expr: string, t: TFunction): string {
   const [min, hour, dom, mon, dow] = expr.trim().split(/\s+/)
   const pad = (s: string | number) => String(s).padStart(2, '0')
-  if (expr.trim() === '* * * * *') return 'Every minute'
+  if (expr.trim() === '* * * * *') return t('actions:scheduleModal.describe.everyMinute')
   if (/^\*\/(\d+)$/.test(min) && hour==='*' && dom==='*' && mon==='*' && dow==='*')
-    return `Every ${min.split('/')[1]} minutes`
+    return t('actions:scheduleModal.describe.everyNMinutes', { n: min.split('/')[1] })
   if (/^\d+$/.test(min) && /^\d+$/.test(hour) && dom==='*' && mon==='*' && dow==='*')
-    return `Every day at ${pad(hour)}:${pad(min)}`
+    return t('actions:scheduleModal.describe.everyDayAt', { time: `${pad(hour)}:${pad(min)}` })
   if (/^\d+$/.test(min) && /^\d+$/.test(hour) && dom==='*' && mon==='*' && /^\d+$/.test(dow)) {
-    const days = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat']
-    return `Every ${days[+dow] ?? 'weekday'} at ${pad(hour)}:${pad(min)}`
+    const dayKeys = ['sun','mon','tue','wed','thu','fri','sat']
+    const dayKey = dayKeys[+dow]
+    const day = dayKey ? t(`actions:scheduleModal.describe.day.${dayKey}`) : t('actions:scheduleModal.describe.day.fallback')
+    return t('actions:scheduleModal.describe.everyWeekdayAt', { day, time: `${pad(hour)}:${pad(min)}` })
   }
   return expr.trim()
 }
@@ -67,6 +72,7 @@ function nowLocalIso() {
 }
 
 export default function ScheduleModal({ snippet, onClose, onSchedule, pending }: Props) {
+  const { t } = useTranslation(['actions', 'common'])
   const [mode, setMode]           = useState<Mode>('forever')
   const [runAt, setRunAt]         = useState(nowLocalIso())
   const [count, setCount]         = useState(3)
@@ -81,7 +87,7 @@ export default function ScheduleModal({ snippet, onClose, onSchedule, pending }:
     Object.fromEntries(snippet.vars.map(v => [v, '']))
   )
 
-  const cronResult = useCron ? validateCron(cronExpr) : { valid: true }
+  const cronResult = useCron ? validateCron(cronExpr, t) : { valid: true }
   const onceInPast = mode === 'once' && !!runAt && new Date(runAt) <= new Date()
   const nCountBad  = mode === 'ntimes' && count < 2
   const varsFilled = snippet.vars.every(v => vars[v]?.trim())
@@ -117,16 +123,16 @@ export default function ScheduleModal({ snippet, onClose, onSchedule, pending }:
   }
 
   const MODES: { id: Mode; label: string }[] = [
-    { id: 'once',    label: '📅 Run once' },
-    { id: 'ntimes',  label: '🔁 Run N times' },
-    { id: 'forever', label: '∞ Run forever' },
+    { id: 'once',    label: t('actions:scheduleModal.modeOnce') },
+    { id: 'ntimes',  label: t('actions:scheduleModal.modeNTimes') },
+    { id: 'forever', label: t('actions:scheduleModal.modeForever') },
   ]
 
   return (
     <div className="modal-overlay" onClick={e => { if (e.target === e.currentTarget) onClose() }}>
       <div className="modal-card sched-modal-card">
         <div className="modal-title">
-          <span>Schedule: {snippet.name}</span>
+          <span>{t('actions:scheduleModal.title', { name: snippet.name })}</span>
           <button className="icon-btn" onClick={onClose}><IconX size={14} /></button>
         </div>
 
@@ -143,10 +149,10 @@ export default function ScheduleModal({ snippet, onClose, onSchedule, pending }:
         {mode === 'once' && (
           <div className="sched-fields">
             <div className="modal-field">
-              <label className="modal-label">Date &amp; time</label>
+              <label className="modal-label">{t('actions:scheduleModal.dateTimeLabel')}</label>
               <input className="modal-input" type="datetime-local" value={runAt}
                 onChange={e => setRunAt(e.target.value)} />
-              {onceInPast && <span className="field-error">Date must be in the future</span>}
+              {onceInPast && <span className="field-error">{t('actions:scheduleModal.dateInPastError')}</span>}
             </div>
           </div>
         )}
@@ -154,25 +160,25 @@ export default function ScheduleModal({ snippet, onClose, onSchedule, pending }:
         {mode === 'ntimes' && (
           <div className="sched-fields">
             <div className="modal-field">
-              <label className="modal-label">Run count (min 2)</label>
+              <label className="modal-label">{t('actions:scheduleModal.runCountLabel')}</label>
               <input className="modal-input" type="number" min={2} value={count}
                 onChange={e => setCount(Math.max(2, +e.target.value))} />
-              {nCountBad && <span className="field-error">Must be at least 2</span>}
+              {nCountBad && <span className="field-error">{t('actions:scheduleModal.runCountError')}</span>}
             </div>
             <div className="modal-field">
-              <label className="modal-label">Every</label>
+              <label className="modal-label">{t('actions:scheduleModal.everyLabel')}</label>
               <div className="interval-row">
                 <input className="modal-input interval-num" type="number" min={1} value={nInterval}
                   onChange={e => setNInterval(Math.max(1, +e.target.value))} />
                 <select className="modal-select" value={nUnit} onChange={e => setNUnit(e.target.value as TimeUnit)}>
-                  <option value="minutes">minutes</option>
-                  <option value="hours">hours</option>
-                  <option value="days">days</option>
+                  <option value="minutes">{t('actions:scheduleModal.unitMinutes')}</option>
+                  <option value="hours">{t('actions:scheduleModal.unitHours')}</option>
+                  <option value="days">{t('actions:scheduleModal.unitDays')}</option>
                 </select>
               </div>
             </div>
             <div className="modal-field">
-              <label className="modal-label">Starting at</label>
+              <label className="modal-label">{t('actions:scheduleModal.startingAtLabel')}</label>
               <input className="modal-input" type="datetime-local" value={nStartAt}
                 onChange={e => setNStartAt(e.target.value)} />
             </div>
@@ -183,28 +189,28 @@ export default function ScheduleModal({ snippet, onClose, onSchedule, pending }:
           <div className="sched-fields">
             <label className="sched-cron-toggle">
               <input type="checkbox" checked={useCron} onChange={e => setUseCron(e.target.checked)} />
-              <span>Custom cron expression</span>
+              <span>{t('actions:scheduleModal.customCronToggle')}</span>
             </label>
             {useCron ? (
               <div className="modal-field">
-                <label className="modal-label">Cron (5 fields)</label>
+                <label className="modal-label">{t('actions:scheduleModal.cronLabel')}</label>
                 <input className="modal-input mono-input" value={cronExpr}
                   onChange={e => setCronExpr(e.target.value)}
                   placeholder="*/30 * * * *" spellCheck={false} />
                 {cronResult.valid
-                  ? <span className="field-ok">↳ {describeCron(cronExpr)}</span>
+                  ? <span className="field-ok">↳ {describeCron(cronExpr, t)}</span>
                   : <span className="field-error">{cronResult.error}</span>}
               </div>
             ) : (
               <div className="modal-field">
-                <label className="modal-label">Every</label>
+                <label className="modal-label">{t('actions:scheduleModal.everyLabel')}</label>
                 <div className="interval-row">
                   <input className="modal-input interval-num" type="number" min={1} value={fInterval}
                     onChange={e => setFInterval(Math.max(1, +e.target.value))} />
                   <select className="modal-select" value={fUnit} onChange={e => setFUnit(e.target.value as TimeUnit)}>
-                    <option value="minutes">minutes</option>
-                    <option value="hours">hours</option>
-                    <option value="days">days</option>
+                    <option value="minutes">{t('actions:scheduleModal.unitMinutes')}</option>
+                    <option value="hours">{t('actions:scheduleModal.unitHours')}</option>
+                    <option value="days">{t('actions:scheduleModal.unitDays')}</option>
                   </select>
                 </div>
               </div>
@@ -214,23 +220,23 @@ export default function ScheduleModal({ snippet, onClose, onSchedule, pending }:
 
         {snippet.vars.length > 0 && (
           <div className="sched-vars">
-            <p className="modal-label" style={{ marginBottom: 8 }}>Variable values (fixed for all runs)</p>
+            <p className="modal-label" style={{ marginBottom: 8 }}>{t('actions:scheduleModal.variableValuesLabel')}</p>
             {snippet.vars.map(v => (
               <div key={v} className="modal-field">
                 <label className="modal-label">{v}</label>
                 <input className="modal-input" value={vars[v] ?? ''}
                   onChange={e => setVars(prev => ({ ...prev, [v]: e.target.value }))}
-                  placeholder={`Enter ${v}…`} />
+                  placeholder={t('actions:shared.varPlaceholder', { name: v })} />
               </div>
             ))}
           </div>
         )}
 
         <div className="modal-footer">
-          <button className="btn-ghost" onClick={onClose}>Cancel</button>
+          <button className="btn-ghost" onClick={onClose}>{t('common:cancel')}</button>
           <button className="btn-primary" onClick={confirm} disabled={!canConfirm || pending}>
             <IconClock size={13} />
-            {pending ? 'Scheduling…' : 'Schedule'}
+            {pending ? t('actions:scheduleModal.scheduling') : t('actions:scheduleModal.schedule')}
           </button>
         </div>
       </div>

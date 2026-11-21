@@ -1,0 +1,51 @@
+{
+  "metricLabel.tps": "TPS",
+  "metricLabel.tick": "Tick",
+  "metricLabel.mem": "内存",
+  "metricLabel.cpu": "CPU",
+
+  "heuristic.tpsNearFreeze": "服务器接近冻结",
+  "heuristic.tpsSignificantLag": "严重卡顿事件",
+  "heuristic.tpsBelowTarget": "TPS 低于目标值",
+  "heuristic.mainThreadStalled": "主线程停滞",
+  "heuristic.serverLagSpike": "服务器卡顿峰值",
+  "heuristic.memPressureCritical": "内存压力严重",
+  "heuristic.memSurgeDetected": "检测到内存激增",
+  "heuristic.hostCpuSaturated": "主机 CPU 已饱和",
+  "heuristic.hostCpuSpike": "主机 CPU 峰值",
+
+  "nearestLog": "最近日志",
+  "jumpToLog": "跳转到日志 →",
+  "gcHint": "GC 标记为 JVM JMX 事件。短时间窗口会标注持续时长。",
+  "focusLabel": "聚焦",
+  "gcDurationLabel": "GC {{duration}}",
+
+  "speedo.tps1m": "TPS 1分钟",
+  "speedo.tickTime": "Tick 耗时",
+  "speedo.memory": "内存",
+  "speedo.cpu": "CPU",
+  "speedo.sysRam": "系统内存",
+  "speedo.disk": "磁盘",
+  "speedo.uptime": "运行时间",
+  "speedo.tickGood": "< {{value}}ms 为良好",
+
+  "logPanel.collapse": "收起日志面板",
+  "logPanel.expand": "展开日志面板",
+  "logPanel.errorsTitle": "错误",
+  "logPanel.logsTitle": "日志",
+  "logPanel.clearHighlight": "清除高亮",
+  "logPanel.filterToWarnings": "仅显示警告/错误",
+  "logPanel.showAllLogs": "显示全部日志",
+  "logPanel.errorsToggle": "错误",
+  "logPanel.allToggle": "全部",
+  "logPanel.waitingForLogs": "等待日志中…",
+  "logPanel.noWarningsOrErrors": "没有警告或错误",
+
+  "errorBanner.failedToFetch": "⚠ 获取指标失败",
+  "statusBar.up": "已运行 {{uptime}}",
+  "statusBar.showLogPanel": "显示日志面板",
+  "statusBar.logsButton": "日志",
+
+  "emptyState.waitingForMetrics": "等待指标数据…",
+  "chartTitle.hostCpu": "主机 CPU"
+}

@@ -1,4 +1,6 @@
 import { useState, useRef, useEffect, useCallback } from 'react'
+import { useTranslation } from 'react-i18next'
+import i18n from '../i18n'
 import { api, apiError } from '../api/client'
 import { useSettings } from '../SettingsContext'
 import { useContextMenu, type ContextMenuItem, type ContextMenuTarget } from '../ContextMenu'
@@ -30,15 +32,17 @@ interface AppDef {
 const WIN_W: Partial<Record<Tab, number>> = { glance: 920, console: 820, players: 720, stats: 1020, files: 900, actions: 680, audit: 780, network: 740, profiling: 860 }
 const WIN_H: Partial<Record<Tab, number>> = { glance: 620, console: 520, players: 540, stats: 660, files: 600, actions: 500, audit: 540, network: 500, profiling: 600 }
 
+// `label` is a live getter (not a resolved string) so every read reflects the
+// current i18next language, even though this array is built once at module load.
 const APPS: AppDef[] = [
   ...TABS.filter(t => t.id !== 'settings').map(t => ({
     id: t.id,
-    label: t.label,
+    get label() { return t.label },
     dw: WIN_W[t.id] ?? 800,
     dh: WIN_H[t.id] ?? 560,
   })),
-  { id: 'settings',    label: 'Settings',    dw: 620, dh: 740 },
-  { id: 'thread-dump', label: 'Thread Dump', dw: 900, dh: 580 },
+  { id: 'settings',    get label() { return i18n.t('shellKernel:tabSettings') },  dw: 620, dh: 740 },
+  { id: 'thread-dump', get label() { return i18n.t('shell:threadDumpAppLabel') }, dw: 900, dh: 580 },
 ]
 
 const DOCK_APPS = APPS.filter(a => a.id !== 'thread-dump')
@@ -178,6 +182,7 @@ type PromptState = {
 // ── Main desktop ────────────────────────────────────────────────────────────
 
 export default function MacShell({ onLogout }: { onLogout: () => void }) {
+  const { t } = useTranslation(['shell', 'common'])
   const { setTab: setKernelTab, paletteOpen, setPaletteOpen } = useShell()
   const [wins, setWins] = useState<WinState[]>([])
   const [, setTopZ] = useState(10)
@@ -356,18 +361,18 @@ export default function MacShell({ onLogout }: { onLogout: () => void }) {
   function dockCtx(e: React.MouseEvent, app: AppDef) {
     const win = wins.find(w => w.id === app.id)
     const items: CtxItem[] = !win
-      ? [{ label: `Open ${app.label}`, action: () => openApp(app.id) }]
+      ? [{ label: t('dockCtx.open', { label: app.label }), action: () => openApp(app.id) }]
       : win.min
         ? [
-            { label: 'Show Window', action: () => openApp(app.id) },
+            { label: t('dockCtx.showWindow'), action: () => openApp(app.id) },
             { type: 'separator' },
-            { label: 'Close', action: () => closeWin(app.id), danger: true },
+            { label: t('dockCtx.close'), action: () => closeWin(app.id), danger: true },
           ]
         : [
-            { label: 'Bring to Front', action: () => focusWin(app.id) },
-            { label: 'Minimize', shortcut: '⌘M', action: () => minWin(app.id) },
+            { label: t('dockCtx.bringToFront'), action: () => focusWin(app.id) },
+            { label: t('dockCtx.minimize'), shortcut: '⌘M', action: () => minWin(app.id) },
             { type: 'separator' },
-            { label: 'Close', shortcut: '⌘W', action: () => closeWin(app.id), danger: true },
+            { label: t('dockCtx.close'), shortcut: '⌘W', action: () => closeWin(app.id), danger: true },
           ]
     openCtx(e, items, { kind: 'dockApp', id: app.id })
   }
@@ -376,18 +381,18 @@ export default function MacShell({ onLogout }: { onLogout: () => void }) {
     const win = wins.find(w => w.id === id)
     if (!win) return
     openCtx(e, [
-      { label: 'Minimize', shortcut: '⌘M', action: () => minWin(id) },
-      { label: win.max ? 'Restore' : 'Zoom', shortcut: '⌘⇧F', action: () => maxWin(id) },
+      { label: t('winTitleCtx.minimize'), shortcut: '⌘M', action: () => minWin(id) },
+      { label: win.max ? t('winTitleCtx.restore') : t('winTitleCtx.zoom'), shortcut: '⌘⇧F', action: () => maxWin(id) },
       { type: 'separator' },
-      { label: 'Close', shortcut: '⌘W', action: () => closeWin(id), danger: true },
+      { label: t('winTitleCtx.close'), shortcut: '⌘W', action: () => closeWin(id), danger: true },
     ], { kind: 'window', id })
   }
 
   function desktopCtx(e: React.MouseEvent) {
     openCtx(e, [
-      { label: 'Bring All to Front', disabled: wins.filter(w => !w.min).length === 0, action: bringAllToFront },
+      { label: t('desktopCtx.bringAllToFront'), disabled: wins.filter(w => !w.min).length === 0, action: bringAllToFront },
       { type: 'separator' },
-      { label: 'Exit Fun Mode', action: () => update({ fun: false }) },
+      { label: t('desktopCtx.exitFunMode'), action: () => update({ fun: false }) },
     ], { kind: 'desktop' })
   }
 
@@ -421,8 +426,8 @@ export default function MacShell({ onLogout }: { onLogout: () => void }) {
       openApp('thread-dump')
     } catch (e) {
       setPrompt({
-        title: 'Thread dump failed',
-        message: apiError(e, 'The thread dump could not be generated.'),
+        title: t('threadDumpFailedTitle'),
+        message: apiError(e, t('threadDumpFailedBody')),
         variant: 'error',
       })
     }
@@ -434,8 +439,8 @@ export default function MacShell({ onLogout }: { onLogout: () => void }) {
       await api.post('/system/restart')
     } catch (e) {
       setPrompt({
-        title: 'Restart request failed',
-        message: apiError(e, 'The restart command could not be dispatched.'),
+        title: t('restartFailedTitle'),
+        message: apiError(e, t('restartFailedBody')),
         variant: 'error',
       })
     }
@@ -449,25 +454,25 @@ export default function MacShell({ onLogout }: { onLogout: () => void }) {
 
   function fileMenuItems(): MenuItem[] {
     return [
-      { label: 'New Finder Window', shortcut: '⌘N', action: () => { setActiveMenu(null); openApp('files') } },
-      { label: 'New Console Window', action: () => { setActiveMenu(null); openApp('console') } },
+      { label: t('fileMenu.newFinderWindow'), shortcut: '⌘N', action: () => { setActiveMenu(null); openApp('files') } },
+      { label: t('fileMenu.newConsoleWindow'), action: () => { setActiveMenu(null); openApp('console') } },
       null,
-      { label: 'Restart Server…', action: () => { setActiveMenu(null); setShowRestartConfirm(true) } },
-      { label: 'Thread Dump', action: triggerThreadDump },
+      { label: t('fileMenu.restartServer'), action: () => { setActiveMenu(null); setShowRestartConfirm(true) } },
+      { label: t('fileMenu.threadDump'), action: triggerThreadDump },
       null,
-      { label: 'Exit Fun Mode', action: () => { setActiveMenu(null); update({ fun: false }) }, danger: true },
+      { label: t('fileMenu.exitFunMode'), action: () => { setActiveMenu(null); update({ fun: false }) }, danger: true },
     ]
   }
 
   function viewMenuItems(): MenuItem[] {
     const items: MenuItem[] = []
     if (finderWinOpen) {
-      items.push({ label: 'as Icons', checked: finderViewMode === 'icons', action: () => { setActiveMenu(null); setFinderViewMode('icons') } })
-      items.push({ label: 'as List', checked: finderViewMode === 'list', action: () => { setActiveMenu(null); setFinderViewMode('list') } })
+      items.push({ label: t('viewMenu.asIcons'), checked: finderViewMode === 'icons', action: () => { setActiveMenu(null); setFinderViewMode('icons') } })
+      items.push({ label: t('viewMenu.asList'), checked: finderViewMode === 'list', action: () => { setActiveMenu(null); setFinderViewMode('list') } })
       items.push(null)
     }
     items.push({
-      label: activeWin?.max ? 'Exit Full Screen' : 'Enter Full Screen',
+      label: activeWin?.max ? t('viewMenu.exitFullScreen') : t('viewMenu.enterFullScreen'),
       shortcut: '⌘⇧F',
       disabled: !activeWin,
       action: () => { setActiveMenu(null); if (activeId) maxWin(activeId) },
@@ -478,24 +483,24 @@ export default function MacShell({ onLogout }: { onLogout: () => void }) {
   function windowMenuItems(): MenuItem[] {
     const items: MenuItem[] = [
       {
-        label: 'Minimize',
+        label: t('windowMenu.minimize'),
         shortcut: '⌘M',
         disabled: !activeWin,
         action: () => { setActiveMenu(null); if (activeId) minWin(activeId) },
       },
       {
-        label: 'Minimize All',
+        label: t('windowMenu.minimizeAll'),
         disabled: openWins.length === 0,
         action: () => { setActiveMenu(null); minimizeAll() },
       },
       null,
       {
-        label: 'Bring All to Front',
+        label: t('windowMenu.bringAllToFront'),
         disabled: openWins.length === 0,
         action: () => { setActiveMenu(null); bringAllToFront() },
       },
       {
-        label: 'Close All',
+        label: t('windowMenu.closeAll'),
         disabled: wins.length === 0,
         action: () => { setActiveMenu(null); closeAll() },
         danger: true,
@@ -518,12 +523,12 @@ export default function MacShell({ onLogout }: { onLogout: () => void }) {
 
   function helpMenuItems(): MenuItem[] {
     return [
-      { label: 'About Teletype', action: () => { setActiveMenu(null); setShowAbout(true) } },
+      { label: t('helpMenu.aboutTeletype'), action: () => { setActiveMenu(null); setShowAbout(true) } },
       null,
-      { label: 'Keyboard Shortcuts', shortcut: '⌘K', action: () => { setActiveMenu(null); setPaletteOpen(true) } },
+      { label: t('helpMenu.keyboardShortcuts'), shortcut: '⌘K', action: () => { setActiveMenu(null); setPaletteOpen(true) } },
       null,
       {
-        label: 'GitHub',
+        label: t('helpMenu.github'),
         action: () => { setActiveMenu(null); window.open('https://github.com/Earth1283/Teletype', '_blank') },
       },
     ]
@@ -570,13 +575,13 @@ export default function MacShell({ onLogout }: { onLogout: () => void }) {
         </div>
 
         <div className="mac-menubar-right">
-          <button className="mac-menubar-spotlight" onClick={() => setPaletteOpen(true)} title="Spotlight (⌘K)">
+          <button className="mac-menubar-spotlight" onClick={() => setPaletteOpen(true)} title={t('spotlightTitle')}>
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
               <circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>
             </svg>
           </button>
           <span className="mac-menubar-clock">{dateStr}&nbsp;&nbsp;{timeStr}</span>
-          <button className="mac-menubar-signout" title="Sign out" onClick={onLogout}>
+          <button className="mac-menubar-signout" title={t('signOutTitle')} onClick={onLogout}>
             <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
               <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/>
             </svg>
@@ -587,7 +592,7 @@ export default function MacShell({ onLogout }: { onLogout: () => void }) {
       {/* ── Desktop area ─────────────────────────────────────────────────── */}
       <div className="mac-desktop-area" ref={desktopAreaRef} onClick={() => setActiveId(null)}>
         {wins.length === 0 && (
-          <div className="mac-desktop-hint">Double-click an icon in the dock to open an app</div>
+          <div className="mac-desktop-hint">{t('desktopHint')}</div>
         )}
         {wins.map(win => (
           <MacWindow
@@ -638,9 +643,9 @@ export default function MacShell({ onLogout }: { onLogout: () => void }) {
               </svg>
             </div>
             <div className="mac-about-name">Teletype</div>
-            <div className="mac-about-subtitle">Minecraft Server Management<br/>Open-source · Fun mode active</div>
+            <div className="mac-about-subtitle">{t('about.subtitle')}<br/>{t('about.tagline')}</div>
             <div style={{ marginTop: 12 }}>
-              <button className="pill-btn" style={{ minWidth: 100 }} onClick={() => setShowAbout(false)}>OK</button>
+              <button className="pill-btn" style={{ minWidth: 100 }} onClick={() => setShowAbout(false)}>{t('common:ok')}</button>
             </div>
           </div>
         </div>
@@ -650,16 +655,16 @@ export default function MacShell({ onLogout }: { onLogout: () => void }) {
       {showRestartConfirm && (
         <div className="mac-system-overlay" onClick={() => setShowRestartConfirm(false)}>
           <div className="mac-system-card" onClick={e => e.stopPropagation()}>
-            <div className="mac-system-title">Restart Minecraft Server?</div>
-            <div className="mac-system-body">All connected players will be disconnected. The server will attempt to restart automatically.</div>
+            <div className="mac-system-title">{t('restartConfirm.title')}</div>
+            <div className="mac-system-body">{t('restartConfirm.body')}</div>
             <div className="mac-system-footer">
-              <button className="pill-btn" onClick={() => setShowRestartConfirm(false)}>Cancel</button>
+              <button className="pill-btn" onClick={() => setShowRestartConfirm(false)}>{t('common:cancel')}</button>
               <button
                 className="pill-btn"
                 style={{ background: 'var(--accent-15, rgba(212,37,52,0.15))', borderColor: 'var(--status-critical)', color: 'var(--status-critical)' }}
                 onClick={doRestart}
               >
-                Restart
+                {t('restartConfirm.restartButton')}
               </button>
             </div>
           </div>
@@ -695,6 +700,7 @@ interface MacWindowProps {
 }
 
 function MacWindow({ win, isActive, onFocus, onStartDrag, onStartResize, onClose, onMin, onMax, onNavigate, onTitleCtx, threadDumpText, reducedMotion }: MacWindowProps) {
+  const { t } = useTranslation('shell')
   const app = APPS.find(a => a.id === win.id)!
   const posStyle: React.CSSProperties = win.max
     ? { zIndex: win.z }
@@ -725,7 +731,7 @@ function MacWindow({ win, isActive, onFocus, onStartDrag, onStartResize, onClose
       </div>
       <div className="mac-window-content">
         {win.id === 'thread-dump'
-          ? <div className="thread-dump-view">{threadDumpText || 'No thread dump loaded.'}</div>
+          ? <div className="thread-dump-view">{threadDumpText || t('noThreadDumpLoaded')}</div>
           : renderPage(win.id as Tab, onNavigate as (t: Tab) => void, !win.min)}
       </div>
       {!win.max && (

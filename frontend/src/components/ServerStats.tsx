@@ -1,4 +1,5 @@
 import { useState, useMemo, useCallback, memo } from 'react'
+import { useTranslation } from 'react-i18next'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import {
   ComposedChart, Area, Line, XAxis, YAxis, CartesianGrid, Tooltip,
@@ -50,6 +51,9 @@ interface GuideContent {
   intro: string
   sections: Array<{ title: string; body: string[] }>
 }
+
+type TFn = (key: string, options?: Record<string, unknown>) => string
+type GuideId = 'tps' | 'mspt' | 'players' | 'entities' | 'chunks' | 'ping' | 'perfOverlay' | 'worldOverlay' | 'correlation'
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -161,23 +165,25 @@ function HelpIcon() {
 }
 
 function HelpButton({ label, onClick }: { label: string; onClick: () => void }) {
+  const { t } = useTranslation('stats')
   return (
-    <button className="stats-help-btn" title={`Explain ${label}`} aria-label={`Explain ${label}`} onClick={onClick}>
+    <button className="stats-help-btn" title={t('explainLabel', { label })} aria-label={t('explainLabel', { label })} onClick={onClick}>
       <HelpIcon />
     </button>
   )
 }
 
 function GuideModal({ guide, onClose }: { guide: GuideContent; onClose: () => void }) {
+  const { t } = useTranslation('stats')
   return (
     <div className="stats-guide-overlay" onClick={onClose}>
       <div className="stats-guide-card" onClick={e => e.stopPropagation()}>
         <div className="stats-guide-head">
           <div>
-            <div className="stats-guide-kicker">Data Guide</div>
+            <div className="stats-guide-kicker">{t('dataGuideKicker')}</div>
             <div className="stats-guide-title">{guide.title}</div>
           </div>
-          <button className="stats-guide-close" onClick={onClose} aria-label="Close guide">×</button>
+          <button className="stats-guide-close" onClick={onClose} aria-label={t('closeGuide')}>×</button>
         </div>
         <p className="stats-guide-intro">{guide.intro}</p>
         <div className="stats-guide-body">
@@ -193,250 +199,26 @@ function GuideModal({ guide, onClose }: { guide: GuideContent; onClose: () => vo
   )
 }
 
-const GUIDE_BY_ID: Record<string, GuideContent> = {
-  tps: {
-    title: 'TPS Chart',
-    intro: 'TPS is the quickest read on whether the server is keeping up with real time. Minecraft targets 20 ticks per second; lower values mean the simulation is falling behind.',
-    sections: [
-      {
-        title: 'How to read it',
-        body: [
-          'The solid TPS line shows the recent one-minute tick rate. The dashed 5-minute line is a smoother baseline that helps separate a short hiccup from a sustained slowdown.',
-          'A healthy server spends most of its time close to 20. Brief dips can be normal during world generation, backups, large teleports, or plugin work. Repeated dips or a flat line below 19 are worth investigating.',
-        ],
-      },
-      {
-        title: 'How this helps you decide',
-        body: [
-          'Compare TPS with MSPT first. Low TPS with high MSPT usually means the main thread is overloaded. Low TPS without high MSPT can point to sampling gaps, startup/shutdown behavior, or external pauses.',
-          'Use the range selector to zoom your question: 1h for recent incidents, 6h for session patterns, 24h for daily load, and 7d for recurring schedule or player-cycle problems.',
-        ],
-      },
-      {
-        title: 'Useful next checks',
-        body: [
-          'If TPS drops line up with player joins, chunk counts, or entity count growth, investigate player movement, farms, mob caps, or chunk loaders.',
-          'If TPS drops line up with CPU, memory, or disk pressure, look at host limits rather than only Minecraft configuration.',
-        ],
-      },
-    ],
-  },
-  mspt: {
-    title: 'MSPT Chart',
-    intro: 'MSPT is milliseconds per tick. Since Minecraft needs 20 ticks per second, each tick has roughly 50ms of budget.',
-    sections: [
-      {
-        title: 'How to read it',
-        body: [
-          'Values under 50ms mean the server can usually sustain 20 TPS. Values above 50ms mean ticks are taking too long and TPS may start falling.',
-          'Spikes are important even when TPS recovers. They often correspond to world saves, plugin tasks, entity bursts, redstone activity, or chunk generation.',
-        ],
-      },
-      {
-        title: 'How this helps you decide',
-        body: [
-          'MSPT is more diagnostic than TPS because it tells you how much main-thread work is happening. TPS tells you the outcome; MSPT helps explain the mechanism.',
-          'When MSPT rises but player count does not, look for world or automation causes. When MSPT rises with players, look at player distribution, chunk loading, and player-triggered plugins.',
-        ],
-      },
-      {
-        title: 'Useful next checks',
-        body: [
-          'Correlate MSPT with Entities and Loaded Chunks. High MSPT plus high entities often points to farms, pathfinding, or mob buildup. High MSPT plus high chunks points to exploration, view distance, or loaders.',
-          'Use anomaly markers on the Z-score overlay to jump to logs near the spike. Logs may show saves, warnings, plugin tasks, or lag messages.',
-        ],
-      },
-    ],
-  },
-  players: {
-    title: 'Players Chart',
-    intro: 'This chart shows online player count over time and overlays join/leave markers when player events are available.',
-    sections: [
-      {
-        title: 'How to read it',
-        body: [
-          'The line shows concurrency. Vertical markers show joins and leaves, which help explain abrupt changes or activity bursts.',
-          'A player-count increase is not inherently bad. It becomes important when it aligns with TPS drops, MSPT spikes, more chunks, more entities, or higher ping.',
-        ],
-      },
-      {
-        title: 'How this helps you decide',
-        body: [
-          'Use this chart to distinguish baseline server load from player-driven load. A problem that appears only when players are online is usually gameplay, world, network, or plugin interaction.',
-          'If performance changes after one or two players join, inspect where they are, whether they are exploring, and whether their actions activate expensive areas.',
-        ],
-      },
-      {
-        title: 'Useful next checks',
-        body: [
-          'Compare with Loaded Chunks and Entities. A small player increase with a large chunk increase often means exploration, high view distance, or teleport-heavy play.',
-          'Compare with Ping P50/P95. If player count rises and ping rises while MSPT stays healthy, the issue may be network or host saturation rather than main-thread lag.',
-        ],
-      },
-    ],
-  },
-  entities: {
-    title: 'Entities Chart',
-    intro: 'Entities include mobs, dropped items, projectiles, armor stands, minecarts, and other world objects that the server may need to tick.',
-    sections: [
-      {
-        title: 'How to read it',
-        body: [
-          'A rising entity count means the worlds are accumulating more tickable objects. Not every entity costs the same, but growth can raise tick work.',
-          'Sharp jumps can indicate farms turning on, players entering loaded areas, world events, or cleanup failures.',
-        ],
-      },
-      {
-        title: 'How this helps you decide',
-        body: [
-          'Entity count is most useful when compared with MSPT. If both rise together, entities are a likely contributor to lag.',
-          'If entities rise but MSPT stays flat, the server is handling them for now. Keep watching for thresholds or recurring buildup.',
-        ],
-      },
-      {
-        title: 'Useful next checks',
-        body: [
-          'Investigate high-density areas, farms, villages, dropped item cleanup, mob caps, and plugin-spawned entities.',
-          'Use the 24h or 7d range to find slow leaks: a gradual upward slope that never resets often points to cleanup or world-management issues.',
-        ],
-      },
-    ],
-  },
-  chunks: {
-    title: 'Loaded Chunks Chart',
-    intro: 'Loaded chunks measure how much world area is active. More chunks mean more block/entity ticking, more memory pressure, and more potential disk activity.',
-    sections: [
-      {
-        title: 'How to read it',
-        body: [
-          'The line shows total loaded chunks across worlds. A stable plateau is normal. Sudden jumps usually mean exploration, teleporting, chunk loaders, high view distance, or many spread-out players.',
-          'Loaded chunks are a multiplier for other work. The same number of players can be much more expensive if they are spread across many areas.',
-        ],
-      },
-      {
-        title: 'How this helps you decide',
-        body: [
-          'Compare chunks with MSPT and memory. Rising chunks plus rising MSPT suggests simulation work. Rising chunks plus memory pressure suggests world footprint or caching pressure.',
-          'Compare chunks with player count. If chunks rise faster than players, the server may need view-distance, simulation-distance, pre-generation, or loader policy changes.',
-        ],
-      },
-      {
-        title: 'Useful next checks',
-        body: [
-          'Review view distance, simulation distance, chunk loaders, portals, teleport commands, and whether players are exploring ungenerated terrain.',
-          'If chunk spikes line up with disk or MSPT spikes, pre-generate terrain or reduce exploration-heavy load during peak hours.',
-        ],
-      },
-    ],
-  },
-  ping: {
-    title: 'Ping Percentiles Chart',
-    intro: 'Ping P50 is median player latency. Ping P95 is the high-latency tail. Together they show whether network problems affect most players or only a few.',
-    sections: [
-      {
-        title: 'How to read it',
-        body: [
-          'P50 tells you the typical player experience. P95 tells you how bad latency gets for the slower end of connected players.',
-          'If P50 and P95 both rise, the server or network path is broadly degraded. If only P95 rises, a subset of players may have routing, distance, Wi-Fi, or regional issues.',
-        ],
-      },
-      {
-        title: 'How this helps you decide',
-        body: [
-          'Compare ping with MSPT. High ping with normal MSPT means the game loop is healthy but network or host connectivity may be poor.',
-          'High ping with high CPU, disk, or memory pressure can indicate host contention. High ping with player count jumps may indicate bandwidth or proxy limits.',
-        ],
-      },
-      {
-        title: 'Useful next checks',
-        body: [
-          'Check proxy/tunnel health, host network graphs, DDoS protection events, routing region, and whether only specific players are affected.',
-          'Ping metrics may be unavailable on non-Paper servers or older forks; absence of this chart does not mean latency is perfect.',
-        ],
-      },
-    ],
-  },
-  perfOverlay: {
-    title: 'Performance Overlay (Z-score)',
-    intro: 'The performance overlay puts several metrics onto one standardized σ scale so different units can be compared on the same chart.',
-    sections: [
-      {
-        title: 'How to read it',
-        body: [
-          'Each line shows how unusual a metric is compared with its own history in the selected range. 0σ is normal for that metric. +2σ means unusually high. -2σ means unusually low.',
-          'TPS is special: negative movement is usually bad. For MSPT, memory, and CPU, positive movement is usually the concerning direction.',
-        ],
-      },
-      {
-        title: 'How this helps you decide',
-        body: [
-          'The overlay answers “what changed at the same time?” If MSPT, CPU, and memory all move together, host or workload pressure is more likely. If only MSPT moves, main-thread work is more likely.',
-          'Anomaly markers appear when any visible series crosses the configured σ threshold. Click a marked area to inspect nearby logs.',
-        ],
-      },
-      {
-        title: 'Important caveats',
-        body: [
-          'Z-scores are relative to the selected window. A quiet one-hour window can make small changes look unusual; a noisy seven-day window can make real issues look less dramatic.',
-          'Use this as a triage tool, not proof. Confirm with raw charts, logs, and operational context.',
-        ],
-      },
-    ],
-  },
-  worldOverlay: {
-    title: 'World Overlay (Z-score)',
-    intro: 'The world overlay standardizes player count, entities, chunks, and optionally ping so you can see which world-facing workload changed together.',
-    sections: [
-      {
-        title: 'How to read it',
-        body: [
-          'Lines above 0σ are higher than usual for the selected range. Lines below 0σ are lower than usual. Crossings and simultaneous spikes are more important than isolated noise.',
-          'The overlay is useful for identifying whether lag is driven by player presence, world area, entity accumulation, or latency.',
-        ],
-      },
-      {
-        title: 'How this helps you decide',
-        body: [
-          'Players plus chunks suggests distribution or exploration. Entities plus MSPT suggests tick cost. Ping without MSPT suggests network rather than server simulation.',
-          'When multiple world metrics spike together, use timestamps to jump into logs and correlate with joins, teleports, world saves, or plugin actions.',
-        ],
-      },
-      {
-        title: 'Useful next checks',
-        body: [
-          'Use this overlay to pick which raw chart to inspect next. The overlay shows relationships; the raw charts show magnitude.',
-          'If the world overlay identifies recurring daily spikes, compare with scheduled actions, backups, restarts, or known player activity windows.',
-        ],
-      },
-    ],
-  },
-  correlation: {
-    title: 'Metric Correlations Table',
-    intro: 'The correlation table estimates how strongly pairs of metrics moved together during the selected range using Pearson r.',
-    sections: [
-      {
-        title: 'How to read it',
-        body: [
-          'Values range from -1.00 to +1.00. Positive values mean two metrics tend to rise together. Negative values mean one tends to rise while the other falls. Values near 0 mean no clear linear relationship.',
-          'As a rough rule: |r| above 0.7 is strong, 0.4 to 0.7 is moderate, and below 0.2 is usually weak or negligible.',
-        ],
-      },
-      {
-        title: 'How this helps you decide',
-        body: [
-          'Correlation helps prioritize investigations. If MSPT correlates strongly with entities, inspect entity-heavy areas. If MSPT correlates with chunks, inspect exploration or loaders. If ping correlates with players but MSPT does not, inspect network capacity.',
-          'The table is best used after you notice a symptom. Find the symptom row or column, then look for high absolute correlations that suggest likely drivers.',
-        ],
-      },
-      {
-        title: 'Important caveats',
-        body: [
-          'Correlation is not causation. Backups, peak hours, restarts, and player behavior can make unrelated metrics move together.',
-          'Small sample sizes and flat metrics can produce missing values. Change the time range if the table looks sparse or misleading.',
-        ],
-      },
-    ],
-  },
+function buildGuides(t: TFn): Record<GuideId, GuideContent> {
+  const guide = (id: string): GuideContent => ({
+    title: t(`guide.${id}.title`),
+    intro: t(`guide.${id}.intro`),
+    sections: [1, 2, 3].map(n => ({
+      title: t(`guide.${id}.section${n}.title`),
+      body: [t(`guide.${id}.section${n}.body1`), t(`guide.${id}.section${n}.body2`)],
+    })),
+  })
+  return {
+    tps: guide('tps'),
+    mspt: guide('mspt'),
+    players: guide('players'),
+    entities: guide('entities'),
+    chunks: guide('chunks'),
+    ping: guide('ping'),
+    perfOverlay: guide('perfOverlay'),
+    worldOverlay: guide('worldOverlay'),
+    correlation: guide('correlation'),
+  }
 }
 
 // ── Mini chart ─────────────────────────────────────────────────────────────────
@@ -446,7 +228,8 @@ interface MiniChartProps {
   dataKey: keyof Snap
   color: string
   label: string
-  guideId: keyof typeof GUIDE_BY_ID
+  guideId: GuideId
+  guides: Record<GuideId, GuideContent>
   onGuide: (guide: GuideContent) => void
   yDomain?: [number | 'auto', number | 'auto']
   yFmt?: (v: number) => string
@@ -479,7 +262,7 @@ function MiniChartTooltip({ active, payload, label, dataKey, fmt, extraLine }: M
   )
 }
 
-const MiniChart = memo(function MiniChart({ data, dataKey, color, label, guideId, onGuide, yDomain, yFmt, events, extraLine }: MiniChartProps) {
+const MiniChart = memo(function MiniChart({ data, dataKey, color, label, guideId, guides, onGuide, yDomain, yFmt, events, extraLine }: MiniChartProps) {
   const fmt = yFmt ?? ((v: number) => String(v))
   const current = data[data.length - 1]
   const markers = useMemo(() => downsampleEvents(events), [events])
@@ -489,7 +272,7 @@ const MiniChart = memo(function MiniChart({ data, dataKey, color, label, guideId
       <div className="glance-chart-header">
         <span className="glance-chart-title">{label}</span>
         {current && <span className="glance-chart-value" style={{ color }}>{fmt(Number(current[dataKey] ?? 0))}</span>}
-        <HelpButton label={label} onClick={() => onGuide(GUIDE_BY_ID[guideId])} />
+        <HelpButton label={label} onClick={() => onGuide(guides[guideId])} />
       </div>
       <ResponsiveContainer width="100%" height={110}>
         <ComposedChart data={data} margin={{ top: 4, right: 8, bottom: 0, left: 0 }}>
@@ -549,6 +332,7 @@ interface ZScoreTooltipProps extends ChartTooltipProps<Record<string, unknown> &
 }
 
 function ZScoreTooltip({ active, payload, series, threshold, showMarkers, onAnomalyClick }: ZScoreTooltipProps) {
+  const { t } = useTranslation('stats')
   const pt = payload?.[0]?.payload
   if (!active || !pt) return null
   const snap = pt._snap
@@ -578,7 +362,7 @@ function ZScoreTooltip({ active, payload, series, threshold, showMarkers, onAnom
         return z !== null && Math.abs(z) >= threshold
       }) && (
         <div className="glance-tooltip-logs-hint" onClick={() => onAnomalyClick(snap.timestamp)}>
-          ⚡ Click to see nearby logs
+          {t('clickToSeeLogs')}
         </div>
       )}
     </div>
@@ -589,14 +373,15 @@ interface ZOverlayProps {
   data: Snap[]
   series: ZSeries[]
   title: string
-  guideId: keyof typeof GUIDE_BY_ID
+  guideId: GuideId
+  guides: Record<GuideId, GuideContent>
   showMarkers: boolean
   threshold: number
   onAnomalyClick: (ts: number) => void
   onGuide: (guide: GuideContent) => void
 }
 
-const ZOverlay = memo(function ZOverlay({ data, series, title, guideId, showMarkers, threshold, onAnomalyClick, onGuide }: ZOverlayProps) {
+const ZOverlay = memo(function ZOverlay({ data, series, title, guideId, guides, showMarkers, threshold, onAnomalyClick, onGuide }: ZOverlayProps) {
   // Precompute Z-scores for each series
   const zData = useMemo(() => {
     const extracted = series.map(s =>
@@ -640,7 +425,7 @@ const ZOverlay = memo(function ZOverlay({ data, series, title, guideId, showMark
             </span>
           ))}
         </div>
-        <HelpButton label={title} onClick={() => onGuide(GUIDE_BY_ID[guideId])} />
+        <HelpButton label={title} onClick={() => onGuide(guides[guideId])} />
       </div>
       <ResponsiveContainer width="100%" height={140}>
         <ComposedChart data={zData} margin={{ top: 4, right: 8, bottom: 0, left: 0 }}
@@ -724,10 +509,13 @@ function rBg(r: number): string {
 
 interface CorrelationTableProps {
   data: Snap[]
+  guides: Record<GuideId, GuideContent>
   onGuide: (guide: GuideContent) => void
 }
 
-const CorrelationTable = memo(function CorrelationTable({ data, onGuide }: CorrelationTableProps) {
+const CorrelationTable = memo(function CorrelationTable({ data, guides, onGuide }: CorrelationTableProps) {
+  const { t } = useTranslation('stats')
+  const metricLabel = (key: keyof Snap) => t(`corrMetric.${String(key)}`)
   const matrix = useMemo(() => {
     const cols = CORR_METRICS.map(m =>
       data.map(s => m.extract ? m.extract(s) : (s[m.key] as number | null | undefined) ?? null)
@@ -757,9 +545,9 @@ const CorrelationTable = memo(function CorrelationTable({ data, onGuide }: Corre
   return (
     <div className="corr-wrap">
       <div className="glance-chart-header" style={{ paddingBottom: 8 }}>
-        <span className="glance-chart-title">Pearson r Correlation Table</span>
-        <span className="corr-hint">|r| &gt; 0.7 strong · 0.4–0.7 moderate · &lt;0.2 negligible</span>
-        <HelpButton label="Metric Correlations" onClick={() => onGuide(GUIDE_BY_ID.correlation)} />
+        <span className="glance-chart-title">{t('correlationTableTitle')}</span>
+        <span className="corr-hint">{t('correlationHint')}</span>
+        <HelpButton label={t('guide.correlation.title')} onClick={() => onGuide(guides.correlation)} />
       </div>
       <div className="corr-table-scroll">
         <table className="corr-table">
@@ -767,7 +555,7 @@ const CorrelationTable = memo(function CorrelationTable({ data, onGuide }: Corre
             <tr>
               <th />
               {activeMetrics.slice(1).map(m => (
-                <th key={m.label} className="corr-th">{m.label}</th>
+                <th key={m.label} className="corr-th">{metricLabel(m.key)}</th>
               ))}
             </tr>
           </thead>
@@ -776,7 +564,7 @@ const CorrelationTable = memo(function CorrelationTable({ data, onGuide }: Corre
               const globalRi = CORR_METRICS.findIndex(m => m.key === rowM.key)
               return (
                 <tr key={rowM.label}>
-                  <td className="corr-row-label">{rowM.label}</td>
+                  <td className="corr-row-label">{metricLabel(rowM.key)}</td>
                   {activeMetrics.slice(ri + 1).map(colM => {
                     const globalCi = CORR_METRICS.findIndex(m => m.key === colM.key)
                     const lo = Math.min(globalRi, globalCi)
@@ -811,14 +599,15 @@ interface LogPanelProps {
 }
 
 function LogPanel({ ts, logs, onNavigate, onClose }: LogPanelProps) {
+  const { t } = useTranslation('stats')
   return (
     <div className="stats-log-panel">
       <div className="stats-log-panel-header">
-        <span className="stats-log-panel-title">Logs near {fmtTimeFull(ts)}</span>
+        <span className="stats-log-panel-title">{t('logsNear', { time: fmtTimeFull(ts) })}</span>
         <div style={{ display: 'flex', gap: 6, marginLeft: 'auto' }}>
           <button className="pill-btn" style={{ fontSize: 10, padding: '2px 8px', height: 22 }}
             onClick={onNavigate}>
-            Go to Console
+            {t('goToConsole')}
           </button>
           <button className="pill-btn" style={{ fontSize: 10, padding: '2px 8px', height: 22 }}
             onClick={onClose}>
@@ -827,7 +616,7 @@ function LogPanel({ ts, logs, onNavigate, onClose }: LogPanelProps) {
         </div>
       </div>
       {logs.length === 0
-        ? <div className="stats-log-empty">No log data available for this period — server log buffer holds recent entries only.</div>
+        ? <div className="stats-log-empty">{t('noLogData')}</div>
         : logs.map((l, i) => (
           <div key={i} className="stats-log-line">{l.line}</div>
         ))
@@ -841,6 +630,8 @@ function LogPanel({ ts, logs, onNavigate, onClose }: LogPanelProps) {
 interface Props { onNavigate?: (tab: string) => void }
 
 export default function ServerStats({ onNavigate }: Props) {
+  const { t } = useTranslation(['stats', 'common'])
+  const guides = useMemo(() => buildGuides(t), [t])
   const { settings, update } = useSettings()
   const { getLogsAround } = useLogApi()
   const qc = useQueryClient()
@@ -936,36 +727,36 @@ export default function ServerStats({ onNavigate }: Props) {
 
   const perfSeries: ZSeries[] = useMemo(() => {
     const s: ZSeries[] = [
-      { key: 'tps1',       label: 'TPS',    color: 'var(--green)' },
-      { key: 'tickTimeMs', label: 'MSPT',   color: 'var(--amber)' },
-      { key: 'memUsedMb',  label: 'JVM Mem',color: 'var(--blue)'  },
+      { key: 'tps1',       label: t('series.tps'),    color: 'var(--green)' },
+      { key: 'tickTimeMs', label: t('series.mspt'),   color: 'var(--amber)' },
+      { key: 'memUsedMb',  label: t('series.jvmMem'), color: 'var(--blue)'  },
     ]
     if (hasCpuData) s.push({
-      key: 'cpuPercent', label: 'CPU', color: 'var(--red)',
+      key: 'cpuPercent', label: t('series.cpu'), color: 'var(--red)',
       extract: snap => (snap.cpuPercent != null && snap.cpuPercent >= 0) ? snap.cpuPercent : null,
     })
     return s
-  }, [hasCpuData])
+  }, [hasCpuData, t])
 
   const worldSeries: ZSeries[] = useMemo(() => {
     const s: ZSeries[] = [
-      { key: 'playerCount',  label: 'Players',  color: 'var(--amber)' },
-      { key: 'entityCount',  label: 'Entities', color: 'var(--blue)'  },
-      { key: 'loadedChunks', label: 'Chunks',   color: 'var(--mist)'  },
+      { key: 'playerCount',  label: t('series.players'),  color: 'var(--amber)' },
+      { key: 'entityCount',  label: t('series.entities'), color: 'var(--blue)'  },
+      { key: 'loadedChunks', label: t('series.chunks'),   color: 'var(--mist)'  },
     ]
     if (hasPingData) s.push({
-      key: 'pingP50', label: 'Ping', color: 'var(--green)',
+      key: 'pingP50', label: t('series.ping'), color: 'var(--green)',
       extract: snap => (snap.pingP50 != null && snap.pingP50 > 0) ? snap.pingP50 : null,
     })
     return s
-  }, [hasPingData])
+  }, [hasPingData, t])
 
   const changeRange = (r: Range) => {
     setRange(r)
     update({ stats: { defaultRange: r } })
   }
 
-  if (isLoading || !data) return <div className="section-root"><div className="dim">Loading…</div></div>
+  if (isLoading || !data) return <div className="section-root"><div className="dim">{t('common:loading')}</div></div>
 
   const [tps1, tps5, tps15] = data.tps
   const memPct = snap && snap.memMaxMb > 0 ? snap.memUsedMb / snap.memMaxMb : 0
@@ -975,7 +766,7 @@ export default function ServerStats({ onNavigate }: Props) {
   return (
     <div className="section-root">
       <div className="section-header">
-        <span className="section-title">Server Stats</span>
+        <span className="section-title">{t('sectionTitle')}</span>
         <div className="mac-seg-ctrl">
           {RANGES.map(r => (
             <button key={r} className={`mac-seg-btn${range === r ? ' active' : ''}`}
@@ -990,168 +781,168 @@ export default function ServerStats({ onNavigate }: Props) {
       {/* ── Stat cards ─────────────────────────────────────────────── */}
       <div className="stats-grid">
         <div className="stat-card">
-          <div className="stat-label">Players</div>
+          <div className="stat-label">{t('statLabel.players')}</div>
           <div className="stat-value amber">{data.onlinePlayers}</div>
-          <div className="stat-sub">of {data.maxPlayers} max</div>
+          <div className="stat-sub">{t('statSub.ofMax', { max: data.maxPlayers })}</div>
           <Sparkline values={historyRawWithCurrent.map(s => s.playerCount)} color="var(--amber)" />
         </div>
         <div className="stat-card">
-          <div className="stat-label">TPS · 1m</div>
+          <div className="stat-label">{t('statLabel.tps1m')}</div>
           <div className={`stat-value ${tpsClass(tps1)}`}>{tps1?.toFixed(1) ?? '—'}</div>
-          <div className="stat-sub">target 20.0</div>
+          <div className="stat-sub">{t('statSub.targetTps')}</div>
           <Sparkline values={historyRawWithCurrent.map(s => s.tps1)} color="var(--green)" />
         </div>
         <div className="stat-card">
-          <div className="stat-label">TPS · 5m</div>
+          <div className="stat-label">{t('statLabel.tps5m')}</div>
           <div className={`stat-value ${tpsClass(tps5)}`}>{tps5?.toFixed(1) ?? '—'}</div>
-          <div className="stat-sub">5 min avg</div>
+          <div className="stat-sub">{t('statSub.avg5m')}</div>
           <Sparkline values={historyRawWithCurrent.map(s => s.tps5)} color="var(--green)" />
         </div>
         <div className="stat-card">
-          <div className="stat-label">TPS · 15m</div>
+          <div className="stat-label">{t('statLabel.tps15m')}</div>
           <div className={`stat-value ${tpsClass(tps15)}`}>{tps15?.toFixed(1) ?? '—'}</div>
-          <div className="stat-sub">15 min avg</div>
+          <div className="stat-sub">{t('statSub.avg15m')}</div>
           <Sparkline values={historyRawWithCurrent.map(s => s.tps15)} color="var(--green)" />
         </div>
         <div className="stat-card">
-          <div className="stat-label">Tick Time</div>
+          <div className="stat-label">{t('statLabel.tickTime')}</div>
           <div className={`stat-value ${snap ? tickClass(snap.tickTimeMs) : ''}`}>
             {snap ? `${Math.round(snap.tickTimeMs)}ms` : '—'}
           </div>
-          <div className="stat-sub">healthy &lt;50ms</div>
+          <div className="stat-sub">{t('statSub.healthyTick')}</div>
           <Sparkline values={historyRawWithCurrent.map(s => s.tickTimeMs)} color="var(--amber)" />
         </div>
         <div className="stat-card">
-          <div className="stat-label">JVM Memory</div>
+          <div className="stat-label">{t('statLabel.jvmMemory')}</div>
           <div className={`stat-value ${memClass(memPct)}`}>{snap ? fmtMem(snap.memUsedMb) : '—'}</div>
-          <div className="stat-sub">{snap ? `of ${fmtMem(snap.memMaxMb)} max` : ''}</div>
+          <div className="stat-sub">{snap ? t('statSub.ofMax', { max: fmtMem(snap.memMaxMb) }) : ''}</div>
           <Sparkline values={historyRawWithCurrent.map(s => s.memUsedMb)} color="var(--blue)" />
         </div>
         {snap?.cpuPercent != null && snap.cpuPercent >= 0 && (
           <div className="stat-card">
-            <div className="stat-label">Host CPU</div>
+            <div className="stat-label">{t('statLabel.hostCpu')}</div>
             <div className={`stat-value ${cpuClass(snap.cpuPercent)}`}>{snap.cpuPercent.toFixed(1)}%</div>
-            <div className="stat-sub">system-wide</div>
+            <div className="stat-sub">{t('statSub.systemWide')}</div>
             <Sparkline values={historyRawWithCurrent.map(s => s.cpuPercent != null && s.cpuPercent >= 0 ? s.cpuPercent : null)} color="var(--red)" />
           </div>
         )}
         {sysMemPct != null && snap?.sysMemUsedMb != null && snap?.sysMemTotalMb != null && (
           <div className="stat-card">
-            <div className="stat-label">Host RAM</div>
+            <div className="stat-label">{t('statLabel.hostRam')}</div>
             <div className={`stat-value ${memClass(sysMemPct)}`}>{fmtMem(snap.sysMemUsedMb)}</div>
-            <div className="stat-sub">of {fmtMem(snap.sysMemTotalMb)}</div>
+            <div className="stat-sub">{t('statSub.of', { value: fmtMem(snap.sysMemTotalMb) })}</div>
             <Sparkline values={historyRawWithCurrent.map(s => s.sysMemUsedMb)} color="var(--blue)" />
           </div>
         )}
         {diskPct != null && snap?.diskUsedGb != null && snap?.diskTotalGb != null && (
           <div className="stat-card">
-            <div className="stat-label">Disk</div>
+            <div className="stat-label">{t('statLabel.disk')}</div>
             <div className={`stat-value ${diskClass(diskPct)}`}>{snap.diskUsedGb} GB</div>
-            <div className="stat-sub">of {snap.diskTotalGb} GB used</div>
+            <div className="stat-sub">{t('statSub.ofGbUsed', { total: snap.diskTotalGb })}</div>
             <Sparkline values={historyRawWithCurrent.map(s => s.diskUsedGb)} color="var(--mist)" />
           </div>
         )}
         {snap && (
           <div className="stat-card">
-            <div className="stat-label">Entities</div>
+            <div className="stat-label">{t('statLabel.entities')}</div>
             <div className="stat-value">{snap.entityCount.toLocaleString()}</div>
-            <div className="stat-sub">all worlds</div>
+            <div className="stat-sub">{t('statSub.allWorlds')}</div>
             <Sparkline values={historyRawWithCurrent.map(s => s.entityCount)} color="var(--blue)" />
           </div>
         )}
         {snap && (
           <div className="stat-card">
-            <div className="stat-label">Chunks</div>
+            <div className="stat-label">{t('statLabel.chunks')}</div>
             <div className="stat-value">{snap.loadedChunks.toLocaleString()}</div>
-            <div className="stat-sub">loaded</div>
+            <div className="stat-sub">{t('statSub.loaded')}</div>
             <Sparkline values={historyRawWithCurrent.map(s => s.loadedChunks)} color="var(--mist)" />
           </div>
         )}
         {snap?.pingP50 != null && snap.pingP50 > 0 && (
           <div className="stat-card">
-            <div className="stat-label">Ping P50</div>
+            <div className="stat-label">{t('statLabel.pingP50')}</div>
             <div className="stat-value green">{snap.pingP50}ms</div>
-            <div className="stat-sub">median latency</div>
+            <div className="stat-sub">{t('statSub.medianLatency')}</div>
             <Sparkline values={historyRawWithCurrent.map(s => s.pingP50 != null && s.pingP50 > 0 ? s.pingP50 : null)} color="var(--green)" />
           </div>
         )}
         {rangeSummary.samples > 0 && (
           <div className="stat-card">
-            <div className="stat-label">Window Data</div>
+            <div className="stat-label">{t('statLabel.windowData')}</div>
             <div className="stat-value">{rangeSummary.coverageMin != null ? `${Math.round(rangeSummary.coverageMin)}m` : '—'}</div>
-            <div className="stat-sub">{rangeSummary.samples.toLocaleString()} samples in {range}</div>
+            <div className="stat-sub">{t('statSub.samplesInRange', { count: rangeSummary.samples.toLocaleString(), range })}</div>
           </div>
         )}
         {rangeSummary.avgTps != null && (
           <div className="stat-card">
-            <div className="stat-label">Avg TPS</div>
+            <div className="stat-label">{t('statLabel.avgTps')}</div>
             <div className={`stat-value ${tpsClass(rangeSummary.avgTps)}`}>{rangeSummary.avgTps.toFixed(1)}</div>
-            <div className="stat-sub">selected window</div>
+            <div className="stat-sub">{t('statSub.selectedWindow')}</div>
           </div>
         )}
         {rangeSummary.minTps != null && (
           <div className="stat-card">
-            <div className="stat-label">Lowest TPS</div>
+            <div className="stat-label">{t('statLabel.lowestTps')}</div>
             <div className={`stat-value ${tpsClass(rangeSummary.minTps)}`}>{rangeSummary.minTps.toFixed(1)}</div>
-            <div className="stat-sub">selected window</div>
+            <div className="stat-sub">{t('statSub.selectedWindow')}</div>
           </div>
         )}
         {rangeSummary.avgMspt != null && (
           <div className="stat-card">
-            <div className="stat-label">Avg MSPT</div>
+            <div className="stat-label">{t('statLabel.avgMspt')}</div>
             <div className={`stat-value ${tickClass(rangeSummary.avgMspt)}`}>{Math.round(rangeSummary.avgMspt)}ms</div>
-            <div className="stat-sub">selected window</div>
+            <div className="stat-sub">{t('statSub.selectedWindow')}</div>
           </div>
         )}
         {rangeSummary.maxMspt != null && (
           <div className="stat-card">
-            <div className="stat-label">Peak MSPT</div>
+            <div className="stat-label">{t('statLabel.peakMspt')}</div>
             <div className={`stat-value ${tickClass(rangeSummary.maxMspt)}`}>{Math.round(rangeSummary.maxMspt)}ms</div>
-            <div className="stat-sub">selected window</div>
+            <div className="stat-sub">{t('statSub.selectedWindow')}</div>
           </div>
         )}
         {rangeSummary.peakPlayers != null && (
           <div className="stat-card">
-            <div className="stat-label">Peak Players</div>
+            <div className="stat-label">{t('statLabel.peakPlayers')}</div>
             <div className="stat-value amber">{Math.round(rangeSummary.peakPlayers)}</div>
-            <div className="stat-sub">{rangeSummary.avgPlayers != null ? `avg ${rangeSummary.avgPlayers.toFixed(1)}` : 'selected window'}</div>
+            <div className="stat-sub">{rangeSummary.avgPlayers != null ? t('statSub.avgValue', { value: rangeSummary.avgPlayers.toFixed(1) }) : t('statSub.selectedWindow')}</div>
           </div>
         )}
         {rangeSummary.avgCpu != null && (
           <div className="stat-card">
-            <div className="stat-label">Avg CPU</div>
+            <div className="stat-label">{t('statLabel.avgCpu')}</div>
             <div className={`stat-value ${cpuClass(rangeSummary.avgCpu)}`}>{rangeSummary.avgCpu.toFixed(1)}%</div>
-            <div className="stat-sub">selected window</div>
+            <div className="stat-sub">{t('statSub.selectedWindow')}</div>
           </div>
         )}
         {rangeSummary.peakJvmPct != null && (
           <div className="stat-card">
-            <div className="stat-label">Peak JVM</div>
+            <div className="stat-label">{t('statLabel.peakJvm')}</div>
             <div className={`stat-value ${memClass(rangeSummary.peakJvmPct)}`}>{fmtPct(rangeSummary.peakJvmPct)}</div>
-            <div className="stat-sub">heap used</div>
+            <div className="stat-sub">{t('statSub.heapUsed')}</div>
           </div>
         )}
         {rangeSummary.maxPingP95 != null && (
           <div className="stat-card">
-            <div className="stat-label">Worst Ping P95</div>
+            <div className="stat-label">{t('statLabel.worstPingP95')}</div>
             <div className="stat-value">{Math.round(rangeSummary.maxPingP95)}ms</div>
-            <div className="stat-sub">selected window</div>
+            <div className="stat-sub">{t('statSub.selectedWindow')}</div>
           </div>
         )}
         <div className="stat-card">
-          <div className="stat-label">Uptime</div>
+          <div className="stat-label">{t('statLabel.uptime')}</div>
           <div className="stat-value">{snap ? fmtUptime(snap.uptimeMs) : '—'}</div>
-          <div className="stat-sub">since last restart</div>
+          <div className="stat-sub">{t('statSub.sinceLastRestart')}</div>
         </div>
         <div className="stat-card">
-          <div className="stat-label">Worlds</div>
+          <div className="stat-label">{t('statLabel.worlds')}</div>
           <div className="stat-value amber">{data.worldCount}</div>
-          <div className="stat-sub">loaded dimensions</div>
+          <div className="stat-sub">{t('statSub.loadedDimensions')}</div>
         </div>
         <div className="stat-card">
-          <div className="stat-label">Plugins</div>
+          <div className="stat-label">{t('statLabel.plugins')}</div>
           <div className="stat-value">{data.pluginCount}</div>
-          <div className="stat-sub">loaded</div>
+          <div className="stat-sub">{t('statSub.loaded')}</div>
         </div>
       </div>
 
@@ -1160,56 +951,56 @@ export default function ServerStats({ onNavigate }: Props) {
 
           {/* ── Individual charts ──────────────────────────────────── */}
           {ss.showChartTps && (
-            <MiniChart data={history} dataKey="tps1" color="var(--green)" label="TPS"
-              guideId="tps" onGuide={setGuide}
+            <MiniChart data={history} dataKey="tps1" color="var(--green)" label={t('chart.tps')}
+              guideId="tps" guides={guides} onGuide={setGuide}
               yDomain={[0, 20]} yFmt={v => v.toFixed(1)}
-              extraLine={{ key: 'tps5', color: 'var(--green)', label: '5m' }} />
+              extraLine={{ key: 'tps5', color: 'var(--green)', label: t('chart.5m') }} />
           )}
           {ss.showChartMspt && (
-            <MiniChart data={history} dataKey="tickTimeMs" color="var(--amber)" label="MSPT"
-              guideId="mspt" onGuide={setGuide}
+            <MiniChart data={history} dataKey="tickTimeMs" color="var(--amber)" label={t('chart.mspt')}
+              guideId="mspt" guides={guides} onGuide={setGuide}
               yDomain={[0, 'auto']} yFmt={v => `${Math.round(v)}ms`} />
           )}
           {ss.showChartPlayers && (
-            <MiniChart data={history} dataKey="playerCount" color="var(--amber)" label="Players"
-              guideId="players" onGuide={setGuide}
+            <MiniChart data={history} dataKey="playerCount" color="var(--amber)" label={t('chart.players')}
+              guideId="players" guides={guides} onGuide={setGuide}
               yDomain={[0, 'auto']} yFmt={v => String(Math.round(v))} events={eventsRaw} />
           )}
           {ss.showChartEntities && (
-            <MiniChart data={history} dataKey="entityCount" color="var(--blue)" label="Entities"
-              guideId="entities" onGuide={setGuide}
+            <MiniChart data={history} dataKey="entityCount" color="var(--blue)" label={t('chart.entities')}
+              guideId="entities" guides={guides} onGuide={setGuide}
               yFmt={fmtK} />
           )}
           {ss.showChartChunks && (
-            <MiniChart data={history} dataKey="loadedChunks" color="var(--mist)" label="Loaded Chunks"
-              guideId="chunks" onGuide={setGuide}
+            <MiniChart data={history} dataKey="loadedChunks" color="var(--mist)" label={t('chart.loadedChunks')}
+              guideId="chunks" guides={guides} onGuide={setGuide}
               yFmt={fmtK} />
           )}
           {ss.showChartPing && hasPingData && (
-            <MiniChart data={history} dataKey="pingP50" color="var(--green)" label="Ping P50 / P95"
-              guideId="ping" onGuide={setGuide}
+            <MiniChart data={history} dataKey="pingP50" color="var(--green)" label={t('chart.pingP50P95')}
+              guideId="ping" guides={guides} onGuide={setGuide}
               yDomain={[0, 'auto']} yFmt={v => `${Math.round(v)}ms`}
-              extraLine={{ key: 'pingP95', color: 'var(--yellow)', label: 'P95' }} />
+              extraLine={{ key: 'pingP95', color: 'var(--yellow)', label: t('chart.p95') }} />
           )}
 
           {/* ── Z-score overlays ───────────────────────────────────── */}
           {ss.showOverlayPerf && (
             <ZOverlay data={history} series={perfSeries}
-              title="Performance Overlay (Z-score)"
+              title={t('chart.perfOverlay')}
               guideId="perfOverlay"
               showMarkers={ss.overlayAnomalyMarkers}
               threshold={ss.overlayAnomalyThreshold}
               onAnomalyClick={onAnomalyClick}
-              onGuide={setGuide} />
+              guides={guides} onGuide={setGuide} />
           )}
           {ss.showOverlayWorld && (
             <ZOverlay data={history} series={worldSeries}
-              title="World Overlay (Z-score)"
+              title={t('chart.worldOverlay')}
               guideId="worldOverlay"
               showMarkers={ss.overlayAnomalyMarkers}
               threshold={ss.overlayAnomalyThreshold}
               onAnomalyClick={onAnomalyClick}
-              onGuide={setGuide} />
+              guides={guides} onGuide={setGuide} />
           )}
 
           {/* ── Log panel ─────────────────────────────────────────── */}
@@ -1224,7 +1015,7 @@ export default function ServerStats({ onNavigate }: Props) {
 
           {/* ── Correlation table ─────────────────────────────────── */}
           {ss.showCorrelation && history.length >= 5 && (
-            <CorrelationTable data={history} onGuide={setGuide} />
+            <CorrelationTable data={history} guides={guides} onGuide={setGuide} />
           )}
         </div>
       )}

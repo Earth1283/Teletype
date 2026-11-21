@@ -1,0 +1,16 @@
+{
+  "appleifyActivated": "Appleify activated",
+  "wheelCommandPalette": "Command Palette",
+  "wheelOpenTab": "Open {{label}}",
+  "tabGlance": "Glance",
+  "tabConsole": "Console",
+  "tabPlayers": "Players",
+  "tabStats": "Stats",
+  "tabFiles": "Files",
+  "tabActions": "Actions",
+  "tabAudit": "Audit",
+  "tabNetwork": "Network",
+  "tabProfiling": "Profiling",
+  "tabSettings": "Settings",
+  "tabFailedToRender": "{{label}} failed to render"
+}

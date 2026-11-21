@@ -1,0 +1,16 @@
+{
+  "appleifyActivated": "Appleify 已激活",
+  "wheelCommandPalette": "命令面板",
+  "wheelOpenTab": "打开 {{label}}",
+  "tabGlance": "概览",
+  "tabConsole": "控制台",
+  "tabPlayers": "玩家",
+  "tabStats": "统计",
+  "tabFiles": "文件",
+  "tabActions": "操作",
+  "tabAudit": "审计",
+  "tabNetwork": "网络",
+  "tabProfiling": "性能分析",
+  "tabSettings": "设置",
+  "tabFailedToRender": "{{label}} 渲染失败"
+}

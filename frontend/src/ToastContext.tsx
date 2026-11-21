@@ -1,4 +1,5 @@
 import { createContext, useCallback, useContext, useRef, useState } from 'react'
+import { useTranslation } from 'react-i18next'
 
 type ToastKind = 'success' | 'error' | 'info'
 
@@ -22,6 +23,7 @@ export function useToast(): ToastAPI {
 }
 
 export function ToastProvider({ children }: { children: React.ReactNode }) {
+  const { t } = useTranslation('toast')
   const [toasts, setToasts] = useState<ToastItem[]>([])
   const counter = useRef(0)
 
@@ -46,11 +48,11 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
     <ToastCtx.Provider value={api}>
       {children}
       <div className="toast-container" role="status" aria-live="polite">
-        {toasts.map(t => (
-          <div key={t.id} className={`toast ${t.kind}${t.exiting ? ' exiting' : ''}`}>
+        {toasts.map(toast => (
+          <div key={toast.id} className={`toast ${toast.kind}${toast.exiting ? ' exiting' : ''}`}>
             <span className="toast-dot" aria-hidden="true" />
-            <span className="toast-msg">{t.msg}</span>
-            <button className="toast-close" onClick={() => dismiss(t.id)} aria-label="Dismiss">×</button>
+            <span className="toast-msg">{toast.msg}</span>
+            <button className="toast-close" onClick={() => dismiss(toast.id)} aria-label={t('dismiss')}>×</button>
           </div>
         ))}
       </div>

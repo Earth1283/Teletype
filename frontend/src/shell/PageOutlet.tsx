@@ -1,4 +1,5 @@
 import { lazy, Suspense } from 'react'
+import { useTranslation } from 'react-i18next'
 import { ErrorBoundary } from '../ErrorBoundary'
 import { Skeleton } from '../Skeleton'
 import { PageActiveProvider } from './PageActivity'
@@ -59,6 +60,7 @@ export interface PageOutletProps {
 
 /** Keep-alive stack: every visited tab stays mounted, hidden via display:none. */
 export function PageOutlet({ activeTab, visitedTabs, onNavigate }: PageOutletProps) {
+  const { t } = useTranslation('shellKernel')
   return (
     <>
       {TABS.map(({ id, label }) => {
@@ -66,7 +68,7 @@ export function PageOutlet({ activeTab, visitedTabs, onNavigate }: PageOutletPro
         const active = id === activeTab
         return (
           <div key={id} className="page-slot" style={{ display: active ? 'contents' : 'none' }}>
-            <ErrorBoundary label={`${label} failed to render`}>
+            <ErrorBoundary label={t('tabFailedToRender', { label })}>
               {renderPage(id, onNavigate, active)}
             </ErrorBoundary>
           </div>

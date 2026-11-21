@@ -1,0 +1,14 @@
+{
+  "closeContextWheel": "关闭上下文轮盘",
+  "actionPalette": "命令面板",
+  "actionGlance": "概览",
+  "actionConsole": "控制台",
+  "actionPlayers": "玩家",
+  "actionStats": "统计",
+  "actionFiles": "文件",
+  "actionActions": "操作",
+  "actionAudit": "审计",
+  "actionNetwork": "网络",
+  "actionSettings": "设置",
+  "actionQuickActions": "快捷操作"
+}

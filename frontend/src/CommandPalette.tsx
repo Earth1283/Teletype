@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState, useMemo } from 'react'
+import { useTranslation } from 'react-i18next'
 import { useQuery } from '@tanstack/react-query'
 import { api } from './api/client'
 import { useLogApi } from './LogContext'
@@ -71,6 +72,7 @@ interface Props {
 }
 
 export default function CommandPalette({ open, onClose, onNavigate }: Props) {
+  const { t } = useTranslation('commandPalette')
   const [query, setQuery] = useState('')
   const [selectedIndex, setSelectedIndex] = useState(0)
   const [recents, setRecents] = useState<Recent[]>([])
@@ -97,9 +99,9 @@ export default function CommandPalette({ open, onClose, onNavigate }: Props) {
     if (consoleCmd) {
       return [{
         id: '__console__',
-        label: `Execute: ${consoleCmd}`,
-        sub: 'send to server console',
-        category: 'Console',
+        label: t('commandPalette:executeLabel', { command: consoleCmd }),
+        sub: t('commandPalette:sendToConsole'),
+        category: t('commandPalette:categoryConsole'),
         icon: <IconTerminal size={14} />,
         run: () => {
           send(consoleCmd)
@@ -114,8 +116,8 @@ export default function CommandPalette({ open, onClose, onNavigate }: Props) {
         return [{
           id: `recent-cmd-${r.cmd}`,
           label: r.cmd,
-          sub: 'run again',
-          category: 'Recent',
+          sub: t('commandPalette:runAgain'),
+          category: t('commandPalette:categoryRecent'),
           icon: <IconTerminal size={14} />,
           run: () => {
             send(r.cmd)
@@ -130,7 +132,7 @@ export default function CommandPalette({ open, onClose, onNavigate }: Props) {
         id: `recent-snip-${s.id}`,
         label: s.name,
         sub: s.cmds[0],
-        category: 'Recent',
+        category: t('commandPalette:categoryRecent'),
         icon: <IconZap size={14} />,
         run: () => {
           api.post(`/actions/execute/${s.id}`, { vars: {} }).catch(() => {})
@@ -140,12 +142,12 @@ export default function CommandPalette({ open, onClose, onNavigate }: Props) {
       }]
     })
 
-    const nav: PaletteItem[] = TABS.map(t => ({
-      id: `nav-${t.id}`,
-      label: t.label,
-      category: 'Navigate',
-      icon: <t.Icon size={14} />,
-      run: () => { onNavigate(t.id); onClose() },
+    const nav: PaletteItem[] = TABS.map(tabItem => ({
+      id: `nav-${tabItem.id}`,
+      label: tabItem.label,
+      category: t('commandPalette:categoryNavigate'),
+      icon: <tabItem.Icon size={14} />,
+      run: () => { onNavigate(tabItem.id); onClose() },
     }))
 
     const qa = snippets
@@ -154,7 +156,7 @@ export default function CommandPalette({ open, onClose, onNavigate }: Props) {
         id: `qa-${s.id}`,
         label: s.name,
         sub: s.cmds[0],
-        category: 'Quick Actions',
+        category: t('commandPalette:categoryQuickActions'),
         icon: <IconZap size={14} />,
         run: () => {
           if (s.vars.length > 0) {
@@ -173,7 +175,7 @@ export default function CommandPalette({ open, onClose, onNavigate }: Props) {
         id: `snip-${s.id}`,
         label: s.name,
         sub: s.cmds[0],
-        category: 'Snippets',
+        category: t('commandPalette:categorySnippets'),
         icon: <IconPlay size={14} />,
         run: () => {
           if (s.vars.length > 0) {
@@ -187,7 +189,7 @@ export default function CommandPalette({ open, onClose, onNavigate }: Props) {
       }))
 
     return [...recent, ...nav, ...qa, ...other]
-  }, [snippets, recents, consoleCmd, onNavigate, onClose, send, quickActionsId])
+  }, [snippets, recents, consoleCmd, onNavigate, onClose, send, quickActionsId, t])
 
   const filtered = useMemo(() => {
     if (consoleCmd) return allItems
@@ -264,7 +266,7 @@ export default function CommandPalette({ open, onClose, onNavigate }: Props) {
           <input
             ref={inputRef}
             className="min-w-0 flex-1 bg-transparent font-sans text-[13px] text-text-primary placeholder:text-text-muted focus:outline-none"
-            placeholder="Search commands, snippets, or type run <cmd>…"
+            placeholder={t('commandPalette:searchPlaceholder')}
             value={query}
             onChange={e => { setQuery(e.target.value); setSelectedIndex(0) }}
             spellCheck={false}
@@ -275,7 +277,7 @@ export default function CommandPalette({ open, onClose, onNavigate }: Props) {
 
         <div className="max-h-[300px] overflow-y-auto p-1.5" ref={listRef}>
           {flatItems.length === 0 ? (
-            <div className="px-3 py-5 text-center font-sans text-[13px] text-text-muted">No results for &ldquo;{query}&rdquo;</div>
+            <div className="px-3 py-5 text-center font-sans text-[13px] text-text-muted">{t('commandPalette:noResults', { query })}</div>
           ) : (
             Array.from(grouped.entries()).map(([category, items]) => (
               <div key={category}>
@@ -307,9 +309,9 @@ export default function CommandPalette({ open, onClose, onNavigate }: Props) {
         </div>
 
         <div className="flex items-center gap-3 border-t border-border px-3 py-1.5 font-mono text-[10px] text-text-muted">
-          <span className="flex items-center gap-1"><kbd className="rounded-sm border border-border px-1">↑↓</kbd> navigate</span>
-          <span className="flex items-center gap-1"><kbd className="rounded-sm border border-border px-1">↵</kbd> run</span>
-          <span className="flex items-center gap-1"><kbd className="rounded-sm border border-border px-1">Esc</kbd> close</span>
+          <span className="flex items-center gap-1"><kbd className="rounded-sm border border-border px-1">↑↓</kbd> {t('commandPalette:hintNavigate')}</span>
+          <span className="flex items-center gap-1"><kbd className="rounded-sm border border-border px-1">↵</kbd> {t('commandPalette:hintRun')}</span>
+          <span className="flex items-center gap-1"><kbd className="rounded-sm border border-border px-1">Esc</kbd> {t('commandPalette:hintClose')}</span>
           <span className="ml-auto flex items-center gap-1">
             <IconCommand size={11} />
             <span>K</span>

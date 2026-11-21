@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import { useSettings } from '../SettingsContext'
 import { useToast } from '../ToastContext'
 import { useShell } from './ShellKernel'
@@ -47,6 +48,7 @@ function haptic(pattern: VibratePattern = 6) {
 }
 
 export default function AppleShell({ onLogout }: { onLogout: () => void }) {
+  const { t } = useTranslation(['appleShell', 'common'])
   const {
     tab, setTab, visitedTabs, paletteOpen, setPaletteOpen, openPalette,
     mobileMoreOpen: moreOpen, setMobileMoreOpen: setMoreOpen, connected,
@@ -129,8 +131,8 @@ export default function AppleShell({ onLogout }: { onLogout: () => void }) {
 
   const disable = useCallback(() => {
     update({ appleify: false })
-    toast.info('Appleify deactivated')
-  }, [update, toast])
+    toast.info(t('appleShell:appleifyDeactivated'))
+  }, [update, toast, t])
 
   const expandPills = useCallback(() => {
     setPillsCollapsed(false)
@@ -182,8 +184,8 @@ export default function AppleShell({ onLogout }: { onLogout: () => void }) {
           {/* Left — connection status */}
           <div className="apple-nav-left">
             {connected
-              ? <div className="apple-live-badge"><span className="apple-live-dot" />Live</div>
-              : <div className="apple-offline-badge">Offline</div>
+              ? <div className="apple-live-badge"><span className="apple-live-dot" />{t('appleShell:live')}</div>
+              : <div className="apple-offline-badge">{t('appleShell:offline')}</div>
             }
           </div>
 
@@ -196,7 +198,7 @@ export default function AppleShell({ onLogout }: { onLogout: () => void }) {
               <button
                 className="apple-nav-icon-btn"
                 type="button"
-                aria-label="Search"
+                aria-label={t('common:search')}
                 onClick={openPalette}
               >
                 <IconCommand size={17} />
@@ -208,7 +210,7 @@ export default function AppleShell({ onLogout }: { onLogout: () => void }) {
 
       {/* Nav collapsed dot — tap to restore both pills */}
       {pillsCollapsed && (
-        <button className="apple-nav-dot" onClick={expandPills} aria-label="Expand navigation">
+        <button className="apple-nav-dot" onClick={expandPills} aria-label={t('appleShell:expandNavigation')}>
           {connected
             ? <span className="apple-live-dot" style={{ width: 7, height: 7 }} />
             : <span className="apple-dot-gray" />}
@@ -224,7 +226,7 @@ export default function AppleShell({ onLogout }: { onLogout: () => void }) {
       <nav
         ref={tabBarRef}
         className={`apple-tab-bar${pillsCollapsed ? ' apple-pill-hidden' : ''}`}
-        aria-label="Navigation"
+        aria-label={t('appleShell:navigation')}
       >
         {PRIMARY_MOBILE_TABS.map(tabId => {
           const t      = tabDef(tabId)
@@ -262,17 +264,17 @@ export default function AppleShell({ onLogout }: { onLogout: () => void }) {
           onPointerUp={handleTabUp}
           onPointerCancel={handleTabUp}
           onClick={() => { haptic(5); setMoreOpen(!moreOpen) }}
-          aria-label="More"
+          aria-label={t('appleShell:more')}
           aria-expanded={moreOpen}
         >
           <div className="apple-tab-icon"><EllipsisCircle size={22} /></div>
-          <span className="apple-tab-label">More</span>
+          <span className="apple-tab-label">{t('appleShell:more')}</span>
         </button>
       </nav>
 
       {/* Tab collapsed dot — tap to restore both pills */}
       {pillsCollapsed && (
-        <button className="apple-tab-dot" onClick={expandPills} aria-label="Expand tab bar">
+        <button className="apple-tab-dot" onClick={expandPills} aria-label={t('appleShell:expandTabBar')}>
           <activeTab.Icon size={20} />
         </button>
       )}
@@ -282,7 +284,7 @@ export default function AppleShell({ onLogout }: { onLogout: () => void }) {
         <button
           type="button"
           className="apple-sheet-scrim"
-          aria-label="Close menu"
+          aria-label={t('appleShell:closeMenu')}
           onClick={() => setMoreOpen(false)}
         />
       )}
@@ -291,11 +293,11 @@ export default function AppleShell({ onLogout }: { onLogout: () => void }) {
         className={`apple-more-sheet${moreOpen ? ' open' : ''}`}
         aria-hidden={!moreOpen}
         role="dialog"
-        aria-label="More options"
+        aria-label={t('appleShell:moreOptions')}
       >
         <div className="apple-sheet-handle" aria-hidden="true" />
         <div className="apple-sheet-header">
-          <span className="apple-sheet-title">More</span>
+          <span className="apple-sheet-title">{t('appleShell:more')}</span>
         </div>
 
         {/* Secondary nav items */}
@@ -328,7 +330,7 @@ export default function AppleShell({ onLogout }: { onLogout: () => void }) {
             <div className="apple-row-icon" style={{ fontSize: 17, background: 'rgba(0,122,255,0.10)' }}>
               🍎
             </div>
-            <span className="apple-row-label">Disable Appleify</span>
+            <span className="apple-row-label">{t('appleShell:disableAppleify')}</span>
             <ChevronRight />
           </button>
 
@@ -336,7 +338,7 @@ export default function AppleShell({ onLogout }: { onLogout: () => void }) {
             <div className="apple-row-icon apple-row-icon--red">
               <IconLogOut size={17} />
             </div>
-            <span className="apple-row-label apple-row-label--red">Sign Out</span>
+            <span className="apple-row-label apple-row-label--red">{t('appleShell:signOut')}</span>
           </button>
         </div>
       </div>

@@ -1,0 +1,16 @@
+{
+  "appleifyActivated": "Appleify activé",
+  "wheelCommandPalette": "Palette de commandes",
+  "wheelOpenTab": "Ouvrir {{label}}",
+  "tabGlance": "Aperçu",
+  "tabConsole": "Console",
+  "tabPlayers": "Joueurs",
+  "tabStats": "Statistiques",
+  "tabFiles": "Fichiers",
+  "tabActions": "Actions",
+  "tabAudit": "Audit",
+  "tabNetwork": "Réseau",
+  "tabProfiling": "Profilage",
+  "tabSettings": "Réglages",
+  "tabFailedToRender": "Échec du rendu de {{label}}"
+}

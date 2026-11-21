@@ -1,0 +1,13 @@
+{
+  "live": "直播中",
+  "offline": "离线",
+  "expandNavigation": "展开导航",
+  "navigation": "导航",
+  "more": "更多",
+  "expandTabBar": "展开标签栏",
+  "closeMenu": "关闭菜单",
+  "moreOptions": "更多选项",
+  "disableAppleify": "禁用 Appleify",
+  "signOut": "登出",
+  "appleifyDeactivated": "Appleify 已停用"
+}

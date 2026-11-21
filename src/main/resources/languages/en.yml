@@ -1,8 +1,14 @@
-# Teletype Plugin Messages
+# Teletype Plugin Messages — English (en)
 # Format: MiniMessage — https://docs.advntr.dev/minimessage/format
 # Available placeholders depend on the message; see comments on each key.
 # {prefix} is always available and resolved from the prefix key below.
 # To disable a message entirely, set it to an empty string: ""
+#
+# To add another language: copy this file to another file in this same
+# languages/ folder (e.g. de.yml), translate the values (keep the keys and
+# {placeholders} unchanged), then set language: de in config.yml and run
+# /tty reload. Missing keys in a non-English file silently fall back to
+# this file's value.
 
 prefix: "<bold><aqua>Teletype</aqua></bold> <dark_gray>»</dark_gray> "
 

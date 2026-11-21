@@ -1,4 +1,5 @@
 import { useState, type ReactNode } from 'react'
+import { useTranslation } from 'react-i18next'
 
 export type PromptVariant = 'info' | 'error' | 'danger'
 
@@ -18,12 +19,14 @@ export default function PromptModal({
   title,
   message,
   variant = 'info',
-  confirmLabel = 'OK',
+  confirmLabel,
   cancelLabel,
   onConfirm,
   onClose,
 }: PromptModalProps) {
+  const { t } = useTranslation(['promptModal', 'common'])
   const [busy, setBusy] = useState(false)
+  const resolvedConfirmLabel = confirmLabel ?? t('common:ok')
 
   if (!open) return null
 
@@ -57,7 +60,7 @@ export default function PromptModal({
             </button>
           )}
           <button className={primaryClass} disabled={busy} onClick={confirm} autoFocus>
-            {busy ? 'Working...' : confirmLabel}
+            {busy ? t('promptModal:working') : resolvedConfirmLabel}
           </button>
         </div>
       </div>

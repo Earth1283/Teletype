@@ -1,0 +1,15 @@
+{
+  "executeLabel": "Execute: {{command}}",
+  "sendToConsole": "send to server console",
+  "categoryConsole": "Console",
+  "runAgain": "run again",
+  "categoryRecent": "Recent",
+  "categoryNavigate": "Navigate",
+  "categoryQuickActions": "Quick Actions",
+  "categorySnippets": "Snippets",
+  "searchPlaceholder": "Search commands, snippets, or type run <cmd>…",
+  "noResults": "No results for “{{query}}”",
+  "hintNavigate": "navigate",
+  "hintRun": "run",
+  "hintClose": "close"
+}

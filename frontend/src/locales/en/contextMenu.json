@@ -1,0 +1,14 @@
+{
+  "closeContextWheel": "Close context wheel",
+  "actionPalette": "Command Palette",
+  "actionGlance": "Glance",
+  "actionConsole": "Console",
+  "actionPlayers": "Players",
+  "actionStats": "Stats",
+  "actionFiles": "Files",
+  "actionActions": "Actions",
+  "actionAudit": "Audit",
+  "actionNetwork": "Network",
+  "actionSettings": "Settings",
+  "actionQuickActions": "Quick Actions"
+}

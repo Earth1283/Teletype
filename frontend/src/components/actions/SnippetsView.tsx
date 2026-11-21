@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import type { Snippet, SnippetCategory } from './actionTypes'
 import {
   useDeleteSnippet, useUpdateSnippet, useCreateSnippet,
@@ -23,6 +24,7 @@ interface Props {
 }
 
 export default function SnippetsView({ snippets, categories }: Props) {
+  const { t } = useTranslation(['actions', 'common'])
   const [catFilter, setCatFilter]         = useState('all')
   const [runSnippet, setRunSnippet]       = useState<Snippet | null>(null)
   const [schedSnippet, setSchedSnippet]   = useState<Snippet | null>(null)
@@ -58,7 +60,7 @@ export default function SnippetsView({ snippets, categories }: Props) {
       <div className="cat-filter-row">
         <button className={`cat-tab${catFilter === 'all' ? ' active' : ''}`}
           onClick={() => setCatFilter('all')}>
-          All <span className="cat-count">{snippets.length}</span>
+          {t('actions:snippetsView.allTab')} <span className="cat-count">{snippets.length}</span>
         </button>
         {categories.map(cat => {
           const count = snippets.filter(s => s.categoryId === cat.id).length
@@ -73,15 +75,15 @@ export default function SnippetsView({ snippets, categories }: Props) {
           )
         })}
         <div style={{ flex: 1 }} />
-        <button className="btn-ghost btn-sm" onClick={() => setShowNewCat(true)}>+ Category</button>
-        <button className="btn-primary btn-sm" onClick={() => setShowNewSnippet(true)}>+ Snippet</button>
+        <button className="btn-ghost btn-sm" onClick={() => setShowNewCat(true)}>{t('actions:snippetsView.addCategory')}</button>
+        <button className="btn-primary btn-sm" onClick={() => setShowNewSnippet(true)}>{t('actions:snippetsView.addSnippet')}</button>
       </div>
 
       {/* Card grid */}
       {displayed.length === 0 ? (
         <div className="actions-empty">
-          <span>No snippets{catFilter !== 'all' ? ' in this category' : ''}.</span>
-          <button className="btn-ghost" onClick={() => setShowNewSnippet(true)}>Create one</button>
+          <span>{catFilter !== 'all' ? t('actions:snippetsView.emptyFiltered') : t('actions:snippetsView.emptyAll')}</span>
+          <button className="btn-ghost" onClick={() => setShowNewSnippet(true)}>{t('actions:snippetsView.createOne')}</button>
         </div>
       ) : (
         <div className="snippet-grid">
@@ -93,10 +95,10 @@ export default function SnippetsView({ snippets, categories }: Props) {
                 <div className="snippet-card-top">
                   <span className="snippet-name">{s.name}</span>
                   <div className="snippet-card-btns">
-                    <button className="icon-btn" title="Run now" onClick={() => setRunSnippet(s)}>
+                    <button className="icon-btn" title={t('actions:snippetsView.runNow')} onClick={() => setRunSnippet(s)}>
                       <IconPlay size={13} />
                     </button>
-                    <button className="icon-btn" title="Schedule" onClick={() => setSchedSnippet(s)}>
+                    <button className="icon-btn" title={t('actions:snippetsView.scheduleTitle')} onClick={() => setSchedSnippet(s)}>
                       <IconClock size={13} />
                     </button>
                     <div className="snippet-menu-wrap">
@@ -108,13 +110,13 @@ export default function SnippetsView({ snippets, categories }: Props) {
                         <div className="snippet-menu">
                           <button className="snippet-menu-item" onClick={() => toggleQA(s)}>
                             <IconZap size={12} />
-                            {isQA ? 'Remove from Quick Actions' : 'Add to Quick Actions'}
+                            {isQA ? t('actions:snippetsView.removeFromQuickActions') : t('actions:snippetsView.addToQuickActions')}
                           </button>
                           <div className="snippet-menu-divider" />
                           <button className="snippet-menu-item danger"
                             onClick={() => { deleteSnippet.mutate(s.id); setMenuId(null) }}>
                             <IconTrash size={12} />
-                            Delete
+                            {t('common:delete')}
                           </button>
                         </div>
                       )}
@@ -142,7 +144,7 @@ export default function SnippetsView({ snippets, categories }: Props) {
                     </div>
                   ))}
                   {s.cmds.length > 3 && (
-                    <div className="snippet-cmd-more">+{s.cmds.length - 3} more…</div>
+                    <div className="snippet-cmd-more">{t('actions:snippetsView.moreCmds', { count: s.cmds.length - 3 })}</div>
                   )}
                 </div>
               </div>

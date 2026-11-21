@@ -1,0 +1,15 @@
+{
+  "executeLabel": "Exécuter : {{command}}",
+  "sendToConsole": "envoyer à la console du serveur",
+  "categoryConsole": "Console",
+  "runAgain": "exécuter à nouveau",
+  "categoryRecent": "Récent",
+  "categoryNavigate": "Naviguer",
+  "categoryQuickActions": "Actions rapides",
+  "categorySnippets": "Extraits",
+  "searchPlaceholder": "Rechercher des commandes, extraits, ou taper run <cmd>…",
+  "noResults": "Aucun résultat pour « {{query}} »",
+  "hintNavigate": "naviguer",
+  "hintRun": "exécuter",
+  "hintClose": "fermer"
+}

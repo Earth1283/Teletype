@@ -1,0 +1,19 @@
+{
+  "signOut": "Sign out",
+  "online": "online",
+  "offline": "offline",
+  "exitMobileView": "Exit mobile view",
+  "switchToMobileView": "Switch to mobile view",
+  "commandPalette": "Command palette",
+  "openCommandPalette": "Open command palette",
+  "collapseSidebar": "Collapse sidebar",
+  "expandSidebar": "Expand sidebar",
+  "commandPaletteHint": "Command palette (⌘K)",
+  "searchOrRunCommand": "Search or run a command",
+  "tpsTooltip": "TPS, last 100 seconds",
+  "tps": "tps",
+  "primaryNavigation": "Primary navigation",
+  "closeMenu": "Close menu",
+  "more": "More",
+  "executeFailed": "{{name}} failed"
+}

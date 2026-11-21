@@ -1,0 +1,13 @@
+{
+  "live": "En direct",
+  "offline": "Hors ligne",
+  "expandNavigation": "Développer la navigation",
+  "navigation": "Navigation",
+  "more": "Plus",
+  "expandTabBar": "Développer la barre d'onglets",
+  "closeMenu": "Fermer le menu",
+  "moreOptions": "Plus d'options",
+  "disableAppleify": "Désactiver Appleify",
+  "signOut": "Déconnexion",
+  "appleifyDeactivated": "Appleify désactivé"
+}

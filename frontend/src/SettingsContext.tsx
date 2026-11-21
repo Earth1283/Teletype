@@ -1,13 +1,16 @@
 import { createContext, useCallback, useContext, useState } from 'react'
+import { SUPPORTED_LANGUAGES } from './languages'
 
 export type ThemeMode = 'system' | 'light' | 'dark'
 export type ThemePalette = 'cobalt' | 'signal' | 'verdant' | 'iris' | 'ocean' | 'rose'
 export type Density = 'comfortable' | 'compact'
+export type Language = 'en' | 'es' | 'fr' | 'zh'
 
 export interface TeletypeSettings {
   greyBeardMode: boolean
   fun: boolean
   appleify: boolean
+  language: Language
 
   appearance: {
     mode: ThemeMode
@@ -94,6 +97,7 @@ export const DEFAULT_SETTINGS: TeletypeSettings = {
   greyBeardMode: false,
   fun: false,
   appleify: false,
+  language: 'en',
   appearance: {
     mode: 'system',
     theme: 'cobalt',
@@ -202,10 +206,15 @@ function deepMerge<T>(defaults: T, overrides: DeepPartial<T> | unknown): T {
   return result as T
 }
 
+function detectBrowserLanguage(): Language {
+  const primary = (navigator.language || 'en').split('-')[0].toLowerCase()
+  return SUPPORTED_LANGUAGES.includes(primary as Language) ? (primary as Language) : 'en'
+}
+
 function load(): TeletypeSettings {
   try {
     const raw = localStorage.getItem(STORAGE_KEY)
-    if (!raw) return DEFAULT_SETTINGS
+    if (!raw) return { ...DEFAULT_SETTINGS, language: detectBrowserLanguage() }
     return deepMerge(DEFAULT_SETTINGS, JSON.parse(raw))
   } catch {
     return DEFAULT_SETTINGS
